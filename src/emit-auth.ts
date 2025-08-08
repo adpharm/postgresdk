@@ -1,0 +1,156 @@
+import type { AuthConfig } from "./types";
+
+export function emitAuth(cfgAuth: AuthConfig | undefined) {
+  const strategy = cfgAuth?.strategy ?? "none";
+
+  const apiKeyHeader = cfgAuth?.apiKeyHeader ?? "x-api-key";
+  const apiKeys = cfgAuth?.apiKeys ?? [];
+
+  const jwtShared = cfgAuth?.jwt?.sharedSecret ?? "";
+  const jwtIssuer = cfgAuth?.jwt?.issuer ?? undefined;
+  const jwtAudience = cfgAuth?.jwt?.audience ?? undefined;
+
+  // Inline as literals; use JSON.stringify for safe embedding.
+  const STRATEGY = JSON.stringify(strategy);
+  const API_KEY_HEADER = JSON.stringify(apiKeyHeader);
+  const RAW_API_KEYS = JSON.stringify(apiKeys);
+  const JWT_SHARED_SECRET = JSON.stringify(jwtShared);
+  const JWT_ISSUER = jwtIssuer === undefined ? "undefined" : JSON.stringify(jwtIssuer);
+  const JWT_AUDIENCE = jwtAudience === undefined ? "undefined" : JSON.stringify(jwtAudience);
+
+  return `/* Generated. Do not edit. */
+import type { Context, Next } from "hono";
+
+// ---- Config inlined by generator ----
+const STRATEGY = ${STRATEGY} as "none" | "api-key" | "jwt-hs256";
+
+const API_KEY_HEADER = ${API_KEY_HEADER} as string;
+const RAW_API_KEYS = ${RAW_API_KEYS} as readonly string[];
+
+const JWT_SHARED_SECRET = ${JWT_SHARED_SECRET} as string;
+const JWT_ISSUER = ${JWT_ISSUER} as string | undefined;
+const JWT_AUDIENCE = ${JWT_AUDIENCE} as string | undefined;
+// -------------------------------------
+
+const DEBUG = process.env.SDK_DEBUG === "1" || process.env.SDK_DEBUG === "true";
+const log = {
+  debug: (...a: any[]) => { if (DEBUG) console.debug("[sdk:auth]", ...a); },
+  warn: (...a: any[]) => console.warn("[sdk:auth]", ...a),
+  error: (...a: any[]) => console.error("[sdk:auth]", ...a),
+};
+
+function expandEnvList(v: string): string[] {
+  if (!v) return [];
+  return v.split(",").map(s => s.trim()).filter(Boolean);
+}
+
+function resolveValue(v: string | undefined): string {
+  if (!v) return "";
+  if (v.startsWith("env:")) {
+    const name = v.slice(4);
+    return process.env[name] ?? "";
+  }
+  return v;
+}
+
+function resolveKeys(keys: readonly string[]): string[] {
+  const out: string[] = [];
+  for (const k of keys) {
+    if (k.startsWith("env:")) {
+      const name = k.slice(4);
+      const got = process.env[name] ?? "";
+      out.push(...expandEnvList(got));
+    } else {
+      out.push(k);
+    }
+  }
+  // Deduplicate
+  return Array.from(new Set(out));
+}
+
+const API_KEYS = resolveKeys(RAW_API_KEYS);
+const HS256_SECRET = resolveValue(JWT_SHARED_SECRET);
+
+// Augment Hono context for DX
+declare module "hono" {
+  interface ContextVariableMap {
+    auth: {
+      kind: "api-key" | "jwt" | "none";
+      token?: string;
+      keyId?: string;
+      sub?: string;
+      claims?: Record<string, any>;
+    };
+  }
+}
+
+export async function authMiddleware(c: Context, next: Next) {
+  try {
+    if (STRATEGY === "none") {
+      c.set("auth", { kind: "none" });
+      return next();
+    }
+
+    if (STRATEGY === "api-key") {
+      const key = c.req.header(API_KEY_HEADER) ?? "";
+      if (!key) return c.json({ error: "Unauthorized" }, 401);
+      if (!API_KEYS.length) {
+        log.warn("No API keys configured; all requests will fail");
+        return c.json({ error: "Unauthorized" }, 401);
+      }
+      if (!API_KEYS.includes(key)) return c.json({ error: "Unauthorized" }, 401);
+      c.set("auth", { kind: "api-key", keyId: key });
+      return next();
+    }
+
+    if (STRATEGY === "jwt-hs256") {
+      const authz = c.req.header("authorization") || c.req.header("Authorization") || "";
+      log.debug("JWT auth header received:", authz ? authz.substring(0, 50) + "..." : "none");
+      const m = authz.match(/^Bearer\\s+(.+)$/i);
+      if (!m) {
+        log.debug("JWT auth header doesn't match Bearer pattern");
+        return c.json({ error: "Unauthorized" }, 401);
+      }
+      const token = m[1];
+
+      if (!HS256_SECRET) {
+        log.error("JWT strategy configured but JWT_SHARED_SECRET is empty");
+        return c.json({ error: "Unauthorized" }, 401);
+      }
+
+      // Lazy import 'jose' so projects not using JWT don't need it at runtime.
+      try {
+        const { jwtVerify } = await import("jose");
+        const key = new TextEncoder().encode(HS256_SECRET);
+        log.debug("Verifying JWT with secret:", HS256_SECRET ? "present" : "missing");
+        log.debug("Expected issuer:", JWT_ISSUER);
+        log.debug("Expected audience:", JWT_AUDIENCE);
+        
+        const { payload } = await jwtVerify(token, key, {
+          issuer: JWT_ISSUER || undefined,
+          audience: JWT_AUDIENCE || undefined,
+        });
+
+        c.set("auth", {
+          kind: "jwt",
+          token,
+          sub: typeof payload.sub === "string" ? payload.sub : undefined,
+          claims: payload as any,
+        });
+        log.debug("JWT verified successfully");
+        return next();
+      } catch (verifyError: any) {
+        log.error("JWT verification failed:", verifyError?.message || verifyError);
+        throw verifyError;
+      }
+    }
+
+    log.error("Unknown auth strategy:", STRATEGY);
+    return c.json({ error: "Unauthorized" }, 401);
+  } catch (e: any) {
+    log.error("Auth error:", e?.message ?? e);
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+}
+`;
+}

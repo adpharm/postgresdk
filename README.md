@@ -8,6 +8,7 @@ Generate a fully-typed, production-ready SDK from your PostgreSQL database schem
 - 🔒 **Type Safety** - Full TypeScript types derived from your database schema  
 - ✅ **Runtime Validation** - Zod schemas for request/response validation
 - 🔗 **Smart Relationships** - Automatic handling of 1:N and M:N relationships with eager loading
+- 🔐 **Built-in Auth** - API key and JWT authentication with zero configuration
 - 🎯 **Zero Config** - Works out of the box with sensible defaults
 - 🏗️ **Framework Ready** - Server routes built for Hono, client SDK works anywhere
 - 📦 **Lightweight** - Minimal dependencies, optimized for production
@@ -81,6 +82,22 @@ export default {
   softDeleteColumn: null,              // Column name for soft deletes (e.g., "deleted_at")
   includeDepthLimit: 3,                 // Max depth for nested includes
   dateType: "date",                    // "date" | "string" - How to handle timestamps
+  
+  // Authentication (optional)
+  auth: {
+    strategy: "none" | "api-key" | "jwt-hs256",  // Default: "none"
+    
+    // For API key auth
+    apiKeyHeader: "x-api-key",         // Header name for API key
+    apiKeys: ["key1", "key2"],         // Array of valid keys
+    
+    // For JWT auth (HS256)
+    jwt: {
+      sharedSecret: "your-secret",     // Shared secret for HS256
+      issuer: "your-app",               // Optional: validate issuer claim
+      audience: "your-audience"        // Optional: validate audience claim
+    }
+  }
 };
 ```
 
@@ -159,6 +176,142 @@ const user = await sdk.users.create({
 });
 ```
 
+## Authentication
+
+postgresdk supports three authentication strategies out of the box:
+
+### No Authentication (Default)
+
+```typescript
+// postgresdk.config.ts
+export default {
+  connectionString: "...",
+  // No auth config needed - routes are unprotected
+};
+```
+
+### API Key Authentication
+
+```typescript
+// postgresdk.config.ts
+export default {
+  connectionString: "...",
+  auth: {
+    strategy: "api-key",
+    apiKeyHeader: "x-api-key",  // Optional, defaults to "x-api-key"
+    apiKeys: [
+      "your-api-key-1",
+      "your-api-key-2",
+      // Can also use environment variables
+      "env:API_KEYS"  // Reads comma-separated keys from process.env.API_KEYS
+    ]
+  }
+};
+
+// Client SDK usage
+const sdk = new SDK({
+  baseUrl: "http://localhost:3000",
+  auth: { apiKey: "your-api-key-1" }
+});
+```
+
+### JWT Authentication (HS256)
+
+```typescript
+// postgresdk.config.ts
+export default {
+  connectionString: "...",
+  auth: {
+    strategy: "jwt-hs256",
+    jwt: {
+      sharedSecret: process.env.JWT_SECRET || "your-secret-key",
+      issuer: "my-app",        // Optional: validates 'iss' claim
+      audience: "my-users"     // Optional: validates 'aud' claim
+    }
+  }
+};
+
+// Client SDK usage with static token
+const sdk = new SDK({
+  baseUrl: "http://localhost:3000",
+  auth: { jwt: "eyJhbGciOiJIUzI1NiIs..." }
+});
+
+// Or with dynamic token provider
+const sdk = new SDK({
+  baseUrl: "http://localhost:3000",
+  auth: { 
+    jwt: async () => {
+      // Refresh token if needed
+      return await getAccessToken();
+    }
+  }
+});
+
+// Or with custom auth headers
+const sdk = new SDK({
+  baseUrl: "http://localhost:3000",
+  auth: async () => ({
+    "Authorization": `Bearer ${await getToken()}`,
+    "X-Tenant-ID": "tenant-123"
+  })
+});
+```
+
+### Environment Variables in Auth Config
+
+The auth configuration supports environment variables with the `env:` prefix:
+
+```typescript
+export default {
+  auth: {
+    strategy: "api-key",
+    apiKeys: ["env:API_KEYS"],  // Reads from process.env.API_KEYS
+    
+    // Or for JWT
+    strategy: "jwt-hs256",
+    jwt: {
+      sharedSecret: "env:JWT_SECRET"  // Reads from process.env.JWT_SECRET
+    }
+  }
+};
+```
+
+### How Auth Works
+
+When authentication is configured:
+
+1. **Server Side**: All generated routes are automatically protected with the configured auth middleware
+2. **Client Side**: The SDK handles auth headers transparently
+3. **Type Safety**: Auth configuration is fully typed
+4. **Zero Overhead**: When `strategy: "none"`, no auth code is included
+
+### JWT Token Generation Example
+
+```typescript
+// Install jose for JWT generation: npm install jose
+import { SignJWT } from 'jose';
+
+const secret = new TextEncoder().encode('your-secret-key');
+
+const token = await new SignJWT({ 
+  sub: 'user123',
+  email: 'user@example.com',
+  roles: ['admin']
+})
+  .setProtectedHeader({ alg: 'HS256' })
+  .setIssuer('my-app')
+  .setAudience('my-users')
+  .setExpirationTime('2h')
+  .sign(secret);
+
+// Use with SDK
+const sdk = new SDK({
+  baseUrl: "http://localhost:3000",
+  auth: { jwt: token }
+});
+```
+
 ## Server Integration
 
 The generated server code is designed for [Hono](https://hono.dev/) but can be adapted to other frameworks:
@@ -212,6 +365,7 @@ Options:
 - Node.js 20+ 
 - PostgreSQL 12+
 - TypeScript project (for using generated code)
+- Optional: `jose` package for JWT authentication (auto-installed when using JWT auth)
 
 ## Development
 

@@ -19,7 +19,7 @@ import { pascal } from "./utils";
 export function emitRoutes(
   table: Table,
   _graph: Graph,
-  opts: { softDeleteColumn: string | null; includeDepthLimit: number }
+  opts: { softDeleteColumn: string | null; includeDepthLimit: number; authStrategy?: string }
 ) {
   const fileTableName = table.name; // SQL table name for file/route
   const Type = pascal(table.name); // PascalCase for type/schemas
@@ -57,11 +57,15 @@ export function emitRoutes(
       )}).has(k)));`
     : `const updateData = parsed.data;`;
 
+  const hasAuth = opts.authStrategy && opts.authStrategy !== "none";
+  const authImport = hasAuth ? `import { authMiddleware } from "../auth";` : "";
+
   return `/* Generated. Do not edit. */
 import { Hono } from "hono";
 import { z } from "zod";
 import { Insert${Type}Schema, Update${Type}Schema } from "../zod/${fileTableName}";
 import { loadIncludes } from "../include-loader";
+${authImport}
 
 const DEBUG = process.env.SDK_DEBUG === "1" || process.env.SDK_DEBUG === "true";
 const log = {
@@ -78,6 +82,10 @@ const listSchema = z.object({
 
 export function register${Type}Routes(app: Hono, deps: { pg: { query: (text: string, params?: any[]) => Promise<{ rows: any[] }> } }) {
   const base = "/v1/${fileTableName}";
+${hasAuth ? `
+  // 🔐 Auth: protect all routes for this table
+  app.use(base, authMiddleware);
+  app.use(\`\${base}/*\`, authMiddleware);` : ""}
 
   // CREATE
   app.post(base, async (c) => {

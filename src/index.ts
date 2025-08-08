@@ -10,17 +10,19 @@ import { emitClient, emitClientIndex } from "./emit-client";
 import { emitIncludeLoader } from "./emit-include-loader";
 import { emitTypes } from "./emit-types";
 import { emitLogger } from "./emit-logger";
+import { emitAuth } from "./emit-auth";
 import { ensureDirs, writeFiles } from "./utils";
+import type { Config } from "./types";
 
 export async function generate(configPath: string) {
   // Load config
   const configUrl = pathToFileURL(configPath).href;
   const module = await import(configUrl);
-  const cfg = module.default || module;
+  const cfg: Config = module.default || module;
 
   console.log("🔍 Introspecting database...");
   const model = await introspect(cfg.connectionString, cfg.schema || "public");
-  
+
   console.log("🔗 Building relationship graph...");
   const graph = buildGraph(model);
 
@@ -60,6 +62,11 @@ export async function generate(configPath: string) {
   // logger (server)
   files.push({ path: join(serverDir, "logger.ts"), content: emitLogger() });
 
+  // auth (server) - only if auth is configured
+  if (cfg.auth?.strategy && cfg.auth.strategy !== "none") {
+    files.push({ path: join(serverDir, "auth.ts"), content: emitAuth(cfg.auth) });
+  }
+
   // per-table outputs
   for (const table of Object.values(model.tables)) {
     // types (server + client)
@@ -79,6 +86,7 @@ export async function generate(configPath: string) {
       content: emitRoutes(table, graph, {
         softDeleteColumn: cfg.softDeleteColumn || null,
         includeDepthLimit: cfg.includeDepthLimit || 3,
+        authStrategy: cfg.auth?.strategy,
       }),
     });
 

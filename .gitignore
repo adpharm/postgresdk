@@ -216,3 +216,4 @@ test-results/
 **/*.webm
 
 test/.results/
+test/.results-*/

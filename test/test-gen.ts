@@ -100,7 +100,14 @@ async function applySchemaWithPg(sqlPath: string) {
   }
 }
 
-function writeTestConfig() {
+function writeTestConfig(withAuth = false) {
+  const authConfig = withAuth ? `,
+  auth: {
+    strategy: "api-key",
+    apiKeyHeader: "x-api-key",
+    apiKeys: ["test-key-123", "test-key-456"]
+  }` : "";
+  
   const cfg = `export default {
   connectionString: "${PG_URL}",
   schema: "public",
@@ -108,7 +115,7 @@ function writeTestConfig() {
   outClient: "${CLIENT_DIR}",
   softDeleteColumn: null,
   includeDepthLimit: 3,
-  dateType: "date"
+  dateType: "date"${authConfig}
 };`;
   writeFileSync(CFG_PATH, cfg, "utf-8");
 }
@@ -132,25 +139,7 @@ async function main() {
   
   if (!isRunning) {
     console.log("⚠️  PostgreSQL container is not running");
-    console.log("   Container name: " + CONTAINER_NAME);
-    
-    // Prompt user to start it
-    const readline = require("readline").createInterface({
-      input: process.stdin,
-      output: process.stdout
-    });
-    
-    const answer = await new Promise<string>(resolve => {
-      readline.question("Do you want to start it? (y/n) ", resolve);
-    });
-    readline.close();
-    
-    if (answer.toLowerCase() !== 'y') {
-      console.log("Aborted. Please start PostgreSQL manually or run:");
-      console.log(`  docker run -d --name ${CONTAINER_NAME} -e POSTGRES_USER=user -e POSTGRES_PASSWORD=pass -e POSTGRES_DB=testdb -p 5432:5432 postgres:17-alpine`);
-      process.exit(1);
-    }
-    
+    console.log("   Starting container: " + CONTAINER_NAME);
     await startPostgres();
     startedContainer = true;
   } else {
@@ -386,11 +375,234 @@ async function main() {
   } finally {
     server.close();
     await pg.end();
+  }
+
+  // ===== TEST WITH AUTH ENABLED =====
+  console.log("\n" + "=".repeat(50));
+  console.log("🔐 Testing with Auth enabled...");
+  console.log("=".repeat(50));
+  
+  // Use different directories for auth tests
+  const AUTH_SERVER_DIR = "test/.results-apikey/server";
+  const AUTH_CLIENT_DIR = "test/.results-apikey/client";
+  
+  // Generate with API key auth
+  console.log("\n1) Regenerating with auth enabled...");
+  const authConfig = `export default {
+  connectionString: "${PG_URL}",
+  schema: "public",
+  outServer: "${AUTH_SERVER_DIR}",
+  outClient: "${AUTH_CLIENT_DIR}",
+  softDeleteColumn: null,
+  includeDepthLimit: 3,
+  dateType: "date",
+  auth: {
+    strategy: "api-key",
+    apiKeyHeader: "x-api-key",
+    apiKeys: ["test-key-123", "test-key-456"]
+  }
+};`;
+  writeFileSync(CFG_PATH, authConfig, "utf-8");
+  execSync(`bun run src/cli.ts -c ${CFG_PATH}`, { stdio: "inherit" });
+  
+  // Import from the new location
+  const { registerAuthorsRoutes: registerAuthorsRoutesAuth } = await import(`../${AUTH_SERVER_DIR}/routes/authors.ts`);
+  const { registerBooksRoutes: registerBooksRoutesAuth } = await import(`../${AUTH_SERVER_DIR}/routes/books.ts`);
+  
+  const pg2 = new Client({ connectionString: PG_URL });
+  await pg2.connect();
+  
+  const appAuth = new Hono();
+  appAuth.onError((err, c) => {
+    console.error("[auth-test:onError]", err?.message || err);
+    return c.json({ error: err?.message || "Internal error" }, 500);
+  });
+  
+  registerAuthorsRoutesAuth(appAuth, { pg: pg2 });
+  registerBooksRoutesAuth(appAuth, { pg: pg2 });
+  
+  const serverAuth = serve({ fetch: appAuth.fetch, port: 3457 });
+  console.log("   → Auth-enabled Hono on http://localhost:3457");
+  
+  // Give server time to fully initialize
+  await new Promise(resolve => setTimeout(resolve, 100));
+  
+  try {
+    const { SDK: SDKAuth } = await import(`../${AUTH_CLIENT_DIR}/index.ts`);
     
-    // Stop container if we started it
-    if (startedContainer) {
-      await stopPostgres();
+    // Test without auth header - should fail
+    console.log("\n📝 Testing Auth Protection:");
+    const sdkNoAuth = new SDKAuth({ baseUrl: "http://localhost:3457" });
+    
+    try {
+      await sdkNoAuth.authors.list();
+      assert(false, "Should have failed without auth");
+    } catch (e: any) {
+      assert(e.message.includes("401") || e.message.includes("Unauthorized"), "Should get 401 without auth");
+      console.log("  ✓ Requests rejected without API key");
     }
+    
+    // Test with valid auth header using the simplified API
+    const sdkWithAuth = new SDKAuth({ 
+      baseUrl: "http://localhost:3457",
+      auth: { apiKey: "test-key-123" }
+    });
+    
+    const authAuthors = await sdkWithAuth.authors.list();
+    console.log("  ✓ Requests accepted with valid API key");
+    assert(Array.isArray(authAuthors), "Should get authors with valid key");
+    
+    // Test with invalid auth header
+    const sdkBadAuth = new SDKAuth({ 
+      baseUrl: "http://localhost:3457",
+      auth: { apiKey: "invalid-key" }
+    });
+    
+    try {
+      await sdkBadAuth.authors.list();
+      assert(false, "Should have failed with invalid auth");
+    } catch (e: any) {
+      assert(e.message.includes("401") || e.message.includes("Unauthorized"), "Should get 401 with invalid key");
+      console.log("  ✓ Requests rejected with invalid API key");
+    }
+    
+    console.log("\n✅ API Key auth tests passed!");
+    
+  } finally {
+    serverAuth.close();
+    await pg2.end();
+  }
+
+  // ===== TEST WITH JWT AUTH =====
+  console.log("\n" + "=".repeat(50));
+  console.log("🔐 Testing with JWT Auth...");
+  console.log("=".repeat(50));
+  
+  // Use different directories for JWT test
+  const JWT_SERVER_DIR = "test/.results-jwt/server";
+  const JWT_CLIENT_DIR = "test/.results-jwt/client";
+  
+  // Regenerate with JWT auth
+  console.log("\n1) Regenerating with JWT auth enabled...");
+  
+  const jwtSecret = "test-secret-key-for-jwt";
+  const jwtConfig = `export default {
+  connectionString: "${PG_URL}",
+  schema: "public",
+  outServer: "${JWT_SERVER_DIR}",
+  outClient: "${JWT_CLIENT_DIR}",
+  softDeleteColumn: null,
+  includeDepthLimit: 3,
+  dateType: "date",
+  auth: {
+    strategy: "jwt-hs256",
+    jwt: {
+      sharedSecret: "${jwtSecret}",
+      issuer: "test-app",
+      audience: "test-client"
+    }
+  }
+};`;
+  writeFileSync(CFG_PATH, jwtConfig, "utf-8");
+  execSync(`bun run src/cli.ts -c ${CFG_PATH}`, { stdio: "inherit" });
+  
+  // Import from JWT-specific directory
+  const { registerAuthorsRoutes: registerAuthorsRoutesJWT } = await import(`../${JWT_SERVER_DIR}/routes/authors.ts`);
+  const { registerBooksRoutes: registerBooksRoutesJWT } = await import(`../${JWT_SERVER_DIR}/routes/books.ts`);
+  
+  const pg3 = new Client({ connectionString: PG_URL });
+  await pg3.connect();
+  
+  const appJWT = new Hono();
+  appJWT.onError((err, c) => {
+    console.error("[jwt-test:onError]", err?.message || err);
+    return c.json({ error: err?.message || "Internal error" }, 500);
+  });
+  
+  registerAuthorsRoutesJWT(appJWT, { pg: pg3 });
+  registerBooksRoutesJWT(appJWT, { pg: pg3 });
+  
+  const serverJWT = serve({ fetch: appJWT.fetch, port: 3458 });
+  console.log("   → JWT-enabled Hono on http://localhost:3458");
+  
+  // Give server time to start
+  await new Promise(resolve => setTimeout(resolve, 500));
+  
+  try {
+    const { SDK: SDKJWT } = await import(`../${JWT_CLIENT_DIR}/index.ts`);
+    const { SignJWT } = await import("jose");
+    
+    // Generate a valid JWT
+    const validJWT = await new SignJWT({ sub: "user123", name: "Test User" })
+      .setProtectedHeader({ alg: "HS256" })
+      .setIssuer("test-app")
+      .setAudience("test-client")
+      .setExpirationTime("1h")
+      .sign(new TextEncoder().encode(jwtSecret));
+    
+    // Generate an invalid JWT (wrong secret)
+    const invalidJWT = await new SignJWT({ sub: "user123" })
+      .setProtectedHeader({ alg: "HS256" })
+      .setIssuer("test-app")
+      .setAudience("test-client")
+      .sign(new TextEncoder().encode("wrong-secret"));
+    
+    console.log("\n📝 Testing JWT Auth:");
+    
+    // Test without JWT - should fail
+    const sdkNoJWT = new SDKJWT({ baseUrl: "http://localhost:3458" });
+    try {
+      await sdkNoJWT.authors.list();
+      assert(false, "Should have failed without JWT");
+    } catch (e: any) {
+      assert(e.message.includes("401") || e.message.includes("Unauthorized"), "Should get 401 without JWT");
+      console.log("  ✓ Requests rejected without JWT");
+    }
+    
+    // Test with valid JWT
+    const sdkWithJWT = new SDKJWT({ 
+      baseUrl: "http://localhost:3458",
+      auth: { jwt: validJWT }
+    });
+    
+    const jwtAuthors = await sdkWithJWT.authors.list();
+    console.log("  ✓ Requests accepted with valid JWT");
+    assert(Array.isArray(jwtAuthors), "Should get authors with valid JWT");
+    
+    // Test with JWT provider function
+    const sdkWithJWTProvider = new SDKJWT({ 
+      baseUrl: "http://localhost:3458",
+      auth: { jwt: async () => validJWT }
+    });
+    
+    const jwtAuthors2 = await sdkWithJWTProvider.authors.list();
+    console.log("  ✓ Requests accepted with JWT provider function");
+    assert(Array.isArray(jwtAuthors2), "Should get authors with JWT provider");
+    
+    // Test with invalid JWT
+    const sdkBadJWT = new SDKJWT({ 
+      baseUrl: "http://localhost:3458",
+      auth: { jwt: invalidJWT }
+    });
+    
+    try {
+      await sdkBadJWT.authors.list();
+      assert(false, "Should have failed with invalid JWT");
+    } catch (e: any) {
+      assert(e.message.includes("401") || e.message.includes("Unauthorized"), "Should get 401 with invalid JWT");
+      console.log("  ✓ Requests rejected with invalid JWT");
+    }
+    
+    console.log("\n✅ JWT auth tests passed!");
+    
+  } finally {
+    serverJWT.close();
+    await pg3.end();
+  }
+    
+  // Stop container if we started it
+  if (startedContainer) {
+    await stopPostgres();
   }
 }
 
