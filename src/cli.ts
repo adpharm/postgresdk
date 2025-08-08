@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+
+// Load environment variables first, before any other imports
+import "dotenv/config";
+
 import { resolve } from "node:path";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";

@@ -1,3 +1,6 @@
+// Load environment variables first, before any other imports
+import "dotenv/config";
+
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { introspect } from "./introspect";

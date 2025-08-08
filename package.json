@@ -29,9 +29,10 @@
     "publish:major": "./publish.sh"
   },
   "dependencies": {
+    "dotenv": "^17.2.1",
+    "hono": "^4.9.0",
     "pg": "^8.16.3",
-    "zod": "^4.0.15",
-    "hono": "^4.9.0"
+    "zod": "^4.0.15"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

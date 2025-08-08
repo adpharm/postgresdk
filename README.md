@@ -230,7 +230,33 @@ export default {
 };
 ```
 
-Environment variables work directly in the config file - no function wrapper needed.
+Environment variables work directly in the config file - no function wrapper needed. postgresdk automatically loads `.env` files using dotenv.
+
+### Environment Variables
+
+postgresdk automatically loads environment variables from `.env` files in your project root. You can use them directly in your config:
+
+```bash
+# .env
+DATABASE_URL=postgres://user:pass@localhost:5432/mydb
+JWT_SECRET=my-super-secret-key
+API_KEYS=key1,key2,key3
+```
+
+```typescript
+// postgresdk.config.ts
+export default {
+  connectionString: process.env.DATABASE_URL,
+  auth: {
+    strategy: "jwt-hs256",
+    jwt: {
+      sharedSecret: process.env.JWT_SECRET,
+    }
+  }
+};
+```
+
+No additional setup required - dotenv is automatically configured before loading your config file.
 
 ## Generated SDK Features
 
