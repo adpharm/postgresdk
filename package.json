@@ -1,20 +1,49 @@
 {
-  "name": "/workspace",
-  "module": "index.ts",
+  "name": "postgresdk",
+  "version": "0.1.1-alpha.0",
+  "description": "Generate a typed server/client SDK from a Postgres schema (includes, Zod, Hono).",
   "type": "module",
-  "private": true,
-  "devDependencies": {
-    "@types/bun": "^1.2.19",
-    "@types/node": "^24.2.1",
-    "@types/pg": "^8.15.5",
-    "zod": "^4.0.15"
+  "bin": {
+    "postgresdk": "./dist/cli.js"
   },
-  "peerDependencies": {
-    "typescript": "^5"
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18.17"
+  },
+  "scripts": {
+    "build": "bun build src/cli.ts --outdir dist --target node --format esm && bun build src/index.ts --outdir dist --target node --format esm && tsc -p tsconfig.build.json --emitDeclarationOnly",
+    "test": "bun test/test-gen.ts",
+    "prepublishOnly": "npm run build",
+    "publish:patch": "./publish.sh",
+    "publish:minor": "./publish.sh",
+    "publish:major": "./publish.sh"
   },
   "dependencies": {
-    "@hono/node-server": "^1.18.1",
-    "hono": "^4.9.0",
-    "pg": "^8.16.3"
-  }
+    "pg": "^8.16.3",
+    "zod": "^4.0.15",
+    "hono": "^4.9.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0",
+    "@types/node": "^20.0.0",
+    "@types/pg": "^8.15.5"
+  },
+  "license": "MIT",
+  "keywords": [
+    "postgres",
+    "sdk",
+    "codegen",
+    "zod",
+    "hono"
+  ]
 }
