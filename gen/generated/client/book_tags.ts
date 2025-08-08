@@ -14,14 +14,22 @@ export class BookTagsClient {
     return json ? { "Content-Type": "application/json", ...extra } : extra;
   }
 
+  private async okOrThrow(res: Response, action: string) {
+    if (!res.ok) {
+      let detail = "";
+      try { detail = await res.text(); } catch {}
+      throw new Error(`${action} book_tags failed: ${res.status} ${detail}`);
+    }
+  }
+
   async create(data: InsertBookTags): Promise<SelectBookTags> {
     const res = await this.fetchFn(`${this.baseUrl}/v1/book_tags`, {
       method: "POST",
       headers: await this.headers(true),
       body: JSON.stringify(data),
     });
-    if (!res.ok) throw new Error(`create book_tags failed: ${res.status}`);
-    return res.json();
+    await this.okOrThrow(res, "create");
+    return (await res.json()) as SelectBookTags;
   }
 
   async getByPk(pk: { book_id: string; tag_id: string }): Promise<SelectBookTags | null> {
@@ -30,8 +38,8 @@ export class BookTagsClient {
       headers: await this.headers(),
     });
     if (res.status === 404) return null;
-    if (!res.ok) throw new Error(`get book_tags failed: ${res.status}`);
-    return res.json();
+    await this.okOrThrow(res, "get");
+    return (await res.json()) as SelectBookTags;
   }
 
   async list(params?: { include?: BookTagsIncludeSpec; limit?: number; offset?: number }): Promise<SelectBookTags[]> {
@@ -40,8 +48,8 @@ export class BookTagsClient {
       headers: await this.headers(true),
       body: JSON.stringify(params ?? {}),
     });
-    if (!res.ok) throw new Error(`list book_tags failed: ${res.status}`);
-    return res.json();
+    await this.okOrThrow(res, "list");
+    return (await res.json()) as SelectBookTags[];
   }
 
   async update(pk: { book_id: string; tag_id: string }, patch: UpdateBookTags): Promise<SelectBookTags | null> {
@@ -52,8 +60,8 @@ export class BookTagsClient {
       body: JSON.stringify(patch),
     });
     if (res.status === 404) return null;
-    if (!res.ok) throw new Error(`update book_tags failed: ${res.status}`);
-    return res.json();
+    await this.okOrThrow(res, "update");
+    return (await res.json()) as SelectBookTags;
   }
 
   async delete(pk: { book_id: string; tag_id: string }): Promise<SelectBookTags | null> {
@@ -63,7 +71,7 @@ export class BookTagsClient {
       headers: await this.headers(),
     });
     if (res.status === 404) return null;
-    if (!res.ok) throw new Error(`delete book_tags failed: ${res.status}`);
-    return res.json();
+    await this.okOrThrow(res, "delete");
+    return (await res.json()) as SelectBookTags;
   }
 }

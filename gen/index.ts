@@ -9,6 +9,7 @@ import { emitRoutes } from "./emit-routes";
 import { emitClient, emitClientIndex } from "./emit-client";
 import { emitIncludeLoader } from "./emit-include-loader";
 import { emitTypes } from "./emit-types";
+import { emitLogger } from "./emit-logger";
 import { ensureDirs, writeFiles } from "./utils";
 
 (async () => {
@@ -47,6 +48,9 @@ import { ensureDirs, writeFiles } from "./utils";
     path: join(serverDir, "include-loader.ts"),
     content: emitIncludeLoader(graph, model, cfg.includeDepthLimit),
   });
+
+  // logger (server)
+  files.push({ path: join(serverDir, "logger.ts"), content: emitLogger() });
 
   // per-table outputs
   for (const table of Object.values(model.tables)) {

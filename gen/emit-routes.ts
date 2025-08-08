@@ -12,7 +12,7 @@ import { pascal } from "./utils";
  * Endpoints:
  *   POST   /v1/<table>           create (Insert<Type>Schema)
  *   GET    /v1/<table>/:...pk    get by pk
- *   POST   /v1/<table>/list      list (limit/offset; includes TODO)
+ *   POST   /v1/<table>/list      list (limit/offset; includes)
  *   PATCH  /v1/<table>/:...pk    update (Update<Type>Schema)
  *   DELETE /v1/<table>/:...pk    delete (or soft-delete)
  */
@@ -23,30 +23,37 @@ export function emitRoutes(
 ) {
   const fileTableName = table.name; // SQL table name for file/route
   const Type = pascal(table.name); // PascalCase for type/schemas
-  const pkCols = table.pk;
-  const hasCompositePk = pkCols.length > 1;
-  const pkPath = hasCompositePk ? pkCols.map((c) => `:${c}`).join("/") : `:${pkCols[0] || "id"}`;
+
+  // Normalize pk to an array and fallback to ["id"] if empty
+  const rawPk = (table as any).pk;
+  const pkCols: string[] = Array.isArray(rawPk) ? rawPk : rawPk ? [rawPk] : [];
+  const safePkCols = pkCols.length ? pkCols : ["id"];
+
+  const hasCompositePk = safePkCols.length > 1;
+  const pkPath = hasCompositePk ? safePkCols.map((c) => `:${c}`).join("/") : `:${safePkCols[0]}`;
 
   const softDel =
     opts.softDeleteColumn && table.columns.some((c) => c.name === opts.softDeleteColumn) ? opts.softDeleteColumn : null;
 
+  // IMPORTANT: interpolate column names at generator time (no escaping/backslashes here)
   const wherePkSql = hasCompositePk
-    ? pkCols.map((c, i) => `"${c}" = $${i + 1}`).join(" AND ")
-    : `"${pkCols[0] || "id"}" = $1`;
+    ? safePkCols.map((c, i) => `"${c}" = $${i + 1}`).join(" AND ")
+    : `"${safePkCols[0]}" = $1`;
 
   const getPkParams = hasCompositePk
-    ? `const pkValues = [${pkCols.map((c) => `c.req.param("${c}")`).join(", ")}];`
-    : `const pkValues = [c.req.param("${pkCols[0] || "id"}")];`;
+    ? `const pkValues = [${safePkCols.map((c) => `c.req.param("${c}")`).join(", ")}];`
+    : `const pkValues = [c.req.param("${safePkCols[0]}")];`;
 
   // Build SET clause indices for UPDATE (PK params first, then update values)
+  // These strings are emitted into generated code, so we DO escape ${...} intentionally here.
   const updateSetSql = hasCompositePk
-    ? `Object.keys(updateData).map((k, i) => \`"\${k}" = $\${i + ${pkCols.length} + 1}\`).join(", ")`
+    ? `Object.keys(updateData).map((k, i) => \`"\${k}" = $\${i + ${safePkCols.length} + 1}\`).join(", ")`
     : `Object.keys(updateData).map((k, i) => \`"\${k}" = $\${i + 2}\`).join(", ")`;
 
   // Prevent updating PK columns
-  const pkFilter = pkCols.length
+  const pkFilter = safePkCols.length
     ? `const updateData = Object.fromEntries(Object.entries(parsed.data).filter(([k]) => !new Set(${JSON.stringify(
-        pkCols
+        safePkCols
       )}).has(k)));`
     : `const updateData = parsed.data;`;
 
@@ -56,8 +63,14 @@ import { z } from "zod";
 import { Insert${Type}Schema, Update${Type}Schema } from "../zod/${fileTableName}";
 import { loadIncludes } from "../include-loader";
 
+const DEBUG = process.env.SDK_DEBUG === "1" || process.env.SDK_DEBUG === "true";
+const log = {
+  debug: (...args: any[]) => { if (DEBUG) console.debug("[sdk]", ...args); },
+  error: (...args: any[]) => console.error("[sdk]", ...args),
+};
+
 const listSchema = z.object({
-  include: z.any().optional(),         // TODO: use include graph + two-step loader
+  include: z.any().optional(),         // TODO: typed include spec in later pass
   limit: z.number().int().positive().max(100).optional(),
   offset: z.number().int().min(0).optional(),
   orderBy: z.any().optional()          // TODO: typed orderBy in a later pass
@@ -68,83 +81,147 @@ export function register${Type}Routes(app: Hono, deps: { pg: { query: (text: str
 
   // CREATE
   app.post(base, async (c) => {
-    const body = await c.req.json().catch(() => ({}));
-    const parsed = Insert${Type}Schema.safeParse(body);
-    if (!parsed.success) return c.json({ error: "Invalid body", issues: parsed.error.flatten() }, 400);
+    try {
+      const body = await c.req.json().catch(() => ({}));
+      log.debug("POST ${fileTableName} body:", body);
+      const parsed = Insert${Type}Schema.safeParse(body);
+      if (!parsed.success) {
+        const issues = parsed.error.flatten();
+        log.debug("POST ${fileTableName} invalid:", issues);
+        return c.json({ error: "Invalid body", issues }, 400);
+      }
 
-    const data = parsed.data;
-    const cols = Object.keys(data);
-    const vals = Object.values(data);
-    if (!cols.length) return c.json({ error: "No fields provided" }, 400);
+      const data = parsed.data;
+      const cols = Object.keys(data);
+      const vals = Object.values(data);
+      if (!cols.length) return c.json({ error: "No fields provided" }, 400);
 
-    const placeholders = cols.map((_, i) => '$' + (i + 1)).join(", ");
-    const text = \`INSERT INTO "${fileTableName}" (\${cols.map(c => '"' + c + '"').join(", ")})
-                   VALUES (\${placeholders})
-                   RETURNING *\`;
-    const { rows } = await deps.pg.query(text, vals);
-    return c.json(rows[0] ?? null, rows[0] ? 201 : 500);
+      const placeholders = cols.map((_, i) => '$' + (i + 1)).join(", ");
+      const text = \`INSERT INTO "${fileTableName}" (\${cols.map(c => '"' + c + '"').join(", ")})
+                     VALUES (\${placeholders})
+                     RETURNING *\`;
+      log.debug("SQL:", text, "vals:", vals);
+      const { rows } = await deps.pg.query(text, vals);
+      return c.json(rows[0] ?? null, rows[0] ? 201 : 500);
+    } catch (e: any) {
+      log.error("POST ${fileTableName} error:", e?.stack ?? e);
+      return c.json({ error: e?.message ?? "Internal error", ...(DEBUG ? { stack: e?.stack } : {}) }, 500);
+    }
   });
 
   // GET BY PK
   app.get(\`\${base}/${pkPath}\`, async (c) => {
-    ${getPkParams}
-    const text = \`SELECT * FROM "${fileTableName}" WHERE ${wherePkSql} LIMIT 1\`;
-    const { rows } = await deps.pg.query(text, pkValues);
-    if (!rows[0]) return c.json(null, 404);
-    return c.json(rows[0]);
+    try {
+      ${getPkParams}
+      const text = \`SELECT * FROM "${fileTableName}" WHERE ${wherePkSql} LIMIT 1\`;
+      log.debug("GET ${fileTableName} by PK:", pkValues, "SQL:", text);
+      const { rows } = await deps.pg.query(text, pkValues);
+      if (!rows[0]) return c.json(null, 404);
+      return c.json(rows[0]);
+    } catch (e: any) {
+      log.error("GET ${fileTableName} error:", e?.stack ?? e);
+      return c.json({ error: e?.message ?? "Internal error", ...(DEBUG ? { stack: e?.stack } : {}) }, 500);
+    }
   });
 
   // LIST
   app.post(\`\${base}/list\`, async (c) => {
-    const body = listSchema.safeParse(await c.req.json().catch(() => ({})));
-    if (!body.success) return c.json({ error: "Invalid body", issues: body.error.flatten() }, 400);
-    const { include, limit = 50, offset = 0 } = body.data;
+    try {
+      const body = listSchema.safeParse(await c.req.json().catch(() => ({})));
+      if (!body.success) {
+        const issues = body.error.flatten();
+        log.debug("LIST ${fileTableName} invalid:", issues);
+        return c.json({ error: "Invalid body", issues }, 400);
+      }
+      const { include, limit = 50, offset = 0 } = body.data;
 
-    const where = ${softDel ? `\`WHERE "${softDel}" IS NULL\`` : `""`};
-    const text = \`SELECT * FROM "${fileTableName}" \${where} LIMIT $1 OFFSET $2\`;
-    const { rows } = await deps.pg.query(text, [limit, offset]);
+      const where = ${softDel ? `\`WHERE "${softDel}" IS NULL\`` : `""`};
+      const text = \`SELECT * FROM "${fileTableName}" \${where} LIMIT $1 OFFSET $2\`;
+      log.debug("LIST ${fileTableName} SQL:", text, "params:", [limit, offset]);
+      const { rows } = await deps.pg.query(text, [limit, offset]);
 
-    // NEW: stitch includes using two-step loader
-    const stitched = await loadIncludes("${fileTableName}", rows, include, deps.pg, ${opts.includeDepthLimit});
-    return c.json(stitched);
+      if (!include) {
+        log.debug("LIST ${fileTableName} rows:", rows.length);
+        return c.json(rows);
+      }
+
+      // Attempt include stitching with explicit error handling
+      log.debug("LIST ${fileTableName} include spec:", include);
+      try {
+        const stitched = await loadIncludes("${fileTableName}", rows, include, deps.pg, ${opts.includeDepthLimit});
+        log.debug("LIST ${fileTableName} stitched count:", Array.isArray(stitched) ? stitched.length : "n/a");
+        return c.json(stitched);
+      } catch (e: any) {
+        const strict = process.env.SDK_STRICT_INCLUDE === "1" || process.env.SDK_STRICT_INCLUDE === "true";
+        const msg = e?.message ?? String(e);
+        const stack = e?.stack;
+        log.error("LIST ${fileTableName} include stitch FAILED:", msg, stack);
+
+        if (strict) {
+          return c.json({ error: "include-stitch-failed", message: msg, ...(DEBUG ? { stack: e?.stack } : {}) }, 500);
+        }
+        // Non-strict fallback: return base rows plus error metadata
+        return c.json({ data: rows, includeError: { message: msg, ...(DEBUG ? { stack: e?.stack } : {}) } }, 200);
+      }
+    } catch (e: any) {
+      log.error("LIST ${fileTableName} error:", e?.stack ?? e);
+      return c.json({ error: e?.message ?? "Internal error", ...(DEBUG ? { stack: e?.stack } : {}) }, 500);
+    }
   });
-
 
   // UPDATE
   app.patch(\`\${base}/${pkPath}\`, async (c) => {
-    ${getPkParams}
-    const body = await c.req.json().catch(() => ({}));
-    const parsed = Update${Type}Schema.safeParse(body);
-    if (!parsed.success) return c.json({ error: "Invalid body", issues: parsed.error.flatten() }, 400);
+    try {
+      ${getPkParams}
+      const body = await c.req.json().catch(() => ({}));
+      log.debug("PATCH ${fileTableName} pk:", pkValues, "patch:", body);
+      const parsed = Update${Type}Schema.safeParse(body);
+      if (!parsed.success) {
+        const issues = parsed.error.flatten();
+        log.debug("PATCH ${fileTableName} invalid:", issues);
+        return c.json({ error: "Invalid body", issues: issues }, 400);
+      }
 
-    ${pkFilter}
-    if (!Object.keys(updateData).length) return c.json({ error: "No updatable fields provided" }, 400);
+      ${pkFilter}
+      if (!Object.keys(updateData).length) return c.json({ error: "No updatable fields provided" }, 400);
 
-    const setSql = ${updateSetSql};
-    const text = \`UPDATE "${fileTableName}" SET \${setSql} WHERE ${wherePkSql} RETURNING *\`;
-    const params = ${
-      hasCompositePk ? `[...pkValues, ...Object.values(updateData)]` : `[pkValues[0], ...Object.values(updateData)]`
-    };
-    const { rows } = await deps.pg.query(text, params);
-    if (!rows[0]) return c.json(null, 404);
-    return c.json(rows[0]);
+      const setSql = ${updateSetSql};
+      const text = \`UPDATE "${fileTableName}" SET \${setSql} WHERE ${wherePkSql} RETURNING *\`;
+      const params = ${
+        hasCompositePk ? `[...pkValues, ...Object.values(updateData)]` : `[pkValues[0], ...Object.values(updateData)]`
+      };
+      log.debug("PATCH ${fileTableName} SQL:", text, "params:", params);
+      const { rows } = await deps.pg.query(text, params);
+      if (!rows[0]) return c.json(null, 404);
+      return c.json(rows[0]);
+    } catch (e: any) {
+      log.error("PATCH ${fileTableName} error:", e?.stack ?? e);
+      return c.json({ error: e?.message ?? "Internal error", ...(DEBUG ? { stack: e?.stack } : {}) }, 500);
+    }
   });
 
   // DELETE (soft or hard)
   app.delete(\`\${base}/${pkPath}\`, async (c) => {
-    ${getPkParams}
-    ${
-      softDel
-        ? `
-    const text = \`UPDATE "${fileTableName}" SET "${softDel}" = NOW() WHERE ${wherePkSql} RETURNING *\`;
-    const { rows } = await deps.pg.query(text, pkValues);
-    if (!rows[0]) return c.json(null, 404);
-    return c.json(rows[0]);`
-        : `
-    const text = \`DELETE FROM "${fileTableName}" WHERE ${wherePkSql} RETURNING *\`;
-    const { rows } = await deps.pg.query(text, pkValues);
-    if (!rows[0]) return c.json(null, 404);
-    return c.json(rows[0]);`
+    try {
+      ${getPkParams}
+      ${
+        softDel
+          ? `
+      const text = \`UPDATE "${fileTableName}" SET "${softDel}" = NOW() WHERE ${wherePkSql} RETURNING *\`;
+      log.debug("DELETE (soft) ${fileTableName} SQL:", text, "pk:", pkValues);
+      const { rows } = await deps.pg.query(text, pkValues);
+      if (!rows[0]) return c.json(null, 404);
+      return c.json(rows[0]);`
+          : `
+      const text = \`DELETE FROM "${fileTableName}" WHERE ${wherePkSql} RETURNING *\`;
+      log.debug("DELETE ${fileTableName} SQL:", text, "pk:", pkValues);
+      const { rows } = await deps.pg.query(text, pkValues);
+      if (!rows[0]) return c.json(null, 404);
+      return c.json(rows[0]);`
+      }
+    } catch (e: any) {
+      log.error("DELETE ${fileTableName} error:", e?.stack ?? e);
+      return c.json({ error: e?.message ?? "Internal error", ...(DEBUG ? { stack: e?.stack } : {}) }, 500);
     }
   });
 }

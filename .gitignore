@@ -214,3 +214,5 @@ terraform/modules/*/lambda/bun.lockb
 test-results/
 **/*.mp4
 **/*.webm
+
+test/.results/

@@ -3,12 +3,19 @@ import { pascal } from "./utils";
 
 export function emitClient(table: Table) {
   const Type = pascal(table.name);
-  const pkCols = table.pk;
-  const hasCompositePk = pkCols.length > 1;
 
-  const pkType = hasCompositePk ? `{ ${pkCols.map((c) => `${c}: string`).join("; ")} }` : `string`;
+  // Normalize PKs
+  const pkCols: string[] = Array.isArray((table as any).pk)
+    ? (table as any).pk
+    : (table as any).pk
+    ? [(table as any).pk]
+    : [];
+  const safePk = pkCols.length ? pkCols : ["id"];
+  const hasCompositePk = safePk.length > 1;
 
-  const pkPathExpr = hasCompositePk ? pkCols.map((c) => `pk.${c}`).join(` + "/" + `) : `pk`;
+  const pkType = hasCompositePk ? `{ ${safePk.map((c) => `${c}: string`).join("; ")} }` : `string`;
+
+  const pkPathExpr = hasCompositePk ? safePk.map((c) => `pk.${c}`).join(` + "/" + `) : `pk`;
 
   return `/* Generated. Do not edit. */
 import type { ${Type}IncludeSpec } from "./include-spec";
@@ -26,13 +33,21 @@ export class ${Type}Client {
     return json ? { "Content-Type": "application/json", ...extra } : extra;
   }
 
+  private async okOrThrow(res: Response, action: string) {
+    if (!res.ok) {
+      let detail = "";
+      try { detail = await res.text(); } catch {}
+      throw new Error(\`\${action} ${table.name} failed: \${res.status} \${detail}\`);
+    }
+  }
+
   async create(data: Insert${Type}): Promise<Select${Type}> {
     const res = await this.fetchFn(\`\${this.baseUrl}/v1/${table.name}\`, {
       method: "POST",
       headers: await this.headers(true),
       body: JSON.stringify(data),
     });
-    if (!res.ok) throw new Error(\`create ${table.name} failed: \${res.status}\`);
+    await this.okOrThrow(res, "create");
     return (await res.json()) as Select${Type};
   }
 
@@ -42,7 +57,7 @@ export class ${Type}Client {
       headers: await this.headers(),
     });
     if (res.status === 404) return null;
-    if (!res.ok) throw new Error(\`get ${table.name} failed: \${res.status}\`);
+    await this.okOrThrow(res, "get");
     return (await res.json()) as Select${Type};
   }
 
@@ -52,7 +67,7 @@ export class ${Type}Client {
       headers: await this.headers(true),
       body: JSON.stringify(params ?? {}),
     });
-    if (!res.ok) throw new Error(\`list ${table.name} failed: \${res.status}\`);
+    await this.okOrThrow(res, "list");
     return (await res.json()) as Select${Type}[];
   }
 
@@ -64,7 +79,7 @@ export class ${Type}Client {
       body: JSON.stringify(patch),
     });
     if (res.status === 404) return null;
-    if (!res.ok) throw new Error(\`update ${table.name} failed: \${res.status}\`);
+    await this.okOrThrow(res, "update");
     return (await res.json()) as Select${Type};
   }
 
@@ -75,7 +90,7 @@ export class ${Type}Client {
       headers: await this.headers(),
     });
     if (res.status === 404) return null;
-    if (!res.ok) throw new Error(\`delete ${table.name} failed: \${res.status}\`);
+    await this.okOrThrow(res, "delete");
     return (await res.json()) as Select${Type};
   }
 }
@@ -84,7 +99,6 @@ export class ${Type}Client {
 
 export function emitClientIndex(tables: Table[]) {
   let out = `/* Generated. Do not edit. */\n`;
-  // We must IMPORT to reference the classes, re-export later if you want
   for (const t of tables) {
     out += `import { ${pascal(t.name)}Client } from "./${t.name}";\n`;
   }
@@ -99,7 +113,6 @@ export function emitClientIndex(tables: Table[]) {
   }
   out += `  }\n`;
   out += `}\n`;
-  // optional: re-exports
   for (const t of tables) out += `export { ${pascal(t.name)}Client } from "./${t.name}";\n`;
   out += `export * from "./include-spec";\n`;
   return out;

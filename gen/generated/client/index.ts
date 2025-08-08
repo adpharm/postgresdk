@@ -1,8 +1,8 @@
 /* Generated. Do not edit. */
-export { AuthorsClient } from "./authors";
-export { BookTagsClient } from "./book_tags";
-export { BooksClient } from "./books";
-export { TagsClient } from "./tags";
+import { AuthorsClient } from "./authors";
+import { BookTagsClient } from "./book_tags";
+import { BooksClient } from "./books";
+import { TagsClient } from "./tags";
 
 export class SDK {
   public authors: AuthorsClient;
@@ -18,3 +18,8 @@ export class SDK {
     this.tags = new TagsClient(cfg.baseUrl, f, cfg.auth);
   }
 }
+export { AuthorsClient } from "./authors";
+export { BookTagsClient } from "./book_tags";
+export { BooksClient } from "./books";
+export { TagsClient } from "./tags";
+export * from "./include-spec";

@@ -30,6 +30,14 @@ type Graph = typeof RELATION_GRAPH;
 type TableName = keyof Graph;
 type IncludeSpec = any;
 
+// Debug helpers (enabled with SDK_DEBUG=1)
+const DEBUG = process.env.SDK_DEBUG === "1" || process.env.SDK_DEBUG === "true";
+const log = {
+  debug: (...args: any[]) => { if (DEBUG) console.debug("[sdk:include]", ...args); },
+  warn:  (...args: any[]) => console.warn("[sdk:include]", ...args),
+  error: (...args: any[]) => console.error("[sdk:include]", ...args),
+};
+
 // Helpers for PK/FK discovery from model (inlined)
 const FK_INDEX = ${JSON.stringify(fkIndex, null, 2)} as const;
 const PKS = ${JSON.stringify(
@@ -96,42 +104,72 @@ export async function loadIncludes(
   pg: { query: (text: string, params?: any[]) => Promise<{ rows: any[] }> },
   maxDepth: number = ${maxDepth}
 ) {
-  if (!spec || !parents.length) return parents;
+  try {
+    if (!spec || !parents.length) return parents;
+    log.debug("loadIncludes root/spec/rows", root, Object.keys(spec ?? {}).length, parents.length);
 
-  // Deep clone parents to avoid mutating caller refs
-  const cloned = parents.map(p => ({ ...p }));
-  await walk(root, cloned, spec, 0);
-  return cloned;
+    // Deep clone parents to avoid mutating caller refs
+    const cloned = parents.map(p => ({ ...p }));
+    await walk(root, cloned, spec, 0);
+    return cloned;
+  } catch (e: any) {
+    log.error("loadIncludes error:", e?.message ?? e, e?.stack);
+    // Never throw to the route; return base rows
+    return parents;
+  }
 
   async function walk(table: TableName, rows: any[], s: any, depth: number): Promise<void> {
     if (!s || depth >= maxDepth || rows.length === 0) return;
     const rels: any = (RELATION_GRAPH as any)[table] || {};
+    log.debug("walk", { table, depth, keys: Object.keys(s) });
 
     // Process each requested relation at this level
     for (const key of Object.keys(s)) {
       const rel = rels[key];
-      if (!rel) throw new Error(\`Unknown include key '\${key}' on '\${table}'\`);
+      if (!rel) {
+        log.warn(\`Unknown include key '\${key}' on '\${table}' — skipping\`);
+        continue;
+      }
       const target = rel.target as TableName;
 
+      // Safely run each loader; never let one bad edge 500 the route
       if (rel.via) {
         // M:N via junction
-        await loadManyToMany(table, target, rel.via as string, rows, key);
+        try {
+          await loadManyToMany(table, target, rel.via as string, rows, key);
+        } catch (e: any) {
+          log.error("loadManyToMany failed", { table, key, via: rel.via, target }, e?.message ?? e);
+          for (const r of rows) r[key] = [];
+        }
         // Recurse if nested include specified
         const childSpec = s[key] && typeof s[key] === "object" ? (s[key] as any).include : undefined;
         if (childSpec) {
           const children = rows.flatMap(r => (r[key] ?? []));
-          await walk(target, children, childSpec, depth + 1);
+          try {
+            await walk(target, children, childSpec, depth + 1);
+          } catch (e: any) {
+            log.error("walk nested (via) failed", { table: String(target), key }, e?.message ?? e);
+          }
         }
         continue;
       }
 
       if (rel.kind === "many") {
         // 1:N target has FK to current
-        await loadOneToMany(table, target, rows, key);
+        try {
+          await loadOneToMany(table, target, rows, key);
+        } catch (e: any) {
+          log.error("loadOneToMany failed", { table, key, target }, e?.message ?? e);
+          for (const r of rows) r[key] = [];
+        }
         const childSpec = s[key] && typeof s[key] === "object" ? (s[key] as any).include : undefined;
         if (childSpec) {
           const children = rows.flatMap(r => (r[key] ?? []));
-          await walk(target, children, childSpec, depth + 1);
+          try {
+            await walk(target, children, childSpec, depth + 1);
+          } catch (e: any) {
+            log.error("walk nested (many) failed", { table: String(target), key }, e?.message ?? e);
+          }
         }
       } else {
         // kind === "one"
@@ -139,14 +177,28 @@ export async function loadIncludes(
         const currFks = (FK_INDEX as any)[table] as Array<{from:string[];toTable:string;to:string[]}>;
         const toTarget = currFks.find(f => f.toTable === target);
         if (toTarget) {
-          await loadBelongsTo(table, target, rows, key);
+          try {
+            await loadBelongsTo(table, target, rows, key);
+          } catch (e: any) {
+            log.error("loadBelongsTo failed", { table, key, target }, e?.message ?? e);
+            for (const r of rows) r[key] = null;
+          }
         } else {
-          await loadHasOne(table, target, rows, key);
+          try {
+            await loadHasOne(table, target, rows, key);
+          } catch (e: any) {
+            log.error("loadHasOne failed", { table, key, target }, e?.message ?? e);
+            for (const r of rows) r[key] = null;
+          }
         }
         const childSpec = s[key] && typeof s[key] === "object" ? (s[key] as any).include : undefined;
         if (childSpec) {
           const children = rows.map(r => r[key]).filter(Boolean);
-          await walk(target, children, childSpec, depth + 1);
+          try {
+            await walk(target, children, childSpec, depth + 1);
+          } catch (e: any) {
+            log.error("walk nested (one) failed", { table: String(target), key }, e?.message ?? e);
+          }
         }
       }
     }
@@ -155,7 +207,7 @@ export async function loadIncludes(
   async function loadBelongsTo(curr: TableName, target: TableName, rows: any[], key: string) {
     // current has FK cols referencing target PK
     const fk = (FK_INDEX as any)[curr].find((f: any) => f.toTable === target);
-    if (!fk) return; // nothing to do
+    if (!fk) { for (const r of rows) r[key] = null; return; }
     const tuples = distinctTuples(rows, fk.from).filter(t => t.every((v: any) => v != null));
     if (!tuples.length) { for (const r of rows) r[key] = null; return; }
 
@@ -164,6 +216,7 @@ export async function loadIncludes(
     const where = buildOrAndPredicate(pkCols, tuples.length, 1);
     const params = tuples.flat();
     const sql = \`SELECT * FROM "\${target}" WHERE \${where}\`;
+    log.debug("belongsTo SQL", { curr, target, key, sql, paramsCount: params.length });
     const { rows: targets } = await pg.query(sql, params);
 
     const idx = indexByTuple(targets, pkCols);
@@ -187,6 +240,7 @@ export async function loadIncludes(
     const where = buildOrAndPredicate(fk.from, tuples.length, 1);
     const params = tuples.flat();
     const sql = \`SELECT * FROM "\${target}" WHERE \${where}\`;
+    log.debug("hasOne SQL", { curr, target, key, sql, paramsCount: params.length });
     const { rows: targets } = await pg.query(sql, params);
 
     const idx = indexByTuple(targets, fk.from);
@@ -208,6 +262,7 @@ export async function loadIncludes(
     const where = buildOrAndPredicate(fk.from, tuples.length, 1);
     const params = tuples.flat();
     const sql = \`SELECT * FROM "\${target}" WHERE \${where}\`;
+    log.debug("oneToMany SQL", { curr, target, key, sql, paramsCount: params.length });
     const { rows: children } = await pg.query(sql, params);
 
     const groups = groupByTuple(children, fk.from);
@@ -230,7 +285,9 @@ export async function loadIncludes(
     // 1) Load junction rows for current parents
     const whereVia = buildOrAndPredicate(toCurr.from, tuples.length, 1);
     const sqlVia = \`SELECT * FROM "\${via}" WHERE \${whereVia}\`;
-    const { rows: jrows } = await pg.query(sqlVia, tuples.flat());
+    const paramsVia = tuples.flat();
+    log.debug("manyToMany junction SQL", { curr, target, via, key, sql: sqlVia, paramsCount: paramsVia.length });
+    const { rows: jrows } = await pg.query(sqlVia, paramsVia);
 
     if (!jrows.length) { for (const r of rows) r[key] = []; return; }
 
@@ -238,7 +295,9 @@ export async function loadIncludes(
     const tTuples = distinctTuples(jrows, toTarget.from);
     const whereT = buildOrAndPredicate((PKS as any)[target], tTuples.length, 1);
     const sqlT = \`SELECT * FROM "\${target}" WHERE \${whereT}\`;
-    const { rows: targets } = await pg.query(sqlT, tTuples.flat());
+    const paramsT = tTuples.flat();
+    log.debug("manyToMany target SQL", { curr, target, via, key, sql: sqlT, paramsCount: paramsT.length });
+    const { rows: targets } = await pg.query(sqlT, paramsT);
 
     const tIdx = indexByTuple(targets, (PKS as any)[target]);
 

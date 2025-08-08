@@ -14,14 +14,22 @@ export class AuthorsClient {
     return json ? { "Content-Type": "application/json", ...extra } : extra;
   }
 
+  private async okOrThrow(res: Response, action: string) {
+    if (!res.ok) {
+      let detail = "";
+      try { detail = await res.text(); } catch {}
+      throw new Error(`${action} authors failed: ${res.status} ${detail}`);
+    }
+  }
+
   async create(data: InsertAuthors): Promise<SelectAuthors> {
     const res = await this.fetchFn(`${this.baseUrl}/v1/authors`, {
       method: "POST",
       headers: await this.headers(true),
       body: JSON.stringify(data),
     });
-    if (!res.ok) throw new Error(`create authors failed: ${res.status}`);
-    return res.json();
+    await this.okOrThrow(res, "create");
+    return (await res.json()) as SelectAuthors;
   }
 
   async getByPk(pk: string): Promise<SelectAuthors | null> {
@@ -30,8 +38,8 @@ export class AuthorsClient {
       headers: await this.headers(),
     });
     if (res.status === 404) return null;
-    if (!res.ok) throw new Error(`get authors failed: ${res.status}`);
-    return res.json();
+    await this.okOrThrow(res, "get");
+    return (await res.json()) as SelectAuthors;
   }
 
   async list(params?: { include?: AuthorsIncludeSpec; limit?: number; offset?: number }): Promise<SelectAuthors[]> {
@@ -40,8 +48,8 @@ export class AuthorsClient {
       headers: await this.headers(true),
       body: JSON.stringify(params ?? {}),
     });
-    if (!res.ok) throw new Error(`list authors failed: ${res.status}`);
-    return res.json();
+    await this.okOrThrow(res, "list");
+    return (await res.json()) as SelectAuthors[];
   }
 
   async update(pk: string, patch: UpdateAuthors): Promise<SelectAuthors | null> {
@@ -52,8 +60,8 @@ export class AuthorsClient {
       body: JSON.stringify(patch),
     });
     if (res.status === 404) return null;
-    if (!res.ok) throw new Error(`update authors failed: ${res.status}`);
-    return res.json();
+    await this.okOrThrow(res, "update");
+    return (await res.json()) as SelectAuthors;
   }
 
   async delete(pk: string): Promise<SelectAuthors | null> {
@@ -63,7 +71,7 @@ export class AuthorsClient {
       headers: await this.headers(),
     });
     if (res.status === 404) return null;
-    if (!res.ok) throw new Error(`delete authors failed: ${res.status}`);
-    return res.json();
+    await this.okOrThrow(res, "delete");
+    return (await res.json()) as SelectAuthors;
   }
 }

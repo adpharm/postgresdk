@@ -1,48 +1,70 @@
-import type { Model } from "./introspect";
+import type { Model, Table } from "./introspect";
 
-export type Edge = { from: string; key: string; kind: "one" | "many"; target: string; via?: string };
+export type Edge = {
+  from: string;
+  key: string;
+  kind: "one" | "many";
+  target: string;
+  via?: string;
+};
+
 export type Graph = Record<string, Record<string, Edge>>;
 
-export function buildGraph(m: Model): Graph {
+const singular = (s: string) => (s.endsWith("s") ? s.slice(0, -1) : s);
+const plural = (s: string) => (s.endsWith("s") ? s : s + "s");
+
+export function buildGraph(model: Model): Graph {
   const graph: Graph = {};
-  for (const t of Object.values(m.tables)) graph[t.name] = {};
+  const tables: Table[] = Object.values(model.tables);
 
-  // 1:N / 1:1
-  for (const child of Object.values(m.tables)) {
+  // init nodes
+  for (const t of tables) graph[t.name] = graph[t.name] ?? {};
+
+  // 1) 1:N & 1:1 from FKs
+  for (const child of tables) {
     for (const fk of child.fks) {
-      const parent = m.tables[fk.toTable];
-      const isUniqueOnFk = child.uniques.some(
-        (u) => u.length === fk.from.length && u.every((c) => fk.from.includes(c))
-      );
+      const parent = tables.find((t) => t.name === fk.toTable);
+      if (!parent) continue;
 
-      // child -> parent (one)
+      // cache nodes so TS knows they're not undefined
+      const childNode = (graph[child.name] ??= {});
+      const parentNode = (graph[parent.name] ??= {});
+
       const upKey = singular(parent.name);
-      graph[child.name][upKey] = { from: child.name, key: upKey, kind: "one", target: parent.name };
-
-      // parent -> child (many or one)
       const downKey = plural(child.name);
-      graph[parent.name][downKey] = {
-        from: parent.name,
-        key: downKey,
-        kind: isUniqueOnFk ? "one" : "many",
-        target: child.name,
-      };
+
+      if (!(upKey in childNode)) {
+        childNode[upKey] = { from: child.name, key: upKey, kind: "one", target: parent.name };
+      }
+      if (!(downKey in parentNode)) {
+        parentNode[downKey] = { from: parent.name, key: downKey, kind: "many", target: child.name };
+      }
     }
   }
 
-  // M:N via junction
-  for (const j of Object.values(m.tables).filter((t) => t.isJunction)) {
+  // 2) M:N via junction (two FKs)
+  for (const j of tables) {
+    if ((j.fks?.length ?? 0) !== 2) continue;
     const [fkA, fkB] = j.fks;
     if (!fkA || !fkB) continue;
-    const A = fkA.toTable,
-      B = fkB.toTable;
-    graph[A][plural(B)] = { from: A, key: plural(B), kind: "many", target: B, via: j.name };
-    graph[B][plural(A)] = { from: B, key: plural(A), kind: "many", target: A, via: j.name };
+
+    const A = fkA.toTable;
+    const B = fkB.toTable;
+    if (!A || !B || A === B) continue;
+
+    const aNode = (graph[A] ??= {});
+    const bNode = (graph[B] ??= {});
+
+    const aKey = plural(B);
+    const bKey = plural(A);
+
+    if (!(aKey in aNode)) {
+      aNode[aKey] = { from: A, key: aKey, kind: "many", target: B, via: j.name };
+    }
+    if (!(bKey in bNode)) {
+      bNode[bKey] = { from: B, key: bKey, kind: "many", target: A, via: j.name };
+    }
   }
 
   return graph;
 }
-
-// naive inflectors (replace with pluralize lib if needed)
-const plural = (s: string) => (s.endsWith("s") ? s : `${s}s`);
-const singular = (s: string) => (s.endsWith("s") ? s.slice(0, -1) : s);
