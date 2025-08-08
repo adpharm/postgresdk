@@ -72,7 +72,7 @@ Create a `postgresdk.config.ts` file in your project root:
 ```typescript
 export default {
   // Required
-  connectionString: "postgres://user:pass@localhost:5432/dbname",
+  connectionString: process.env.DATABASE_URL || "postgres://user:pass@localhost:5432/dbname",
   
   // Optional (with defaults)
   schema: "public",                    // Database schema to introspect
@@ -83,6 +83,8 @@ export default {
   dateType: "date",                    // "date" | "string" - How to handle timestamps
 };
 ```
+
+Environment variables work directly in the config file - no function wrapper needed.
 
 ## Generated SDK Features
 

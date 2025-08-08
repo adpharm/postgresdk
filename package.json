@@ -21,7 +21,7 @@
     "node": ">=18.17"
   },
   "scripts": {
-    "build": "bun build src/cli.ts --outdir dist --target node --format esm && bun build src/index.ts --outdir dist --target node --format esm && tsc -p tsconfig.build.json --emitDeclarationOnly",
+    "build": "bun build src/cli.ts src/index.ts --outdir dist --target node --format esm --external=pg --external=zod --external=hono --external=node:* && tsc -p tsconfig.build.json --emitDeclarationOnly",
     "test": "bun test/test-gen.ts",
     "prepublishOnly": "npm run build",
     "publish:patch": "./publish.sh",
