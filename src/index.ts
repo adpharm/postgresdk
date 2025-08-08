@@ -1,5 +1,5 @@
-import cfg from "../gen.config";
-import { join } from "path";
+import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { introspect } from "./introspect";
 import { buildGraph } from "./rel-classify";
 import { emitIncludeSpec } from "./emit-include-spec";
@@ -12,15 +12,23 @@ import { emitTypes } from "./emit-types";
 import { emitLogger } from "./emit-logger";
 import { ensureDirs, writeFiles } from "./utils";
 
-(async () => {
-  const model = await introspect(cfg.connectionString, cfg.schema);
+export async function generate(configPath: string) {
+  // Load config
+  const configUrl = pathToFileURL(configPath).href;
+  const module = await import(configUrl);
+  const cfg = module.default || module;
+
+  console.log("🔍 Introspecting database...");
+  const model = await introspect(cfg.connectionString, cfg.schema || "public");
+  
+  console.log("🔗 Building relationship graph...");
   const graph = buildGraph(model);
 
-  const serverDir = cfg.outServer;
-  const clientDir = cfg.outClient;
+  const serverDir = cfg.outServer || "./generated/server";
+  const clientDir = cfg.outClient || "./generated/client";
+  const normDateType = cfg.dateType === "string" ? "string" : "date";
 
-  const normDateType: "date" | "string" = cfg.dateType === "string" ? "string" : "date";
-
+  console.log("📁 Creating directories...");
   await ensureDirs([
     serverDir,
     join(serverDir, "types"),
@@ -30,7 +38,7 @@ import { ensureDirs, writeFiles } from "./utils";
     join(clientDir, "types"),
   ]);
 
-  const files: Array<{ path: string; content: string }> = [];
+  const files = [];
 
   // include-spec (shared)
   const includeSpec = emitIncludeSpec(graph);
@@ -40,13 +48,13 @@ import { ensureDirs, writeFiles } from "./utils";
   // include-builder (server)
   files.push({
     path: join(serverDir, "include-builder.ts"),
-    content: emitIncludeBuilder(graph, cfg.includeDepthLimit),
+    content: emitIncludeBuilder(graph, cfg.includeDepthLimit || 3),
   });
 
   // include-loader (server)
   files.push({
     path: join(serverDir, "include-loader.ts"),
-    content: emitIncludeLoader(graph, model, cfg.includeDepthLimit),
+    content: emitIncludeLoader(graph, model, cfg.includeDepthLimit || 3),
   });
 
   // logger (server)
@@ -69,8 +77,8 @@ import { ensureDirs, writeFiles } from "./utils";
     files.push({
       path: join(serverDir, "routes", `${table.name}.ts`),
       content: emitRoutes(table, graph, {
-        softDeleteColumn: cfg.softDeleteColumn ?? null,
-        includeDepthLimit: cfg.includeDepthLimit ?? 3,
+        softDeleteColumn: cfg.softDeleteColumn || null,
+        includeDepthLimit: cfg.includeDepthLimit || 3,
       }),
     });
 
@@ -87,11 +95,10 @@ import { ensureDirs, writeFiles } from "./utils";
     content: emitClientIndex(Object.values(model.tables)),
   });
 
+  console.log("✍️  Writing files...");
   await writeFiles(files);
-  console.log(`✓ Generated ${files.length} files`);
-  console.log(`  server: ${serverDir}`);
-  console.log(`  client: ${clientDir}`);
-})().catch((e) => {
-  console.error("❌ Generation failed", e);
-  process.exit(1);
-});
+
+  console.log(`✅ Generated ${files.length} files`);
+  console.log(`  Server: ${serverDir}`);
+  console.log(`  Client: ${clientDir}`);
+}

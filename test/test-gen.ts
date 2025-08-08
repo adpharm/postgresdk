@@ -1,14 +1,93 @@
 import { join } from "node:path";
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
-import { execSync } from "node:child_process";
+import { execSync, exec } from "node:child_process";
 import { Client } from "pg";
 import { Hono } from "hono";
 import { serve } from "@hono/node-server";
+import { promisify } from "node:util";
 
+const execAsync = promisify(exec);
+
+const CONTAINER_NAME = "postgresdk-test-db";
 const PG_URL = "postgres://user:pass@localhost:5432/testdb";
 const SERVER_DIR = "test/.results/server";
 const CLIENT_DIR = "test/.results/client";
 const CFG_PATH = join(process.cwd(), "gen.config.ts");
+
+async function checkDocker(): Promise<boolean> {
+  try {
+    await execAsync("docker --version");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function isContainerRunning(): Promise<boolean> {
+  try {
+    const { stdout } = await execAsync(`docker ps --filter "name=${CONTAINER_NAME}" --format "{{.Names}}"`);
+    return stdout.trim() === CONTAINER_NAME;
+  } catch {
+    return false;
+  }
+}
+
+async function startPostgres(): Promise<void> {
+  console.log("🐳 Starting PostgreSQL container...");
+  
+  // Check if container exists but is stopped
+  try {
+    const { stdout } = await execAsync(`docker ps -a --filter "name=${CONTAINER_NAME}" --format "{{.Names}}"`);
+    if (stdout.trim() === CONTAINER_NAME) {
+      console.log("  → Container exists, starting it...");
+      await execAsync(`docker start ${CONTAINER_NAME}`);
+    } else {
+      console.log("  → Creating new container...");
+      // Pull image first if needed
+      try {
+        await execAsync(`docker pull postgres:17-alpine`);
+      } catch {
+        // Image might already exist
+      }
+      
+      await execAsync(`docker run -d --name ${CONTAINER_NAME} -e POSTGRES_USER=user -e POSTGRES_PASSWORD=pass -e POSTGRES_DB=testdb -p 5432:5432 postgres:17-alpine`);
+    }
+  } catch (error) {
+    console.error("Failed to start container:", error);
+    throw error;
+  }
+  
+  // Wait for PostgreSQL to be ready
+  console.log("  → Waiting for PostgreSQL to be ready...");
+  let attempts = 0;
+  const maxAttempts = 30;
+  
+  while (attempts < maxAttempts) {
+    try {
+      const pg = new Client({ connectionString: PG_URL });
+      await pg.connect();
+      await pg.query("SELECT 1");
+      await pg.end();
+      console.log("  ✓ PostgreSQL is ready!");
+      return;
+    } catch {
+      attempts++;
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+  }
+  
+  throw new Error("PostgreSQL failed to start in time");
+}
+
+async function stopPostgres(): Promise<void> {
+  console.log("🐳 Stopping PostgreSQL container...");
+  try {
+    await execAsync(`docker stop ${CONTAINER_NAME}`);
+    console.log("  ✓ Container stopped");
+  } catch (error) {
+    console.error("  ⚠️  Failed to stop container:", error);
+  }
+}
 
 async function applySchemaWithPg(sqlPath: string) {
   const sql = readFileSync(sqlPath, "utf8");
@@ -38,15 +117,55 @@ function assert(condition: boolean, message: string) {
   if (!condition) throw new Error(`Assertion failed: ${message}`);
 }
 
+let startedContainer = false;
+
 async function main() {
-  console.log("0) Write test gen.config.ts …");
+  // Check Docker is available
+  if (!await checkDocker()) {
+    console.error("❌ Docker is not installed or not running");
+    console.error("   Please install Docker and try again");
+    process.exit(1);
+  }
+
+  // Check if container is running
+  const isRunning = await isContainerRunning();
+  
+  if (!isRunning) {
+    console.log("⚠️  PostgreSQL container is not running");
+    console.log("   Container name: " + CONTAINER_NAME);
+    
+    // Prompt user to start it
+    const readline = require("readline").createInterface({
+      input: process.stdin,
+      output: process.stdout
+    });
+    
+    const answer = await new Promise<string>(resolve => {
+      readline.question("Do you want to start it? (y/n) ", resolve);
+    });
+    readline.close();
+    
+    if (answer.toLowerCase() !== 'y') {
+      console.log("Aborted. Please start PostgreSQL manually or run:");
+      console.log(`  docker run -d --name ${CONTAINER_NAME} -e POSTGRES_USER=user -e POSTGRES_PASSWORD=pass -e POSTGRES_DB=testdb -p 5432:5432 postgres:17-alpine`);
+      process.exit(1);
+    }
+    
+    await startPostgres();
+    startedContainer = true;
+  } else {
+    console.log("✓ PostgreSQL container is running");
+  }
+
+  console.log("\n0) Write test gen.config.ts …");
   writeTestConfig();
 
   console.log("1) Apply test schema via pg client …");
   await applySchemaWithPg("test/schema.sql");
 
   console.log("2) Run generator …");
-  execSync(`bun run gen/index.ts`, { stdio: "inherit" });
+  // Use the CLI with the config we just wrote
+  execSync(`bun run src/cli.ts -c ${CFG_PATH}`, { stdio: "inherit" });
 
   console.log("3) Verify generated files exist …");
   const required = [
@@ -267,10 +386,23 @@ async function main() {
   } finally {
     server.close();
     await pg.end();
+    
+    // Stop container if we started it
+    if (startedContainer) {
+      await stopPostgres();
+    }
   }
 }
 
-main().catch((err) => {
+main().catch(async (err) => {
   console.error("❌ Test failed", err);
+  
+  // Stop container if we started it
+  if (startedContainer) {
+    try {
+      await stopPostgres();
+    } catch {}
+  }
+  
   process.exit(1);
 });
