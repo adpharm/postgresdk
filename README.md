@@ -89,7 +89,7 @@ const recentBooks = await sdk.books.list({
 ```typescript
 import { Hono } from "hono";
 import { Client } from "pg";
-import { createRouter } from "./generated/server";
+import { createRouter } from "./generated/server/router";
 
 const app = new Hono();
 const pg = new Client({ connectionString: process.env.DATABASE_URL });
@@ -479,7 +479,7 @@ postgresdk generates a `createRouter` function that returns a Hono router with a
 import { Hono } from "hono";
 import { serve } from "@hono/node-server";
 import { Client } from "pg";
-import { createRouter } from "./generated/server";
+import { createRouter } from "./generated/server/router";
 
 const app = new Hono();
 
@@ -502,7 +502,7 @@ The `createRouter` function returns a Hono router that can be mounted anywhere:
 
 ```typescript
 import { Hono } from "hono";
-import { createRouter } from "./generated/server";
+import { createRouter } from "./generated/server/router";
 
 const app = new Hono();
 
@@ -523,7 +523,7 @@ app.route("/v2", apiRouter);   // Routes will be at /v2/v1/users, /v2/v1/posts, 
 If you prefer to register routes directly on your app without a sub-router:
 
 ```typescript
-import { registerAllRoutes } from "./generated/server";
+import { registerAllRoutes } from "./generated/server/router";
 
 const app = new Hono();
 const pg = new Client({ connectionString: process.env.DATABASE_URL });
@@ -538,7 +538,7 @@ registerAllRoutes(app, { pg });
 You can also import and register individual routes:
 
 ```typescript
-import { registerUsersRoutes, registerPostsRoutes } from "./generated/server";
+import { registerUsersRoutes, registerPostsRoutes } from "./generated/server/router";
 
 const app = new Hono();
 

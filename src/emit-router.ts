@@ -2,9 +2,9 @@ import type { Table } from "./introspect";
 import { pascal } from "./utils";
 
 /**
- * Emits the server index file that exports helper functions for route registration
+ * Emits the server router file that exports helper functions for route registration
  */
-export function emitServerIndex(tables: Table[], hasAuth: boolean) {
+export function emitRouter(tables: Table[], hasAuth: boolean) {
   const tableNames = tables.map(t => t.name).sort();
   const imports = tableNames
     .map(name => {
@@ -38,7 +38,7 @@ ${hasAuth ? `export { authMiddleware } from "./auth";` : ""}
  * @example
  * import { Hono } from "hono";
  * import { Client } from "pg";
- * import { createRouter } from "./generated/server";
+ * import { createRouter } from "./generated/server/router";
  * 
  * const app = new Hono();
  * const pg = new Client({ connectionString: process.env.DATABASE_URL });
@@ -66,7 +66,7 @@ ${registrations}
  * @example
  * import { Hono } from "hono";
  * import { Client } from "pg";
- * import { registerAllRoutes } from "./generated/server";
+ * import { registerAllRoutes } from "./generated/server/router";
  * 
  * const app = new Hono();
  * const pg = new Client({ connectionString: process.env.DATABASE_URL });
