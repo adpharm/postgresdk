@@ -1,0 +1,20 @@
+{
+  "name": "/workspace",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "devDependencies": {
+    "@types/bun": "^1.2.19",
+    "@types/node": "^24.2.1",
+    "@types/pg": "^8.15.5",
+    "zod": "^4.0.15"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.18.1",
+    "hono": "^4.9.0",
+    "pg": "^8.16.3"
+  }
+}
