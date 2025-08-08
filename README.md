@@ -348,7 +348,23 @@ export default {
 ### API Key Authentication
 
 ```typescript
-// postgresdk.config.ts
+// postgresdk.config.ts - Simplified syntax
+export default {
+  connectionString: "...",
+  auth: {
+    apiKey: "your-api-key"  // Single key shorthand
+  }
+};
+
+// Or multiple keys
+export default {
+  connectionString: "...",
+  auth: {
+    apiKeys: ["key1", "key2", "key3"]
+  }
+};
+
+// Or full syntax with custom header
 export default {
   connectionString: "...",
   auth: {
@@ -373,7 +389,15 @@ const sdk = new SDK({
 ### JWT Authentication (HS256)
 
 ```typescript
-// postgresdk.config.ts
+// postgresdk.config.ts - Simplified syntax
+export default {
+  connectionString: "...",
+  auth: {
+    jwt: "your-secret-key"  // Shared secret shorthand
+  }
+};
+
+// Or full syntax with issuer/audience validation
 export default {
   connectionString: "...",
   auth: {

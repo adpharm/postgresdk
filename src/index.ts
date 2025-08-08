@@ -17,12 +17,17 @@ import { emitAuth } from "./emit-auth";
 import { emitRouter } from "./emit-router";
 import { ensureDirs, writeFiles } from "./utils";
 import type { Config } from "./types";
+import { normalizeAuthConfig } from "./types";
 
 export async function generate(configPath: string) {
   // Load config
   const configUrl = pathToFileURL(configPath).href;
   const module = await import(configUrl);
-  const cfg: Config = module.default || module;
+  const rawCfg: Config = module.default || module;
+
+  // Normalize auth config to handle simplified syntax
+  const normalizedAuth = normalizeAuthConfig(rawCfg.auth);
+  const cfg: Config = { ...rawCfg, auth: normalizedAuth };
 
   console.log("🔍 Introspecting database...");
   const model = await introspect(cfg.connectionString, cfg.schema || "public");
@@ -67,8 +72,8 @@ export async function generate(configPath: string) {
   files.push({ path: join(serverDir, "logger.ts"), content: emitLogger() });
 
   // auth (server) - only if auth is configured
-  if (cfg.auth?.strategy && cfg.auth.strategy !== "none") {
-    files.push({ path: join(serverDir, "auth.ts"), content: emitAuth(cfg.auth) });
+  if (normalizedAuth?.strategy && normalizedAuth.strategy !== "none") {
+    files.push({ path: join(serverDir, "auth.ts"), content: emitAuth(normalizedAuth) });
   }
 
   // per-table outputs
@@ -90,7 +95,7 @@ export async function generate(configPath: string) {
       content: emitRoutes(table, graph, {
         softDeleteColumn: cfg.softDeleteColumn || null,
         includeDepthLimit: cfg.includeDepthLimit || 3,
-        authStrategy: cfg.auth?.strategy,
+        authStrategy: normalizedAuth?.strategy,
       }),
     });
 
@@ -110,7 +115,7 @@ export async function generate(configPath: string) {
   // server router (with createRouter and registerAllRoutes helpers)
   files.push({
     path: join(serverDir, "router.ts"),
-    content: emitRouter(Object.values(model.tables), !!cfg.auth?.strategy && cfg.auth.strategy !== "none"),
+    content: emitRouter(Object.values(model.tables), !!normalizedAuth?.strategy && normalizedAuth.strategy !== "none"),
   });
 
   console.log("✍️  Writing files...");
