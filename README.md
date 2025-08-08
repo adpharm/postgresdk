@@ -1,6 +1,135 @@
 # postgresdk
 
-Generate a fully-typed, production-ready SDK from your PostgreSQL database schema. Automatically creates both server-side REST API routes and client-side SDK with TypeScript types, Zod validation, and support for complex relationships.
+Turn your PostgreSQL database into a fully-typed, production-ready SDK in seconds.
+
+## What You Get
+
+Start with your existing PostgreSQL database:
+
+```sql
+CREATE TABLE authors (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  bio TEXT
+);
+
+CREATE TABLE books (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title TEXT NOT NULL,
+  author_id UUID REFERENCES authors(id),
+  published_at TIMESTAMPTZ
+);
+
+CREATE TABLE tags (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT UNIQUE NOT NULL
+);
+
+CREATE TABLE book_tags (
+  book_id UUID REFERENCES books(id),
+  tag_id UUID REFERENCES tags(id),
+  PRIMARY KEY (book_id, tag_id)
+);
+```
+
+Run one command:
+
+```bash
+npx postgresdk
+```
+
+Get a complete, type-safe SDK with:
+
+### 🎯 Client SDK with Full TypeScript Support
+
+```typescript
+import { SDK } from "./generated/client";
+
+const sdk = new SDK({ 
+  baseUrl: "http://localhost:3000",
+  auth: { apiKey: "your-key" }  // Optional auth
+});
+
+// ✅ Fully typed - autocomplete everything!
+const author = await sdk.authors.create({
+  name: "Jane Austen",
+  bio: "English novelist known for social commentary"
+});
+
+// ✅ Type-safe relationships with eager loading
+const booksWithAuthor = await sdk.books.list({
+  include: { 
+    author: true,      // 1:N relationship
+    tags: true         // M:N relationship
+  }
+});
+
+// ✅ Complex nested queries
+const authorsWithEverything = await sdk.authors.list({
+  include: {
+    books: {
+      include: {
+        tags: true
+      }
+    }
+  }
+});
+
+// ✅ Built-in pagination & filtering
+const recentBooks = await sdk.books.list({
+  where: { published_at: { gte: "2024-01-01" } },
+  orderBy: "published_at",
+  order: "desc",
+  limit: 10
+});
+```
+
+### 🚀 Production-Ready REST API
+
+```typescript
+import { Hono } from "hono";
+import { Client } from "pg";
+import { createRouter } from "./generated/server";
+
+const app = new Hono();
+const pg = new Client({ connectionString: process.env.DATABASE_URL });
+await pg.connect();
+
+// That's it! Full REST API with:
+// - Input validation (Zod)
+// - Error handling
+// - Relationship loading
+// - Auth middleware (if configured)
+// - Type safety throughout
+
+const api = createRouter({ pg });
+app.route("/", api);
+
+// GET    /v1/authors
+// POST   /v1/authors
+// GET    /v1/authors/:id
+// PATCH  /v1/authors/:id
+// DELETE /v1/authors/:id
+// POST   /v1/authors/list  (with filtering & includes)
+```
+
+### 🔒 Type Safety Everywhere
+
+```typescript
+// TypeScript catches errors at compile time
+const book = await sdk.books.create({
+  title: "Pride and Prejudice",
+  author_id: "not-a-uuid",     // ❌ Type error!
+  published_at: "invalid-date"  // ❌ Type error!
+});
+
+// Generated Zod schemas for runtime validation
+import { InsertBooksSchema } from "./generated/server/zod/books";
+
+const validated = InsertBooksSchema.parse(requestBody);
+```
+
+All from your existing database schema. No manual coding required.
 
 ## Features
 
@@ -312,29 +441,285 @@ const sdk = new SDK({
 });
 ```
 
-## Server Integration
+## Server Integration with Hono
 
-The generated server code is designed for [Hono](https://hono.dev/) but can be adapted to other frameworks:
+The generated code integrates seamlessly with [Hono](https://hono.dev/), a lightweight web framework for the Edge.
+
+### Basic Setup
+
+postgresdk generates a `createRouter` function that returns a Hono router with all your routes:
 
 ```typescript
 import { Hono } from "hono";
 import { serve } from "@hono/node-server";
 import { Client } from "pg";
+import { createRouter } from "./generated/server";
 
-// Import generated route registrations
-import { registerUsersRoutes } from "./generated/server/routes/users";
-import { registerPostsRoutes } from "./generated/server/routes/posts";
+const app = new Hono();
+
+// Database connection
+const pg = new Client({ connectionString: process.env.DATABASE_URL });
+await pg.connect();
+
+// Mount all generated routes at once
+const apiRouter = createRouter({ pg });
+app.route("/", apiRouter);
+
+// Start server
+serve({ fetch: app.fetch, port: 3000 });
+console.log("Server running on http://localhost:3000");
+```
+
+### Mounting Routes at Different Paths
+
+The `createRouter` function returns a Hono router that can be mounted anywhere:
+
+```typescript
+import { Hono } from "hono";
+import { createRouter } from "./generated/server";
+
+const app = new Hono();
+
+// Your existing routes
+app.get("/", (c) => c.json({ message: "Welcome" }));
+app.get("/health", (c) => c.json({ status: "ok" }));
+
+// Mount generated routes under /api
+const apiRouter = createRouter({ pg });
+app.route("/api", apiRouter);  // Routes will be at /api/v1/users, /api/v1/posts, etc.
+
+// Or mount under different version
+app.route("/v2", apiRouter);   // Routes will be at /v2/v1/users, /v2/v1/posts, etc.
+```
+
+### Alternative: Register Routes Directly
+
+If you prefer to register routes directly on your app without a sub-router:
+
+```typescript
+import { registerAllRoutes } from "./generated/server";
 
 const app = new Hono();
 const pg = new Client({ connectionString: process.env.DATABASE_URL });
 await pg.connect();
 
-// Register routes
+// Register all routes directly on app
+registerAllRoutes(app, { pg });
+```
+
+### Selective Route Registration
+
+You can also import and register individual routes:
+
+```typescript
+import { registerUsersRoutes, registerPostsRoutes } from "./generated/server";
+
+const app = new Hono();
+
+// Only register specific routes
 registerUsersRoutes(app, { pg });
 registerPostsRoutes(app, { pg });
 
-// Start server
+### Adding to an Existing Hono App
+
+```typescript
+import { Hono } from "hono";
+import { cors } from "hono/cors";
+import { logger } from "hono/logger";
+
+// Your existing Hono app
+const app = new Hono();
+
+// Your existing middleware
+app.use("*", cors());
+app.use("*", logger());
+
+// Your existing routes
+app.get("/", (c) => c.json({ message: "Hello World" }));
+app.get("/health", (c) => c.json({ status: "ok" }));
+
+// Add postgresdk generated routes
+const pg = new Client({ connectionString: process.env.DATABASE_URL });
+await pg.connect();
+
+// All generated routes are prefixed with /v1 by default
+import { registerUsersRoutes } from "./generated/server/routes/users";
+import { registerPostsRoutes } from "./generated/server/routes/posts";
+
+registerUsersRoutes(app, { pg });  // Adds /v1/users/*
+registerPostsRoutes(app, { pg });  // Adds /v1/posts/*
+
+// Your routes continue to work alongside generated ones
+app.get("/custom", (c) => c.json({ custom: true }));
+```
+
+### With Error Handling & Logging
+
+```typescript
+import { Hono } from "hono";
+import { HTTPException } from "hono/http-exception";
+
+const app = new Hono();
+
+// Global error handling
+app.onError((err, c) => {
+  if (err instanceof HTTPException) {
+    return err.getResponse();
+  }
+  console.error("Unhandled error:", err);
+  return c.json({ error: "Internal Server Error" }, 500);
+});
+
+// Request logging middleware
+app.use("*", async (c, next) => {
+  const start = Date.now();
+  await next();
+  const ms = Date.now() - start;
+  console.log(`${c.req.method} ${c.req.path} - ${c.res.status} ${ms}ms`);
+});
+
+// Register generated routes with database
+const pg = new Client({ connectionString: process.env.DATABASE_URL });
+await pg.connect();
+
+import { registerUsersRoutes } from "./generated/server/routes/users";
+registerUsersRoutes(app, { pg });
+```
+
+### With Database Connection Pooling
+
+For production, use connection pooling:
+
+```typescript
+import { Pool } from "pg";
+import { Hono } from "hono";
+
+// Use a connection pool instead of a single client
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  max: 20,               // Maximum number of clients in the pool
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 2000,
+});
+
+const app = new Hono();
+
+// The generated routes work with both Client and Pool
+import { registerUsersRoutes } from "./generated/server/routes/users";
+import { registerPostsRoutes } from "./generated/server/routes/posts";
+
+registerUsersRoutes(app, { pg: pool });
+registerPostsRoutes(app, { pg: pool });
+
+// Graceful shutdown
+process.on("SIGTERM", async () => {
+  await pool.end();
+  process.exit(0);
+});
+```
+
+### With Different Deployment Targets
+
+```typescript
+// For Node.js
+import { serve } from "@hono/node-server";
 serve({ fetch: app.fetch, port: 3000 });
+
+// For Cloudflare Workers
+export default app;
+
+// For Vercel
+import { handle } from "@hono/vercel";
+export default handle(app);
+
+// For AWS Lambda
+import { handle } from "@hono/aws-lambda";
+export const handler = handle(app);
+
+// For Deno
+Deno.serve(app.fetch);
+
+// For Bun
+export default {
+  port: 3000,
+  fetch: app.fetch,
+};
+```
+
+### Complete Production Example
+
+```typescript
+import { Hono } from "hono";
+import { cors } from "hono/cors";
+import { compress } from "hono/compress";
+import { secureHeaders } from "hono/secure-headers";
+import { serve } from "@hono/node-server";
+import { Pool } from "pg";
+
+// Import all generated route registrations
+import { registerUsersRoutes } from "./generated/server/routes/users";
+import { registerPostsRoutes } from "./generated/server/routes/posts";
+import { registerCommentsRoutes } from "./generated/server/routes/comments";
+
+// Create app with type safety
+const app = new Hono();
+
+// Production middleware stack
+app.use("*", cors({
+  origin: process.env.ALLOWED_ORIGINS?.split(",") || "*",
+  credentials: true,
+}));
+app.use("*", compress());
+app.use("*", secureHeaders());
+
+// Health check
+app.get("/health", (c) => c.json({ 
+  status: "ok", 
+  timestamp: new Date().toISOString() 
+}));
+
+// Database connection pool
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
+  max: 20,
+});
+
+// Register all generated routes
+registerUsersRoutes(app, { pg: pool });
+registerPostsRoutes(app, { pg: pool });
+registerCommentsRoutes(app, { pg: pool });
+
+// 404 handler
+app.notFound((c) => c.json({ error: "Not Found" }, 404));
+
+// Global error handler
+app.onError((err, c) => {
+  console.error(`Error ${c.req.method} ${c.req.path}:`, err);
+  return c.json({ 
+    error: process.env.NODE_ENV === "production" 
+      ? "Internal Server Error" 
+      : err.message 
+  }, 500);
+});
+
+// Start server
+const port = parseInt(process.env.PORT || "3000");
+serve({ 
+  fetch: app.fetch, 
+  port,
+  hostname: "0.0.0.0"
+});
+
+console.log(`Server running on http://localhost:${port}`);
+console.log(`Environment: ${process.env.NODE_ENV || "development"}`);
+
+// Graceful shutdown
+process.on("SIGTERM", async () => {
+  console.log("SIGTERM received, closing connections...");
+  await pool.end();
+  process.exit(0);
+});
 ```
 
 ## CLI Options

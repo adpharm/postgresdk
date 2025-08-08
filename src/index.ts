@@ -11,6 +11,7 @@ import { emitIncludeLoader } from "./emit-include-loader";
 import { emitTypes } from "./emit-types";
 import { emitLogger } from "./emit-logger";
 import { emitAuth } from "./emit-auth";
+import { emitServerIndex } from "./emit-server-index";
 import { ensureDirs, writeFiles } from "./utils";
 import type { Config } from "./types";
 
@@ -101,6 +102,12 @@ export async function generate(configPath: string) {
   files.push({
     path: join(clientDir, "index.ts"),
     content: emitClientIndex(Object.values(model.tables)),
+  });
+
+  // server index (with registerAllRoutes helper)
+  files.push({
+    path: join(serverDir, "index.ts"),
+    content: emitServerIndex(Object.values(model.tables), !!cfg.auth?.strategy && cfg.auth.strategy !== "none"),
   });
 
   console.log("✍️  Writing files...");
