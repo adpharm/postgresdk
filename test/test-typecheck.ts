@@ -110,6 +110,7 @@ async function typeCheckDirectory(dir: string, name: string): Promise<boolean> {
       resolveJsonModule: true,
       noEmit: true,
       allowImportingTsExtensions: true,
+      verbatimModuleSyntax: true,
       types: ["node", "bun-types"]
     },
     include: [

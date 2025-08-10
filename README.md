@@ -218,6 +218,7 @@ export default {
   softDeleteColumn: null,              // Column name for soft deletes (e.g., "deleted_at")
   includeDepthLimit: 3,                 // Max depth for nested includes
   dateType: "date",                    // "date" | "string" - How to handle timestamps
+  driver: "pg",                        // "pg" | "neon" - Database driver to use
   
   // Authentication (optional) - simplified syntax
   auth: {
@@ -491,6 +492,141 @@ const sdk = new SDK({
   baseUrl: "http://localhost:3000",
   auth: { jwt: token }
 });
+```
+
+## Database Drivers
+
+postgresdk supports two database drivers, allowing you to choose based on your deployment target:
+
+### Node.js `pg` Driver (Default)
+
+The standard PostgreSQL driver for Node.js environments. Works everywhere Node.js runs.
+
+```typescript
+// postgresdk.config.ts
+export default {
+  connectionString: process.env.DATABASE_URL,
+  driver: "pg"  // Optional, this is the default
+};
+```
+
+Server setup:
+```typescript
+import { Hono } from "hono";
+import { Client } from "pg";
+import { createRouter } from "./generated/server/router";
+
+const app = new Hono();
+
+// Standard pg client
+const pg = new Client({ connectionString: process.env.DATABASE_URL });
+await pg.connect();
+
+// Wire up the generated routes
+const apiRouter = createRouter({ pg });
+app.route("/", apiRouter);
+```
+
+### Neon Serverless Driver (Edge-Compatible)
+
+For edge environments like Vercel Edge Functions or Cloudflare Workers. Uses HTTP/WebSocket instead of TCP connections.
+
+```typescript
+// postgresdk.config.ts
+export default {
+  connectionString: process.env.DATABASE_URL,
+  driver: "neon"  // Use Neon driver for edge compatibility
+};
+```
+
+Server setup:
+```typescript
+import { Hono } from "hono";
+import { neon } from "@neondatabase/serverless";
+import { createRouter } from "./generated/server/router";
+
+const app = new Hono();
+
+// Neon serverless client
+const sql = neon(process.env.DATABASE_URL!);
+
+// Create pg-compatible adapter
+const pg = {
+  async query(text: string, params?: any[]) {
+    const rows = await sql(text, params);
+    return { rows };
+  }
+};
+
+// Wire up the generated routes (same interface!)
+const apiRouter = createRouter({ pg });
+app.route("/", apiRouter);
+
+// Deploy to Vercel Edge
+export const config = { runtime: 'edge' };
+export default app;
+```
+
+### Which Driver Should I Use?
+
+- **Use `pg` (default) when:**
+  - Running on traditional Node.js servers
+  - Using Docker, VPS, or dedicated hosting
+  - Need connection pooling or advanced PostgreSQL features
+  - Running on AWS Lambda, Google Cloud Functions (with Node.js runtime)
+
+- **Use `neon` when:**
+  - Deploying to Vercel Edge Functions
+  - Deploying to Cloudflare Workers
+  - Need globally distributed edge computing
+  - Want to avoid TCP connection overhead
+  - Using Neon as your PostgreSQL provider
+
+### Connection Pooling with `pg`
+
+For production Node.js deployments, use connection pooling:
+
+```typescript
+import { Pool } from "pg";
+import { createRouter } from "./generated/server/router";
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  max: 20,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 2000,
+});
+
+// The generated routes work with both Client and Pool
+const apiRouter = createRouter({ pg: pool });
+```
+
+### Custom Database Adapters
+
+You can use any database client as long as it matches the expected interface:
+
+```typescript
+// Any client that implements this interface works
+interface DatabaseAdapter {
+  query(text: string, params?: any[]): Promise<{ rows: any[] }>;
+}
+
+// Example with Drizzle ORM
+import { drizzle } from "drizzle-orm/node-postgres";
+import { Client } from "pg";
+
+const client = new Client({ connectionString: process.env.DATABASE_URL });
+const db = drizzle(client);
+
+// Create adapter
+const pg = {
+  async query(text: string, params?: any[]) {
+    const result = await client.query(text, params);
+    return { rows: result.rows };
+  }
+};
+
+const apiRouter = createRouter({ pg });
 ```
 
 ## Server Integration with Hono

@@ -64,7 +64,7 @@ export function emitClientIndex(tables: Table[]) {
   let out = `/* Generated. Do not edit. */\n`;
   
   // Import BaseClient and its types
-  out += `import { BaseClient, AuthConfig } from "./base-client";\n`;
+  out += `import { BaseClient, type AuthConfig } from "./base-client";\n`;
   
   // Import all table clients
   for (const t of tables) {
