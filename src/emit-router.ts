@@ -29,6 +29,7 @@ export function emitRouter(tables: Table[], hasAuth: boolean) {
 
   return `/* Generated. Do not edit. */
 import { Hono } from "hono";
+import { SDK_MANIFEST } from "./sdk-bundle";
 ${imports}
 ${hasAuth ? `export { authMiddleware } from "./auth";` : ""}
 
@@ -56,7 +57,34 @@ export function createRouter(
   deps: { pg: { query: (text: string, params?: any[]) => Promise<{ rows: any[] }> } }
 ): Hono {
   const router = new Hono();
+  
+  // Register table routes
 ${registrations}
+  
+  // SDK distribution endpoints
+  router.get("/sdk/manifest", (c) => {
+    return c.json({
+      version: SDK_MANIFEST.version,
+      generated: SDK_MANIFEST.generated,
+      files: Object.keys(SDK_MANIFEST.files)
+    });
+  });
+  
+  router.get("/sdk/download", (c) => {
+    return c.json(SDK_MANIFEST);
+  });
+  
+  router.get("/sdk/files/:path{.*}", (c) => {
+    const path = c.req.param("path");
+    const content = SDK_MANIFEST.files[path];
+    if (!content) {
+      return c.text("File not found", 404);
+    }
+    return c.text(content, 200, {
+      "Content-Type": "text/plain; charset=utf-8"
+    });
+  });
+  
   return router;
 }
 

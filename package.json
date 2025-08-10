@@ -22,7 +22,10 @@
   },
   "scripts": {
     "build": "bun build src/cli.ts src/index.ts --outdir dist --target node --format esm --external=pg --external=zod --external=hono --external=node:* && tsc -p tsconfig.build.json --emitDeclarationOnly",
-    "test": "bun test/test-gen.ts",
+    "test": "bun test:init && bun test:gen && bun test:pull",
+    "test:init": "bun test/test-init.ts",
+    "test:gen": "bun test/test-gen.ts",
+    "test:pull": "bun test/test-pull.ts",
     "prepublishOnly": "npm run build",
     "publish:patch": "./publish.sh",
     "publish:minor": "./publish.sh",

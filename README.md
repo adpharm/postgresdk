@@ -35,7 +35,7 @@ CREATE TABLE book_tags (
 Run one command:
 
 ```bash
-npx postgresdk
+npx postgresdk generate
 ```
 
 Get a complete, type-safe SDK with:
@@ -140,36 +140,43 @@ All from your existing database schema. No manual coding required.
 - 🔐 **Built-in Auth** - API key and JWT authentication with zero configuration
 - 🎯 **Zero Config** - Works out of the box with sensible defaults
 - 🏗️ **Framework Ready** - Server routes built for Hono, client SDK works anywhere
-- 📦 **Lightweight** - Minimal dependencies, optimized for production
+- 📦 **Lightweight** - Minimal dependencies, optimized bundle size with shared BaseClient
+- 🔄 **SDK Distribution** - Built-in SDK bundling and pull mechanism for easy client distribution
 
 ## Installation
 
 ```bash
 npm install -g postgresdk
 # or
-npx postgresdk
+npx postgresdk generate
 ```
 
 ## Quick Start
 
-1. Create a configuration file `postgresdk.config.ts`:
+1. Initialize your project:
+
+```bash
+npx postgresdk init
+```
+
+This creates a `postgresdk.config.ts` file with all available options documented.
+
+2. Edit the configuration file with your database connection:
 
 ```typescript
 export default {
-  connectionString: "postgres://user:pass@localhost:5432/mydb",
-  schema: "public",
-  outServer: "./generated/server",
-  outClient: "./generated/client",
+  connectionString: process.env.DATABASE_URL || "postgres://user:pass@localhost:5432/mydb",
+  // Uncomment and customize other options as needed
 };
 ```
 
-2. Run the generator:
+3. Run the generator:
 
 ```bash
-postgresdk
+postgresdk generate
 ```
 
-3. Use the generated SDK:
+4. Use the generated SDK:
 
 ```typescript
 // Server (Hono)
@@ -212,19 +219,19 @@ export default {
   includeDepthLimit: 3,                 // Max depth for nested includes
   dateType: "date",                    // "date" | "string" - How to handle timestamps
   
-  // Authentication (optional)
+  // Authentication (optional) - simplified syntax
   auth: {
+    apiKey: process.env.API_KEY,        // Simple API key auth
+    // OR
+    jwt: process.env.JWT_SECRET,        // Simple JWT auth
+    // OR full syntax for advanced options:
     strategy: "none" | "api-key" | "jwt-hs256",  // Default: "none"
-    
-    // For API key auth
-    apiKeyHeader: "x-api-key",         // Header name for API key
-    apiKeys: ["key1", "key2"],         // Array of valid keys
-    
-    // For JWT auth (HS256)
+    apiKeyHeader: "x-api-key",          // Custom header name
+    apiKeys: ["key1", "key2"],          // Multiple valid keys
     jwt: {
-      sharedSecret: "your-secret",     // Shared secret for HS256
-      issuer: "your-app",               // Optional: validate issuer claim
-      audience: "your-audience"        // Optional: validate audience claim
+      sharedSecret: "your-secret",      // Shared secret for HS256
+      issuer: "your-app",                // Optional: validate issuer claim
+      audience: "your-audience"         // Optional: validate audience claim
     }
   }
 };
@@ -348,11 +355,11 @@ export default {
 ### API Key Authentication
 
 ```typescript
-// postgresdk.config.ts - Simplified syntax
+// postgresdk.config.ts - Simple syntax (recommended)
 export default {
   connectionString: "...",
   auth: {
-    apiKey: "your-api-key"  // Single key shorthand
+    apiKey: process.env.API_KEY  // Single key shorthand
   }
 };
 
@@ -360,50 +367,45 @@ export default {
 export default {
   connectionString: "...",
   auth: {
-    apiKeys: ["key1", "key2", "key3"]
+    apiKeys: [process.env.API_KEY_1, process.env.API_KEY_2]
   }
 };
 
-// Or full syntax with custom header
+// Full syntax with custom header (optional)
 export default {
   connectionString: "...",
   auth: {
     strategy: "api-key",
-    apiKeyHeader: "x-api-key",  // Optional, defaults to "x-api-key"
-    apiKeys: [
-      "your-api-key-1",
-      "your-api-key-2",
-      // Can also use environment variables
-      "env:API_KEYS"  // Reads comma-separated keys from process.env.API_KEYS
-    ]
+    apiKeyHeader: "x-custom-key",  // Default: "x-api-key"
+    apiKeys: ["key1", "key2"]
   }
 };
 
 // Client SDK usage
 const sdk = new SDK({
   baseUrl: "http://localhost:3000",
-  auth: { apiKey: "your-api-key-1" }
+  auth: { apiKey: process.env.API_KEY }
 });
 ```
 
 ### JWT Authentication (HS256)
 
 ```typescript
-// postgresdk.config.ts - Simplified syntax
+// postgresdk.config.ts - Simple syntax (recommended)
 export default {
   connectionString: "...",
   auth: {
-    jwt: "your-secret-key"  // Shared secret shorthand
+    jwt: process.env.JWT_SECRET  // Shared secret shorthand
   }
 };
 
-// Or full syntax with issuer/audience validation
+// Full syntax with issuer/audience validation (optional)
 export default {
   connectionString: "...",
   auth: {
     strategy: "jwt-hs256",
     jwt: {
-      sharedSecret: process.env.JWT_SECRET || "your-secret-key",
+      sharedSecret: process.env.JWT_SECRET,
       issuer: "my-app",        // Optional: validates 'iss' claim
       audience: "my-users"     // Optional: validates 'aud' claim
     }
@@ -772,15 +774,114 @@ process.on("SIGTERM", async () => {
 });
 ```
 
-## CLI Options
+## SDK Distribution
+
+postgresdk makes it easy to distribute your generated SDK to client applications. When you generate your SDK, it's automatically bundled and served through your API, allowing client apps to pull the latest SDK directly.
+
+### Publishing Your SDK
+
+When you run `postgresdk generate`, the SDK is automatically:
+1. Generated as TypeScript files for both server and client
+2. Bundled and made available through API endpoints
+3. Ready to be pulled by client applications
+
+Your API automatically serves the SDK at these endpoints:
+- `GET /sdk/manifest` - SDK metadata and file list
+- `GET /sdk/download` - Download all SDK files as JSON
+- `GET /sdk/files/:path` - Download individual SDK files
+
+### Pulling the SDK in Client Apps
+
+Client applications can pull your SDK using the `postgresdk pull` command:
 
 ```bash
-postgresdk [options]
+# Install postgresdk in your client app
+npm install -D postgresdk
 
-Options:
+# Pull the SDK from your API
+postgresdk pull --from=https://api.myapp.com --output=./src/sdk
+
+# Or with authentication
+postgresdk pull --from=https://api.myapp.com --output=./src/sdk --token=your-token
+```
+
+### Configuration-based Pull
+
+Create a `postgresdk.config.ts` in your client app:
+
+```typescript
+export default {
+  pull: {
+    from: "https://api.myapp.com",
+    output: "./src/sdk",
+    token: process.env.API_TOKEN  // Optional auth
+  }
+};
+```
+
+Then simply run:
+```bash
+postgresdk pull
+```
+
+### Automated SDK Updates
+
+You can automate SDK updates in your client app's build process:
+
+```json
+// package.json
+{
+  "scripts": {
+    "prebuild": "postgresdk pull",
+    "build": "tsc"
+  }
+}
+```
+
+### SDK Versioning
+
+The pulled SDK includes metadata about when it was generated and from where:
+
+```typescript
+// .postgresdk.json (auto-generated)
+{
+  "version": "1.0.0",
+  "generated": "2024-01-15T10:30:00Z",
+  "pulledFrom": "https://api.myapp.com",
+  "pulledAt": "2024-01-15T11:00:00Z"
+}
+```
+
+## CLI Commands
+
+```bash
+postgresdk <command> [options]
+
+Commands:
+  init                 Create a postgresdk.config.ts file with all options
+  generate             Generate SDK from database
+  pull                 Pull SDK from API endpoint
+  version              Show version
+  help                 Show help
+
+Init Options:
+  (no options)         Creates postgresdk.config.ts in current directory
+
+Generate Options:
   -c, --config <path>  Path to config file (default: postgresdk.config.ts)
-  -v, --version        Show version
-  -h, --help           Show help
+
+Pull Options:
+  --from <url>         API URL to pull SDK from
+  --output <path>      Output directory (default: ./src/sdk)
+  --token <token>      Authentication token
+  -c, --config <path>  Path to config file with pull settings
+
+Examples:
+  postgresdk init                        # Create config file
+  postgresdk generate                    # Generate using default config
+  postgresdk generate -c custom.config.ts
+  postgresdk pull --from=https://api.com --output=./src/sdk
+  postgresdk pull -c client.config.ts    # Pull using config file
 ```
 
 ## How It Works

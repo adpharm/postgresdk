@@ -16,6 +16,7 @@ import { emitTypes } from "./emit-types";
 import { emitLogger } from "./emit-logger";
 import { emitAuth } from "./emit-auth";
 import { emitRouter } from "./emit-router";
+import { emitSdkBundle } from "./emit-sdk-bundle";
 import { ensureDirs, writeFiles } from "./utils";
 import type { Config } from "./types";
 import { normalizeAuthConfig } from "./types";
@@ -120,6 +121,13 @@ export async function generate(configPath: string) {
   files.push({
     path: join(serverDir, "router.ts"),
     content: emitRouter(Object.values(model.tables), !!normalizedAuth?.strategy && normalizedAuth.strategy !== "none"),
+  });
+
+  // Generate SDK bundle for serving from API
+  const clientFiles = files.filter(f => f.path.includes(clientDir));
+  files.push({
+    path: join(serverDir, "sdk-bundle.ts"),
+    content: emitSdkBundle(clientFiles),
   });
 
   console.log("✍️  Writing files...");

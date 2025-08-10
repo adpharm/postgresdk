@@ -154,7 +154,7 @@ async function main() {
 
   console.log("2) Run generator …");
   // Use the CLI with the config we just wrote
-  execSync(`bun run src/cli.ts -c ${CFG_PATH}`, { stdio: "inherit" });
+  execSync(`bun run src/cli.ts generate -c ${CFG_PATH}`, { stdio: "inherit" });
 
   console.log("3) Verify generated files exist …");
   const required = [
@@ -403,7 +403,7 @@ async function main() {
   }
 };`;
   writeFileSync(CFG_PATH, authConfig, "utf-8");
-  execSync(`bun run src/cli.ts -c ${CFG_PATH}`, { stdio: "inherit" });
+  execSync(`bun run src/cli.ts generate -c ${CFG_PATH}`, { stdio: "inherit" });
   
   // Import from the new location
   const { registerAuthorsRoutes: registerAuthorsRoutesAuth } = await import(`../${AUTH_SERVER_DIR}/routes/authors.ts`);
@@ -504,7 +504,7 @@ async function main() {
   }
 };`;
   writeFileSync(CFG_PATH, jwtConfig, "utf-8");
-  execSync(`bun run src/cli.ts -c ${CFG_PATH}`, { stdio: "inherit" });
+  execSync(`bun run src/cli.ts generate -c ${CFG_PATH}`, { stdio: "inherit" });
   
   // Import from JWT-specific directory
   const { registerAuthorsRoutes: registerAuthorsRoutesJWT } = await import(`../${JWT_SERVER_DIR}/routes/authors.ts`);

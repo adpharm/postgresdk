@@ -38,6 +38,15 @@ export interface Config {
   
   // Auth
   auth?: AuthConfigInput;
+  
+  // Pull configuration (for client repos)
+  pull?: PullConfig;
+}
+
+export interface PullConfig {
+  from: string;           // API URL to pull from
+  output?: string;        // Output directory (default: ./src/sdk)
+  token?: string;         // Auth token if needed
 }
 
 // Normalize simplified auth syntax to full AuthConfig
