@@ -599,6 +599,91 @@ async function main() {
     serverJWT.close();
     await pg3.end();
   }
+
+  // ===== TEST WITH SAME OUTPUT DIRECTORY =====
+  console.log("\n" + "=".repeat(50));
+  console.log("📁 Testing with same output directory...");
+  console.log("=".repeat(50));
+  
+  const SAME_DIR = "test/.results-same-dir";
+  
+  console.log("\n1) Generating with same server and client directory...");
+  const sameDirConfig = `export default {
+  connectionString: "${PG_URL}",
+  schema: "public",
+  outServer: "${SAME_DIR}",
+  outClient: "${SAME_DIR}",
+  softDeleteColumn: null,
+  includeDepthLimit: 3,
+  dateType: "date"
+};`;
+  writeFileSync(CFG_PATH, sameDirConfig, "utf-8");
+  execSync(`bun run src/cli.ts generate -c ${CFG_PATH}`, { stdio: "inherit" });
+  
+  console.log("\n2) Verifying directory structure...");
+  
+  // Check that SDK files are in the sdk subdirectory
+  assert(existsSync(join(SAME_DIR, "sdk")), "SDK subdirectory should exist");
+  assert(existsSync(join(SAME_DIR, "sdk", "index.ts")), "SDK index.ts should be in sdk subdir");
+  assert(existsSync(join(SAME_DIR, "sdk", "authors.ts")), "SDK client files should be in sdk subdir");
+  assert(existsSync(join(SAME_DIR, "sdk", "base-client.ts")), "Base client should be in sdk subdir");
+  
+  // Check that server files are in the root
+  assert(existsSync(join(SAME_DIR, "router.ts")), "Router should be in root");
+  assert(existsSync(join(SAME_DIR, "routes")), "Routes directory should be in root");
+  assert(existsSync(join(SAME_DIR, "include-loader.ts")), "Include loader should be in root");
+  assert(existsSync(join(SAME_DIR, "sdk-bundle.ts")), "SDK bundle should be in root");
+  
+  console.log("  ✓ Client SDK files are in 'sdk' subdirectory");
+  console.log("  ✓ Server files are in root directory");
+  console.log("  ✓ Clean separation between server and client code");
+  
+  // Verify SDK bundle is generated correctly with client files
+  console.log("\n2b) Verifying SDK bundle generation...");
+  const bundleContent = readFileSync(join(SAME_DIR, "sdk-bundle.ts"), "utf-8");
+  assert(bundleContent.includes("SDK_MANIFEST"), "Bundle should contain SDK_MANIFEST");
+  assert(bundleContent.includes("files:"), "Bundle should have files object");
+  assert(!bundleContent.includes("files: {}"), "Bundle files should not be empty");
+  assert(bundleContent.includes('"index.ts":'), "Bundle should contain index.ts");
+  assert(bundleContent.includes('"authors.ts":'), "Bundle should contain authors.ts");
+  assert(bundleContent.includes('"base-client.ts":'), "Bundle should contain base-client.ts");
+  console.log("  ✓ SDK bundle correctly includes all client files");
+  
+  // Test that the generated code works
+  console.log("\n3) Testing generated code functionality...");
+  const { registerAuthorsRoutes: registerAuthorsSameDir } = await import(`../${SAME_DIR}/routes/authors.ts`);
+  const { registerBooksRoutes: registerBooksSameDir } = await import(`../${SAME_DIR}/routes/books.ts`);
+  
+  const pg4 = new Client({ connectionString: PG_URL });
+  await pg4.connect();
+  
+  const appSameDir = new Hono();
+  registerAuthorsSameDir(appSameDir, { pg: pg4 });
+  registerBooksSameDir(appSameDir, { pg: pg4 });
+  
+  const serverSameDir = serve({ fetch: appSameDir.fetch, port: 3459 });
+  console.log("   → Testing server on http://localhost:3459");
+  
+  try {
+    const { SDK: SDKSameDir } = await import(`../${SAME_DIR}/sdk/index.ts`);
+    const sdkSameDir = new SDKSameDir({ baseUrl: "http://localhost:3459" });
+    
+    // Quick functionality test
+    const testAuthor = await sdkSameDir.authors.create({ name: "Test Author Same Dir" });
+    assert(testAuthor.name === "Test Author Same Dir", "Should create author");
+    
+    const fetchedAuthor = await sdkSameDir.authors.getByPk(testAuthor.id);
+    assert(fetchedAuthor?.name === "Test Author Same Dir", "Should fetch author");
+    
+    await sdkSameDir.authors.delete(testAuthor.id);
+    console.log("  ✓ SDK from same-dir configuration works correctly");
+    
+  } finally {
+    serverSameDir.close();
+    await pg4.end();
+  }
+  
+  console.log("\n✅ Same directory configuration tests passed!");
     
   // Stop container if we started it
   if (startedContainer) {

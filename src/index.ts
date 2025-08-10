@@ -38,7 +38,14 @@ export async function generate(configPath: string) {
   const graph = buildGraph(model);
 
   const serverDir = cfg.outServer || "./generated/server";
-  const clientDir = cfg.outClient || "./generated/client";
+  const originalClientDir = cfg.outClient || "./generated/client";
+  
+  // If server and client dirs are the same, put client SDK in an 'sdk' subdirectory
+  const sameDirectory = serverDir === originalClientDir;
+  let clientDir = originalClientDir;
+  if (sameDirectory) {
+    clientDir = join(originalClientDir, "sdk");
+  }
   const normDateType = cfg.dateType === "string" ? "string" : "date";
 
   console.log("📁 Creating directories...");
@@ -124,10 +131,15 @@ export async function generate(configPath: string) {
   });
 
   // Generate SDK bundle for serving from API
-  const clientFiles = files.filter(f => f.path.includes(clientDir));
+  // When looking for client files, we need to use the actual path where they were written
+  const clientFiles = files.filter(f => {
+    // Check if the file path contains the client directory (including sdk subdir if applicable)
+    return f.path.includes(clientDir);
+  });
+  
   files.push({
     path: join(serverDir, "sdk-bundle.ts"),
-    content: emitSdkBundle(clientFiles),
+    content: emitSdkBundle(clientFiles, clientDir),
   });
 
   console.log("✍️  Writing files...");
@@ -135,5 +147,5 @@ export async function generate(configPath: string) {
 
   console.log(`✅ Generated ${files.length} files`);
   console.log(`  Server: ${serverDir}`);
-  console.log(`  Client: ${clientDir}`);
+  console.log(`  Client: ${sameDirectory ? clientDir + " (in sdk subdir due to same output dir)" : clientDir}`);
 }

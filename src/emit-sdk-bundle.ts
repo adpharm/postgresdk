@@ -2,16 +2,21 @@
  * Generates a bundle containing all client SDK files as a single module
  * that can be served by the API
  */
-export function emitSdkBundle(clientFiles: { path: string; content: string }[]) {
+export function emitSdkBundle(clientFiles: { path: string; content: string }[], clientDir: string) {
   // Extract just the relative paths within the client directory
   const files: Record<string, string> = {};
   
   for (const file of clientFiles) {
     // Get the path relative to the client directory
-    const parts = file.path.split('/');
-    const clientIndex = parts.lastIndexOf('client');
-    if (clientIndex >= 0 && clientIndex < parts.length - 1) {
-      const relativePath = parts.slice(clientIndex + 1).join('/');
+    // Handle both normal case (separate dirs) and same-dir case (with /sdk subdir)
+    const normalizedClientDir = clientDir.replace(/\\/g, '/');
+    const normalizedFilePath = file.path.replace(/\\/g, '/');
+    
+    if (normalizedFilePath.startsWith(normalizedClientDir)) {
+      // Remove the client directory prefix and any leading slash
+      const relativePath = normalizedFilePath
+        .substring(normalizedClientDir.length)
+        .replace(/^\//, '');
       files[relativePath] = file.content;
     }
   }
