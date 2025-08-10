@@ -173,8 +173,8 @@ async function main() {
     if (!existsSync(f)) throw new Error(`Missing generated file: ${f}`);
   }
 
-  console.log("4) Type-check generated code …");
-  execSync(`tsc --noEmit`, { stdio: "inherit" });
+  // Type checking is now done in test:typecheck for better coverage
+  console.log("4) Skipping type-check (done in dedicated test:typecheck)...");
 
   console.log("5) Boot Hono API using generated routes …");
   const { registerAuthorsRoutes } = await import(`../${SERVER_DIR}/routes/authors.ts`);

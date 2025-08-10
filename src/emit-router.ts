@@ -76,7 +76,7 @@ ${registrations}
   
   router.get("/sdk/files/:path{.*}", (c) => {
     const path = c.req.param("path");
-    const content = SDK_MANIFEST.files[path];
+    const content = SDK_MANIFEST.files[path as keyof typeof SDK_MANIFEST.files];
     if (!content) {
       return c.text("File not found", 404);
     }
