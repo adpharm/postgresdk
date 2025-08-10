@@ -127,7 +127,7 @@ export async function generate(configPath: string) {
   // server router (with createRouter and registerAllRoutes helpers)
   files.push({
     path: join(serverDir, "router.ts"),
-    content: emitRouter(Object.values(model.tables), !!normalizedAuth?.strategy && normalizedAuth.strategy !== "none"),
+    content: emitRouter(Object.values(model.tables), !!normalizedAuth?.strategy && normalizedAuth.strategy !== "none", cfg.driver || "pg"),
   });
 
   // Generate SDK bundle for serving from API

@@ -35,6 +35,7 @@ export interface Config {
   softDeleteColumn?: string | null;
   includeDepthLimit?: number;
   dateType?: "date" | "string";
+  driver?: "pg" | "neon";
   
   // Auth
   auth?: AuthConfigInput;
