@@ -62,14 +62,6 @@ export default {
    */
   // dateType: "date",
   
-  /**
-   * Database driver to use for connection
-   * - "pg": Node.js pg driver (default, works anywhere Node.js runs)
-   * - "neon": Neon serverless driver (edge-compatible, works on Vercel Edge/Cloudflare Workers)
-   * @default "pg"
-   */
-  // driver: "pg",
-  
   // ========== AUTHENTICATION ==========
   
   /**

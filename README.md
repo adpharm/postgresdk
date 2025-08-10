@@ -218,7 +218,6 @@ export default {
   softDeleteColumn: null,              // Column name for soft deletes (e.g., "deleted_at")
   includeDepthLimit: 3,                 // Max depth for nested includes
   dateType: "date",                    // "date" | "string" - How to handle timestamps
-  driver: "pg",                        // "pg" | "neon" - Database driver to use
   
   // Authentication (optional) - simplified syntax
   auth: {
@@ -496,19 +495,11 @@ const sdk = new SDK({
 
 ## Database Drivers
 
-postgresdk supports two database drivers, allowing you to choose based on your deployment target:
+The generated code works with any PostgreSQL client that implements a simple `query` interface. You can use the standard `pg` driver, Neon's serverless driver, or any other compatible client.
 
-### Node.js `pg` Driver (Default)
+### Node.js `pg` Driver
 
 The standard PostgreSQL driver for Node.js environments. Works everywhere Node.js runs.
-
-```typescript
-// postgresdk.config.ts
-export default {
-  connectionString: process.env.DATABASE_URL,
-  driver: "pg"  // Optional, this is the default
-};
-```
 
 Server setup:
 ```typescript
@@ -531,35 +522,19 @@ app.route("/", apiRouter);
 
 For edge environments like Vercel Edge Functions or Cloudflare Workers. Uses HTTP/WebSocket instead of TCP connections.
 
-```typescript
-// postgresdk.config.ts
-export default {
-  connectionString: process.env.DATABASE_URL,
-  driver: "neon"  // Use Neon driver for edge compatibility
-};
-```
-
 Server setup:
 ```typescript
 import { Hono } from "hono";
-import { neon } from "@neondatabase/serverless";
+import { Pool } from "@neondatabase/serverless";
 import { createRouter } from "./generated/server/router";
 
 const app = new Hono();
 
-// Neon serverless client
-const sql = neon(process.env.DATABASE_URL!);
+// Neon's Pool is compatible with node-postgres
+const pool = new Pool({ connectionString: process.env.DATABASE_URL! });
 
-// Create pg-compatible adapter
-const pg = {
-  async query(text: string, params?: any[]) {
-    const rows = await sql(text, params);
-    return { rows };
-  }
-};
-
-// Wire up the generated routes (same interface!)
-const apiRouter = createRouter({ pg });
+// Wire up the generated routes (Pool has the same query interface)
+const apiRouter = createRouter({ pg: pool });
 app.route("/", apiRouter);
 
 // Deploy to Vercel Edge
@@ -611,18 +586,15 @@ interface DatabaseAdapter {
   query(text: string, params?: any[]): Promise<{ rows: any[] }>;
 }
 
-// Example with Drizzle ORM
-import { drizzle } from "drizzle-orm/node-postgres";
-import { Client } from "pg";
+// Both pg and @neondatabase/serverless Pool/Client implement this interface natively
+// For other ORMs, you may need to create an adapter:
 
-const client = new Client({ connectionString: process.env.DATABASE_URL });
-const db = drizzle(client);
-
-// Create adapter
+// Example with a hypothetical ORM that doesn't match the interface
+const customClient = new SomeORM();
 const pg = {
   async query(text: string, params?: any[]) {
-    const result = await client.query(text, params);
-    return { rows: result.rows };
+    const result = await customClient.raw(text, params);
+    return { rows: result };
   }
 };
 

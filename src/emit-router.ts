@@ -4,7 +4,7 @@ import { pascal } from "./utils";
 /**
  * Emits the server router file that exports helper functions for route registration
  */
-export function emitRouter(tables: Table[], hasAuth: boolean, driver: "pg" | "neon" = "pg") {
+export function emitRouter(tables: Table[], hasAuth: boolean) {
   const tableNames = tables.map(t => t.name).sort();
   const imports = tableNames
     .map(name => {
@@ -27,35 +27,6 @@ export function emitRouter(tables: Table[], hasAuth: boolean, driver: "pg" | "ne
     })
     .join("\n");
 
-  const pgExample = driver === "pg" ? `
- * import { Client } from "pg";
- * import { createRouter } from "./generated/server/router";
- * 
- * const app = new Hono();
- * const pg = new Client({ connectionString: process.env.DATABASE_URL });
- * await pg.connect();
- * 
- * // Mount all generated routes under /api
- * const apiRouter = createRouter({ pg });
- * app.route("/api", apiRouter);` : `
- * import { neon } from "@neondatabase/serverless";
- * import { createRouter } from "./generated/server/router";
- * 
- * const app = new Hono();
- * const sql = neon(process.env.DATABASE_URL!);
- * 
- * // Create pg-compatible adapter for Neon
- * const pg = {
- *   async query(text: string, params?: any[]) {
- *     const rows = await sql(text, params);
- *     return { rows };
- *   }
- * };
- * 
- * // Mount all generated routes under /api
- * const apiRouter = createRouter({ pg });
- * app.route("/api", apiRouter);`;
-
   return `/* Generated. Do not edit. */
 import { Hono } from "hono";
 import { SDK_MANIFEST } from "./sdk-bundle";
@@ -66,7 +37,23 @@ ${hasAuth ? `export { authMiddleware } from "./auth";` : ""}
  * Creates a Hono router with all generated routes that can be mounted into your existing app.
  * 
  * @example
- * import { Hono } from "hono";${pgExample}
+ * import { Hono } from "hono";
+ * import { createRouter } from "./generated/server/router";
+ * 
+ * // Using pg driver (Node.js)
+ * import { Client } from "pg";
+ * const pg = new Client({ connectionString: process.env.DATABASE_URL });
+ * await pg.connect();
+ * 
+ * // OR using Neon driver (Edge-compatible)
+ * import { Pool } from "@neondatabase/serverless";
+ * const pool = new Pool({ connectionString: process.env.DATABASE_URL! });
+ * const pg = pool; // Pool already has the compatible query method
+ * 
+ * // Mount all generated routes
+ * const app = new Hono();
+ * const apiRouter = createRouter({ pg });
+ * app.route("/api", apiRouter);
  * 
  * // Or mount directly at root
  * const router = createRouter({ pg });
@@ -111,24 +98,13 @@ ${registrations}
  * Register all generated routes directly on an existing Hono app.
  * 
  * @example
- * import { Hono } from "hono";${driver === "pg" ? `
- * import { Client } from "pg";
+ * import { Hono } from "hono";
  * import { registerAllRoutes } from "./generated/server/router";
  * 
  * const app = new Hono();
- * const pg = new Client({ connectionString: process.env.DATABASE_URL });
- * await pg.connect();` : `
- * import { neon } from "@neondatabase/serverless";
- * import { registerAllRoutes } from "./generated/server/router";
  * 
- * const app = new Hono();
- * const sql = neon(process.env.DATABASE_URL!);
- * const pg = {
- *   async query(text: string, params?: any[]) {
- *     const rows = await sql(text, params);
- *     return { rows };
- *   }
- * };`}
+ * // Setup database connection (see createRouter example for both pg and Neon options)
+ * const pg = yourDatabaseClient;
  * 
  * // Register all routes at once
  * registerAllRoutes(app, { pg });
