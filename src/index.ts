@@ -10,6 +10,7 @@ import { emitIncludeBuilder } from "./emit-include-builder";
 import { emitZod } from "./emit-zod";
 import { emitRoutes } from "./emit-routes";
 import { emitClient, emitClientIndex } from "./emit-client";
+import { emitBaseClient } from "./emit-base-client";
 import { emitIncludeLoader } from "./emit-include-loader";
 import { emitTypes } from "./emit-types";
 import { emitLogger } from "./emit-logger";
@@ -55,6 +56,9 @@ export async function generate(configPath: string) {
   const includeSpec = emitIncludeSpec(graph);
   files.push({ path: join(serverDir, "include-spec.ts"), content: includeSpec });
   files.push({ path: join(clientDir, "include-spec.ts"), content: includeSpec });
+
+  // base-client (client only)
+  files.push({ path: join(clientDir, "base-client.ts"), content: emitBaseClient() });
 
   // include-builder (server)
   files.push({
