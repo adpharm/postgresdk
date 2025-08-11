@@ -231,7 +231,7 @@ export async function generate(configPath: string) {
     
     files.push({
       path: join(testDir, "run-tests.sh"),
-      content: emitTestScript(testFramework, originalTestDir),
+      content: emitTestScript(testFramework, testDir),
     });
     
     files.push({
