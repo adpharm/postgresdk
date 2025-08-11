@@ -20,6 +20,7 @@ import { emitSdkBundle } from "./emit-sdk-bundle";
 import { emitCoreOperations } from "./emit-core-operations";
 import { emitTableTest, emitTestSetup, emitDockerCompose, emitTestScript, emitVitestConfig, emitTestGitignore } from "./emit-tests";
 import { emitApiContract } from "./emit-api-contract";
+import { emitUnifiedContract } from "./emit-sdk-contract";
 import { ensureDirs, writeFiles } from "./utils";
 import type { Config } from "./types";
 import { normalizeAuthConfig } from "./types";
@@ -116,6 +117,9 @@ export async function generate(configPath: string) {
   });
 
   // per-table outputs
+  if (process.env.SDK_DEBUG) {
+    console.log(`[Index] About to process ${Object.keys(model.tables || {}).length} tables for generation`);
+  }
   for (const table of Object.values(model.tables)) {
     // types (server + client)
     const typesSrc = emitTypes(table, { numericMode: "string" });
@@ -182,9 +186,29 @@ export async function generate(configPath: string) {
   });
 
   // Generate API contract that describes the entire API
+  // Keep legacy API contract for backward compatibility
   files.push({
     path: join(serverDir, "api-contract.ts"),
     content: emitApiContract(model, cfg),
+  });
+  
+  // Add new unified contract with both API and SDK documentation
+  const contractCode = emitUnifiedContract(model, cfg);
+  files.push({
+    path: join(serverDir, "contract.ts"),
+    content: contractCode,
+  });
+  
+  // Also generate a markdown version for easy reading
+  const { generateUnifiedContract, generateUnifiedContractMarkdown } = await import("./emit-sdk-contract");
+  // Debug: Check model before passing it
+  if (process.env.SDK_DEBUG) {
+    console.log(`[Index] Model has ${Object.keys(model.tables || {}).length} tables before contract generation`);
+  }
+  const contract = generateUnifiedContract(model, cfg);
+  files.push({
+    path: join(serverDir, "CONTRACT.md"),
+    content: generateUnifiedContractMarkdown(contract),
   });
 
   // Generate tests if configured

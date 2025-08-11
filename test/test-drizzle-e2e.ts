@@ -1,0 +1,218 @@
+#!/usr/bin/env bun
+/**
+ * End-to-end test for Drizzle schema -> PostgreSDK generation -> Test execution
+ * 
+ * This test:
+ * 1. Creates a new database for Drizzle
+ * 2. Pushes the Drizzle schema to the database
+ * 3. Generates API with PostgreSDK
+ * 4. Runs the generated tests to verify everything works
+ */
+
+import { execSync } from "node:child_process";
+import { existsSync, rmSync, mkdirSync } from "node:fs";
+import { Client } from "pg";
+
+const DB_NAME = "drizzle_test";
+const ADMIN_URL = "postgres://user:pass@localhost:5432/testdb";
+const TEST_URL = `postgres://user:pass@localhost:5432/${DB_NAME}`;
+const OUTPUT_DIR = "test/.drizzle-e2e-results";
+
+async function createDatabase() {
+  console.log("📦 Creating test database...");
+  const client = new Client({ connectionString: ADMIN_URL });
+  await client.connect();
+  
+  try {
+    // Drop if exists and create fresh
+    await client.query(`DROP DATABASE IF EXISTS ${DB_NAME}`);
+    await client.query(`CREATE DATABASE ${DB_NAME}`);
+    console.log("  ✓ Database created");
+  } finally {
+    await client.end();
+  }
+}
+
+async function pushDrizzleSchema() {
+  console.log("\n🚀 Pushing Drizzle schema to database...");
+  
+  // Set the DATABASE_URL for drizzle-kit
+  process.env.DATABASE_URL = TEST_URL;
+  
+  try {
+    // Use drizzle-kit push to apply schema directly (no migrations needed for test)
+    // Use --force to skip confirmation prompt
+    execSync("bunx drizzle-kit push --config=test/drizzle-e2e/drizzle.config.ts --force", {
+      stdio: "inherit",
+      env: { ...process.env, DATABASE_URL: TEST_URL }
+    });
+    console.log("  ✓ Schema pushed successfully");
+  } catch (error) {
+    console.error("  ❌ Failed to push schema:", error);
+    throw error;
+  }
+}
+
+async function generatePostgreSDK() {
+  console.log("\n🔧 Generating PostgreSDK API...");
+  
+  // Clean output directory
+  if (existsSync(OUTPUT_DIR)) {
+    rmSync(OUTPUT_DIR, { recursive: true, force: true });
+  }
+  mkdirSync(OUTPUT_DIR, { recursive: true });
+  
+  // Create config for PostgreSDK
+  const config = `export default {
+  connectionString: "${TEST_URL}",
+  outServer: "${OUTPUT_DIR}/server",
+  outClient: "${OUTPUT_DIR}/client",
+  tests: {
+    generate: true,
+    output: "${OUTPUT_DIR}/tests",
+    framework: "vitest"
+  }
+};`;
+  
+  const configPath = `${OUTPUT_DIR}/postgresdk.config.ts`;
+  require("fs").writeFileSync(configPath, config);
+  
+  try {
+    execSync(`bun src/cli.ts generate -c ${configPath}`, {
+      stdio: "inherit"
+    });
+    console.log("  ✓ API generated successfully");
+  } catch (error) {
+    console.error("  ❌ Failed to generate API:", error);
+    throw error;
+  }
+}
+
+async function waitForServer(url: string, maxAttempts = 30): Promise<boolean> {
+  for (let i = 0; i < maxAttempts; i++) {
+    try {
+      const res = await fetch(`${url}/health`);
+      if (res.ok) {
+        return true;
+      }
+    } catch {}
+    await new Promise(resolve => setTimeout(resolve, 1000));
+  }
+  return false;
+}
+
+async function runGeneratedTests() {
+  console.log("\n🧪 Running generated tests...");
+  
+  const PORT = 3555;
+  const SERVER_URL = `http://localhost:${PORT}`;
+  
+  // Start the API server
+  console.log("  → Starting API server...");
+  
+  const { spawn } = require("child_process");
+  const serverProcess = spawn("bun", [
+    "test/drizzle-e2e/test-server.ts",
+    OUTPUT_DIR + "/server",
+    PORT.toString(),
+    TEST_URL
+  ], {
+    stdio: ["pipe", "pipe", "pipe"]
+  });
+  
+  // Capture server output for debugging
+  serverProcess.stdout.on("data", (data: Buffer) => {
+    const output = data.toString();
+    if (output.includes("Server running")) {
+      console.log("  ✓ Server started successfully");
+    }
+  });
+  
+  serverProcess.stderr.on("data", (data: Buffer) => {
+    console.error("  Server error:", data.toString());
+  });
+  
+  // Wait for server to be ready
+  console.log("  → Waiting for server to be ready...");
+  const isReady = await waitForServer(SERVER_URL);
+  
+  if (!isReady) {
+    console.error("  ❌ Server failed to start");
+    serverProcess.kill();
+    throw new Error("Server did not start in time");
+  }
+  
+  console.log("  ✓ Server is ready");
+  console.log("  → Running tests...");
+  
+  let testsPassed = false;
+  
+  try {
+    // Run the generated tests
+    execSync(`cd ${OUTPUT_DIR}/tests && API_URL=${SERVER_URL} bunx vitest run`, {
+      stdio: "inherit",
+      env: { ...process.env, API_URL: SERVER_URL }
+    });
+    console.log("  ✓ Tests completed successfully");
+    testsPassed = true;
+  } catch (error) {
+    console.error("  ❌ Tests failed");
+    // Don't throw here, we want to see the results
+  } finally {
+    // Clean up server process
+    console.log("  → Stopping server...");
+    serverProcess.kill("SIGTERM");
+    
+    // Give it a moment to shut down gracefully
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // Force kill if still running
+    try {
+      serverProcess.kill("SIGKILL");
+    } catch {}
+  }
+  
+  return testsPassed;
+}
+
+async function main() {
+  console.log("🎯 Drizzle End-to-End Test");
+  console.log("=" + "=".repeat(49));
+  
+  try {
+    // Step 1: Create database
+    await createDatabase();
+    
+    // Step 2: Push Drizzle schema
+    await pushDrizzleSchema();
+    
+    // Step 3: Generate PostgreSDK API
+    await generatePostgreSDK();
+    
+    // Step 4: Show what was generated
+    console.log("\n📁 Generated files:");
+    execSync(`find ${OUTPUT_DIR} -type f -name "*.ts" | head -20`, { stdio: "inherit" });
+    
+    console.log("\n" + "=".repeat(50));
+    console.log("✅ E2E Test Setup Complete!");
+    
+    // Now run the tests
+    const testsPassed = await runGeneratedTests();
+    
+    console.log("\n" + "=".repeat(50));
+    if (testsPassed) {
+      console.log("✅ All E2E tests passed!");
+    } else {
+      console.log("❌ Some tests failed");
+      console.log("\n📁 Check the test results above for details");
+      process.exit(1);
+    }
+    
+  } catch (error) {
+    console.error("\n❌ E2E test failed:", error);
+    process.exit(1);
+  }
+}
+
+// Run the test
+main().catch(console.error);

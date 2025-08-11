@@ -57,7 +57,8 @@ export function generateApiContract(model: Model, config: Config & { auth?: Auth
   const relationships: RelationshipContract[] = [];
   
   // Process each table
-  for (const table of Object.values(model.tables)) {
+  const tables = Object.values(model.tables || {});
+  for (const table of tables) {
     resources.push(generateResourceContract(table, model));
     
     // Extract relationships

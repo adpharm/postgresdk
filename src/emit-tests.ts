@@ -298,11 +298,80 @@ export TEST_API_URL="http://localhost:3000"
 echo "⏳ Waiting for database..."
 sleep 3
 
-# TODO: Run your migrations on the test database
-# Example:
-# echo "📊 Running migrations..."
-# npm run migrate -- --database-url="$TEST_DATABASE_URL"
+# REQUIRED: Run migrations on the test database
+echo ""
+echo "📊 Database Migration Step"
+echo "========================================="
+echo ""
+echo "⚠️  IMPORTANT: You must run migrations before tests can work!"
+echo ""
+echo "Choose one of the following options:"
+echo ""
+echo "Option 1: Add your migration command (recommended):"
+echo "  Uncomment and modify one of these examples:"
+echo ""
+echo "  # For Prisma:"
+echo "  # npx prisma migrate deploy"
+echo ""
+echo "  # For Drizzle:"
+echo "  # npx drizzle-kit push --config=./drizzle.config.ts"
+echo ""
+echo "  # For node-pg-migrate:"
+echo "  # npm run migrate up"
+echo ""
+echo "  # For Knex:"
+echo "  # npx knex migrate:latest"
+echo ""
+echo "  # For TypeORM:"
+echo "  # npm run typeorm migration:run"
+echo ""
+echo "  # For custom migration scripts:"
+echo "  # node ./scripts/migrate.js"
+echo ""
+echo "Option 2: Skip migrations (only if your database is already set up):"
+echo "  Uncomment the line: # SKIP_MIGRATIONS=true"
+echo ""
+echo "========================================="
+echo ""
 
+# MIGRATION_COMMAND:
+# Add your migration command here. Examples:
+# MIGRATION_COMMAND="npx prisma migrate deploy"
+# MIGRATION_COMMAND="npx drizzle-kit push --config=./drizzle.config.ts"
+# MIGRATION_COMMAND="npm run migrate up"
+
+# Or skip migrations if your database is pre-configured:
+# SKIP_MIGRATIONS=true
+
+if [ -z "\${MIGRATION_COMMAND}" ] && [ -z "\${SKIP_MIGRATIONS}" ]; then
+  echo "❌ ERROR: No migration strategy configured!"
+  echo ""
+  echo "   Please edit this script and either:"
+  echo "   1. Set MIGRATION_COMMAND with your migration command"
+  echo "   2. Set SKIP_MIGRATIONS=true if migrations aren't needed"
+  echo ""
+  echo "   Tests cannot run without a properly migrated database schema."
+  echo ""
+  exit 1
+fi
+
+if [ ! -z "\${MIGRATION_COMMAND}" ]; then
+  echo "📊 Running migrations..."
+  echo "   Command: \${MIGRATION_COMMAND}"
+  eval "\${MIGRATION_COMMAND}"
+  if [ \$? -ne 0 ]; then
+    echo "❌ Migration failed! Please check your migration command and database connection."
+    exit 1
+  fi
+  echo "✅ Migrations completed successfully"
+elif [ "\${SKIP_MIGRATIONS}" = "true" ]; then
+  echo "⏭️  Skipping migrations (SKIP_MIGRATIONS=true)"
+else
+  echo "❌ Invalid migration configuration"
+  exit 1
+fi
+
+echo ""
 echo "🚀 Starting API server..."
 echo "⚠️  TODO: Uncomment and customize the API server startup command below:"
 echo ""
