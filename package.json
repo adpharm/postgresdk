@@ -1,6 +1,6 @@
 {
   "name": "postgresdk",
-  "version": "0.6.13",
+  "version": "0.6.14",
   "description": "Generate a typed server/client SDK from a Postgres schema (includes, Zod, Hono).",
   "type": "module",
   "bin": {
