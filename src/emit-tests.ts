@@ -353,26 +353,56 @@ else
 fi
 
 echo ""
-echo "🚀 Starting API server..."
-echo "⚠️  TODO: Uncomment and customize the API server startup command below:"
+echo "🚀 API Server Setup"
+echo "════════════════════════════════════════════════════════════════"
 echo ""
-echo "  # Example for Node.js/Bun using PROJECT_ROOT:"
-echo "  # cd \\$PROJECT_ROOT && npm run dev &"
-echo "  # SERVER_PID=\\$!"
+echo "⚠️  IMPORTANT: This script expects your API server to be running."
 echo ""
-echo "  # Example for custom server file:"
-echo "  # DATABASE_URL=\\$TEST_DATABASE_URL node \\$PROJECT_ROOT/src/server.js &"
-echo "  # SERVER_PID=\\$!"
+echo "   Option 1: Start manually (recommended for development)"
+echo "     - Start your API server in another terminal"
+echo "     - Make sure it uses TEST_DATABASE_URL: \$TEST_DATABASE_URL"
+echo "     - Make sure it's accessible at: \$TEST_API_URL"
 echo ""
-echo "  # Example for Bun:"
-echo "  # DATABASE_URL=\\$TEST_DATABASE_URL bun \\$PROJECT_ROOT/src/index.ts &"
-echo "  # SERVER_PID=\\$!"
+echo "   Option 2: Auto-start (edit this script)"
+echo "     - Uncomment and customize one of these commands:"
+echo "     # cd \$PROJECT_ROOT && DATABASE_URL=\$TEST_DATABASE_URL npm run dev &"
+echo "     # DATABASE_URL=\$TEST_DATABASE_URL bun \$PROJECT_ROOT/src/server.ts &"
+echo "     # SERVER_PID=\$!  # (uncomment this line too)"
+echo "     # sleep 3        # (wait for server to start)"
 echo ""
-echo "  Please edit this script to start your API server."
+echo "════════════════════════════════════════════════════════════════"
 echo ""
-# cd $PROJECT_ROOT && npm run dev &
+
+# Uncomment these lines to auto-start your API server:
+# cd $PROJECT_ROOT && DATABASE_URL=$TEST_DATABASE_URL npm run dev &
 # SERVER_PID=$!
 # sleep 3
+
+# Check if API server is running before starting tests
+echo "🔍 Checking if API server is running..."
+API_URL="\${TEST_API_URL:-http://localhost:3000}"
+
+# Simple health check - just try to connect to the port
+if ! curl -f -s --connect-timeout 3 "\${API_URL}/health" > /dev/null 2>&1; then
+  # Try a generic endpoint or just check if port is open
+  if ! nc -z localhost 3000 2>/dev/null; then
+    echo "❌ ERROR: API server is not running on \${API_URL}"
+    echo ""
+    echo "   The API server must be running before tests can execute."
+    echo "   Please:"
+    echo "   1. Start your API server manually, OR"
+    echo "   2. Edit this script to start the server automatically (see comments above)"
+    echo ""
+    echo "   Uncomment and customize one of these server startup commands:"
+    echo "   # cd \$PROJECT_ROOT && npm run dev &"
+    echo "   # DATABASE_URL=\$TEST_DATABASE_URL bun \$PROJECT_ROOT/src/server.ts &"
+    echo ""
+    exit 1
+  fi
+fi
+
+echo "✅ API server is responding"
+echo ""
 
 echo "🧪 Running tests..."
 TIMESTAMP=\$(date +%Y%m%d_%H%M%S)
@@ -396,8 +426,14 @@ echo "  $TEST_RESULTS_DIR/"
 echo ""
 echo "💡 Tips:"
 echo "  - Database will be stopped automatically on script exit"
+echo "  - API server (if started by this script) will also be stopped automatically"
 echo "  - To manually stop the database: docker-compose -f $SCRIPT_DIR/docker-compose.yml down"
 echo "  - To reset the database: docker-compose -f $SCRIPT_DIR/docker-compose.yml down -v"
+echo ""
+echo "🔧 If tests failed due to server issues:"
+echo "  - Check that your API server is configured to use TEST_DATABASE_URL"
+echo "  - Verify your API server is accessible at $API_URL"
+echo "  - Make sure all required environment variables are set"
 
 exit $TEST_EXIT_CODE
 `;
