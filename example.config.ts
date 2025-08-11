@@ -35,9 +35,9 @@ export default {
    * - TypeScript types
    * - Authentication middleware (if configured)
    * - Include/relationship handlers
-   * @default "./generated/server"
+   * @default "./api/server"
    */
-  outServer: "./generated/server",
+  outServer: "./api/server",
   
   /**
    * Output directory for client SDK
@@ -48,9 +48,9 @@ export default {
    * 
    * Note: If outServer and outClient are the same directory,
    * the client SDK will be placed in an 'sdk' subdirectory.
-   * @default "./generated/client"
+   * @default "./api/client"
    */
-  outClient: "./generated/client",
+  outClient: "./api/client",
   
   // ========== ADVANCED OPTIONS ==========
   
@@ -147,9 +147,10 @@ export default {
     
     /**
      * Output directory for tests
-     * @default "./generated/tests"
+     * Note: If same as server or client directory, tests will be placed in a 'tests' subdirectory.
+     * @default "./api/tests"
      */
-    output: "./generated/tests",
+    output: "./api/tests",
     
     /**
      * Test framework to use

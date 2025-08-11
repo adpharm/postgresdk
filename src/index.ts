@@ -39,8 +39,8 @@ export async function generate(configPath: string) {
   console.log("🔗 Building relationship graph...");
   const graph = buildGraph(model);
 
-  const serverDir = cfg.outServer || "./generated/server";
-  const originalClientDir = cfg.outClient || "./generated/client";
+  const serverDir = cfg.outServer || "./api/server";
+  const originalClientDir = cfg.outClient || "./api/client";
   
   // If server and client dirs are the same, put client SDK in an 'sdk' subdirectory
   const sameDirectory = serverDir === originalClientDir;
@@ -53,7 +53,14 @@ export async function generate(configPath: string) {
 
   // Test configuration
   const generateTests = cfg.tests?.generate ?? false;
-  const testDir = cfg.tests?.output || "./generated/tests";
+  const originalTestDir = cfg.tests?.output || "./api/tests";
+  
+  // If test dir is the same as server or client dir, put tests in a 'tests' subdirectory
+  let testDir = originalTestDir;
+  if (generateTests && (originalTestDir === serverDir || originalTestDir === originalClientDir)) {
+    testDir = join(originalTestDir, "tests");
+  }
+  
   const testFramework = cfg.tests?.framework || "vitest";
 
   console.log("📁 Creating directories...");
@@ -211,7 +218,8 @@ export async function generate(configPath: string) {
   console.log(`  Client: ${sameDirectory ? clientDir + " (in sdk subdir due to same output dir)" : clientDir}`);
   
   if (generateTests) {
-    console.log(`  Tests: ${testDir}`);
+    const testsInSubdir = originalTestDir === serverDir || originalTestDir === originalClientDir;
+    console.log(`  Tests: ${testsInSubdir ? testDir + " (in tests subdir due to same output dir)" : testDir}`);
     console.log(`  🐳 Run 'cd ${testDir} && docker-compose up -d' to start test database`);
     console.log(`  🧪 Run 'bash ${testDir}/run-tests.sh' to execute tests`);
   }

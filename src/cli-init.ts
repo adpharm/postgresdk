@@ -28,15 +28,15 @@ export default {
   
   /**
    * Output directory for server-side code (routes, validators, etc.)
-   * @default "./generated/server"
+   * @default "./api/server"
    */
-  // outServer: "./generated/server",
+  // outServer: "./api/server",
   
   /**
    * Output directory for client SDK
-   * @default "./generated/client"
+   * @default "./api/client"
    */
-  // outClient: "./generated/client",
+  // outClient: "./api/client",
   
   // ========== ADVANCED OPTIONS ==========
   
@@ -91,7 +91,7 @@ export default {
    */
   // tests: {
   //   generate: true,
-  //   output: "./generated/tests",
+  //   output: "./api/tests",
   //   framework: "vitest"  // or "jest" or "bun"
   // },
   

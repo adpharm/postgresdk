@@ -43,7 +43,7 @@ Get a complete, type-safe SDK with:
 ### 🎯 Client SDK with Full TypeScript Support
 
 ```typescript
-import { SDK } from "./generated/client";
+import { SDK } from "./api/client";
 
 const sdk = new SDK({ 
   baseUrl: "http://localhost:3000",
@@ -89,7 +89,7 @@ const recentBooks = await sdk.books.list({
 ```typescript
 import { Hono } from "hono";
 import { Client } from "pg";
-import { createRouter } from "./generated/server/router";
+import { createRouter } from "./api/server/router";
 
 const app = new Hono();
 const pg = new Client({ connectionString: process.env.DATABASE_URL });
@@ -124,7 +124,7 @@ const book = await sdk.books.create({
 });
 
 // Generated Zod schemas for runtime validation
-import { InsertBooksSchema } from "./generated/server/zod/books";
+import { InsertBooksSchema } from "./api/server/zod/books";
 
 const validated = InsertBooksSchema.parse(requestBody);
 ```
@@ -182,7 +182,7 @@ postgresdk generate
 // Server (Hono)
 import { Hono } from "hono";
 import { Client } from "pg";
-import { registerUsersRoutes } from "./generated/server/routes/users";
+import { registerUsersRoutes } from "./api/server/routes/users";
 
 const app = new Hono();
 const pg = new Client({ connectionString: "..." });
@@ -191,7 +191,7 @@ await pg.connect();
 registerUsersRoutes(app, { pg });
 
 // Client
-import { SDK } from "./generated/client";
+import { SDK } from "./api/client";
 
 const sdk = new SDK({ baseUrl: "http://localhost:3000" });
 
@@ -213,8 +213,8 @@ export default {
   
   // Optional (with defaults)
   schema: "public",                    // Database schema to introspect
-  outServer: "./generated/server",     // Server code output directory  
-  outClient: "./generated/client",     // Client SDK output directory
+  outServer: "./api/server",           // Server code output directory  
+  outClient: "./api/client",           // Client SDK output directory
   softDeleteColumn: null,              // Column name for soft deletes (e.g., "deleted_at")
   includeDepthLimit: 3,                 // Max depth for nested includes
   dateType: "date",                    // "date" | "string" - How to handle timestamps
@@ -507,7 +507,7 @@ Server setup:
 ```typescript
 import { Hono } from "hono";
 import { Client } from "pg";
-import { createRouter } from "./generated/server/router";
+import { createRouter } from "./api/server/router";
 
 const app = new Hono();
 
@@ -540,7 +540,7 @@ Server setup:
 ```typescript
 import { Hono } from "hono";
 import { Pool } from "@neondatabase/serverless";
-import { createRouter } from "./generated/server/router";
+import { createRouter } from "./api/server/router";
 
 const app = new Hono();
 
@@ -577,7 +577,7 @@ For production Node.js deployments, use connection pooling:
 
 ```typescript
 import { Pool } from "pg";
-import { createRouter } from "./generated/server/router";
+import { createRouter } from "./api/server/router";
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -627,7 +627,7 @@ postgresdk generates a `createRouter` function that returns a Hono router with a
 import { Hono } from "hono";
 import { serve } from "@hono/node-server";
 import { Client } from "pg";
-import { createRouter } from "./generated/server/router";
+import { createRouter } from "./api/server/router";
 
 const app = new Hono();
 
@@ -650,7 +650,7 @@ The `createRouter` function returns a Hono router that can be mounted anywhere:
 
 ```typescript
 import { Hono } from "hono";
-import { createRouter } from "./generated/server/router";
+import { createRouter } from "./api/server/router";
 
 const app = new Hono();
 
@@ -671,7 +671,7 @@ app.route("/v2", apiRouter);   // Routes will be at /v2/v1/users, /v2/v1/posts, 
 If you prefer to register routes directly on your app without a sub-router:
 
 ```typescript
-import { registerAllRoutes } from "./generated/server/router";
+import { registerAllRoutes } from "./api/server/router";
 
 const app = new Hono();
 const pg = new Client({ connectionString: process.env.DATABASE_URL });
@@ -686,7 +686,7 @@ registerAllRoutes(app, { pg });
 You can also import and register individual routes:
 
 ```typescript
-import { registerUsersRoutes, registerPostsRoutes } from "./generated/server/router";
+import { registerUsersRoutes, registerPostsRoutes } from "./api/server/router";
 
 const app = new Hono();
 
@@ -717,8 +717,8 @@ const pg = new Client({ connectionString: process.env.DATABASE_URL });
 await pg.connect();
 
 // All generated routes are prefixed with /v1 by default
-import { registerUsersRoutes } from "./generated/server/routes/users";
-import { registerPostsRoutes } from "./generated/server/routes/posts";
+import { registerUsersRoutes } from "./api/server/routes/users";
+import { registerPostsRoutes } from "./api/server/routes/posts";
 
 registerUsersRoutes(app, { pg });  // Adds /v1/users/*
 registerPostsRoutes(app, { pg });  // Adds /v1/posts/*
@@ -756,7 +756,7 @@ app.use("*", async (c, next) => {
 const pg = new Client({ connectionString: process.env.DATABASE_URL });
 await pg.connect();
 
-import { registerUsersRoutes } from "./generated/server/routes/users";
+import { registerUsersRoutes } from "./api/server/routes/users";
 registerUsersRoutes(app, { pg });
 ```
 
@@ -779,8 +779,8 @@ const pool = new Pool({
 const app = new Hono();
 
 // The generated routes work with both Client and Pool
-import { registerUsersRoutes } from "./generated/server/routes/users";
-import { registerPostsRoutes } from "./generated/server/routes/posts";
+import { registerUsersRoutes } from "./api/server/routes/users";
+import { registerPostsRoutes } from "./api/server/routes/posts";
 
 registerUsersRoutes(app, { pg: pool });
 registerPostsRoutes(app, { pg: pool });
@@ -831,9 +831,9 @@ import { serve } from "@hono/node-server";
 import { Pool } from "pg";
 
 // Import all generated route registrations
-import { registerUsersRoutes } from "./generated/server/routes/users";
-import { registerPostsRoutes } from "./generated/server/routes/posts";
-import { registerCommentsRoutes } from "./generated/server/routes/comments";
+import { registerUsersRoutes } from "./api/server/routes/users";
+import { registerPostsRoutes } from "./api/server/routes/posts";
+import { registerCommentsRoutes } from "./api/server/routes/comments";
 
 // Create app with type safety
 const app = new Hono();
@@ -988,7 +988,7 @@ export default {
   
   tests: {
     generate: true,              // Enable test generation
-    output: "./generated/tests", // Output directory
+    output: "./api/tests",       // Output directory
     framework: "vitest"          // Test framework (vitest, jest, or bun)
   }
 };
@@ -1009,7 +1009,7 @@ The generated Docker setup makes it easy to run tests in isolation:
 
 ```bash
 # Navigate to test directory
-cd generated/tests
+cd api/tests
 
 # Start test database
 docker-compose up -d
@@ -1052,7 +1052,7 @@ Example custom test:
 ```typescript
 // tests/custom/user-workflow.test.ts
 import { describe, it, expect } from 'vitest';
-import { createTestSDK, randomEmail } from '../generated/tests/setup';
+import { createTestSDK, randomEmail } from '../api/tests/setup';
 
 describe('User Registration Workflow', () => {
   const sdk = createTestSDK();

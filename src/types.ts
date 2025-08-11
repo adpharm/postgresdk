@@ -55,7 +55,7 @@ export interface Config {
   tests?: {
     // Generate test files
     generate?: boolean;
-    // Output directory for tests (default: "./generated/tests")
+    // Output directory for tests (default: "./api/tests")
     output?: string;
     // Test framework to use
     framework?: "vitest" | "jest" | "bun";
