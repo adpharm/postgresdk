@@ -343,6 +343,8 @@ if [ ! -z "\${MIGRATION_COMMAND}" ]; then
     exit 1
   fi
   echo "✅ Migrations completed successfully"
+  echo "⏳ Waiting for database to settle..."
+  sleep 2
 elif [ "\${SKIP_MIGRATIONS}" = "true" ]; then
   echo "⏭️  Skipping migrations (SKIP_MIGRATIONS=true)"
 else

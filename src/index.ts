@@ -19,7 +19,6 @@ import { emitHonoRouter } from "./emit-router-hono";
 import { emitSdkBundle } from "./emit-sdk-bundle";
 import { emitCoreOperations } from "./emit-core-operations";
 import { emitTableTest, emitTestSetup, emitDockerCompose, emitTestScript, emitVitestConfig, emitTestGitignore } from "./emit-tests";
-import { emitApiContract } from "./emit-api-contract";
 import { emitUnifiedContract } from "./emit-sdk-contract";
 import { ensureDirs, writeFiles } from "./utils";
 import type { Config } from "./types";
@@ -185,14 +184,7 @@ export async function generate(configPath: string) {
     content: emitSdkBundle(clientFiles, clientDir),
   });
 
-  // Generate API contract that describes the entire API
-  // Keep legacy API contract for backward compatibility
-  files.push({
-    path: join(serverDir, "api-contract.ts"),
-    content: emitApiContract(model, cfg),
-  });
-  
-  // Add new unified contract with both API and SDK documentation
+  // Generate unified contract with both API and SDK documentation
   const contractCode = emitUnifiedContract(model, cfg);
   files.push({
     path: join(serverDir, "contract.ts"),
