@@ -96,7 +96,7 @@ export async function getByPk(
 export async function listRecords(
   ctx: OperationContext,
   params: { limit?: number; offset?: number; include?: any }
-): Promise<{ data?: any; error?: string; issues?: any; status: number }> {
+): Promise<{ data?: any; error?: string; issues?: any; needsIncludes?: boolean; includeSpec?: any; status: number }> {
   try {
     const { limit = 50, offset = 0, include } = params;
     
