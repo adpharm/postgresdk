@@ -83,6 +83,18 @@ export default {
    */
   // useJsExtensionsClient: false,
   
+  // ========== TEST GENERATION ==========
+  
+  /**
+   * Generate basic SDK tests
+   * Uncomment to enable test generation with Docker setup
+   */
+  // tests: {
+  //   generate: true,
+  //   output: "./generated/tests",
+  //   framework: "vitest"  // or "jest" or "bun"
+  // },
+  
   // ========== AUTHENTICATION ==========
   
   /**

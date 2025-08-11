@@ -50,6 +50,16 @@ export interface Config {
   
   // Use .js extensions in client SDK imports (for specific bundlers/environments)
   useJsExtensionsClient?: boolean;
+  
+  // Test generation configuration
+  tests?: {
+    // Generate test files
+    generate?: boolean;
+    // Output directory for tests (default: "./generated/tests")
+    output?: string;
+    // Test framework to use
+    framework?: "vitest" | "jest" | "bun";
+  };
 }
 
 export interface PullConfig {

@@ -18,6 +18,7 @@ import { emitAuth } from "./emit-auth";
 import { emitHonoRouter } from "./emit-router-hono";
 import { emitSdkBundle } from "./emit-sdk-bundle";
 import { emitCoreOperations } from "./emit-core-operations";
+import { emitTableTest, emitTestSetup, emitDockerCompose, emitTestScript } from "./emit-tests";
 import { ensureDirs, writeFiles } from "./utils";
 import type { Config } from "./types";
 import { normalizeAuthConfig } from "./types";
@@ -50,15 +51,26 @@ export async function generate(configPath: string) {
   const normDateType = cfg.dateType === "string" ? "string" : "date";
   const serverFramework = cfg.serverFramework || "hono";
 
+  // Test configuration
+  const generateTests = cfg.tests?.generate ?? false;
+  const testDir = cfg.tests?.output || "./generated/tests";
+  const testFramework = cfg.tests?.framework || "vitest";
+
   console.log("📁 Creating directories...");
-  await ensureDirs([
+  const dirs = [
     serverDir,
     join(serverDir, "types"),
     join(serverDir, "zod"),
     join(serverDir, "routes"),
     clientDir,
     join(clientDir, "types"),
-  ]);
+  ];
+  
+  if (generateTests) {
+    dirs.push(testDir);
+  }
+  
+  await ensureDirs(dirs);
 
   const files = [];
 
@@ -162,10 +174,45 @@ export async function generate(configPath: string) {
     content: emitSdkBundle(clientFiles, clientDir),
   });
 
+  // Generate tests if configured
+  if (generateTests) {
+    console.log("🧪 Generating tests...");
+    
+    // Test setup files
+    files.push({
+      path: join(testDir, "setup.ts"),
+      content: emitTestSetup(testFramework),
+    });
+    
+    files.push({
+      path: join(testDir, "docker-compose.yml"),
+      content: emitDockerCompose(),
+    });
+    
+    files.push({
+      path: join(testDir, "run-tests.sh"),
+      content: emitTestScript(testFramework),
+    });
+    
+    // Generate test for each table
+    for (const table of Object.values(model.tables)) {
+      files.push({
+        path: join(testDir, `${table.name}.test.ts`),
+        content: emitTableTest(table, testFramework),
+      });
+    }
+  }
+
   console.log("✍️  Writing files...");
   await writeFiles(files);
 
   console.log(`✅ Generated ${files.length} files`);
   console.log(`  Server: ${serverDir}`);
   console.log(`  Client: ${sameDirectory ? clientDir + " (in sdk subdir due to same output dir)" : clientDir}`);
+  
+  if (generateTests) {
+    console.log(`  Tests: ${testDir}`);
+    console.log(`  🐳 Run 'cd ${testDir} && docker-compose up -d' to start test database`);
+    console.log(`  🧪 Run 'bash ${testDir}/run-tests.sh' to execute tests`);
+  }
 }

@@ -974,6 +974,104 @@ The pulled SDK includes metadata about when it was generated and from where:
 }
 ```
 
+## Generated Tests
+
+postgresdk can generate basic SDK tests to help you get started quickly. These tests demonstrate CRUD operations for each table and include Docker setup for easy testing.
+
+### Enabling Test Generation
+
+Add test configuration to your `postgresdk.config.ts`:
+
+```typescript
+export default {
+  connectionString: process.env.DATABASE_URL,
+  
+  tests: {
+    generate: true,              // Enable test generation
+    output: "./generated/tests", // Output directory
+    framework: "vitest"          // Test framework (vitest, jest, or bun)
+  }
+};
+```
+
+### What Gets Generated
+
+When tests are enabled, postgresdk generates:
+
+1. **Test files for each table** - Basic CRUD operation tests
+2. **setup.ts** - Common test utilities and helpers
+3. **docker-compose.yml** - PostgreSQL test database configuration
+4. **run-tests.sh** - Script to run tests with Docker
+
+### Running Tests with Docker
+
+The generated Docker setup makes it easy to run tests in isolation:
+
+```bash
+# Navigate to test directory
+cd generated/tests
+
+# Start test database
+docker-compose up -d
+
+# Wait for database to be ready
+sleep 3
+
+# Set environment variables
+export TEST_DATABASE_URL="postgres://testuser:testpass@localhost:5432/testdb"
+export TEST_API_URL="http://localhost:3000"
+
+# Run your migrations on test database
+# (your migration command here)
+
+# Start your API server
+npm run dev &
+
+# Run tests
+npm test
+
+# Stop database when done
+docker-compose down
+
+# Or use the generated script
+bash run-tests.sh
+```
+
+### Customizing Tests
+
+The generated tests are basic and meant as a starting point. Create your own test files for:
+
+- Business logic validation
+- Complex query scenarios  
+- Edge cases and error handling
+- Performance testing
+- Integration workflows
+
+Example custom test:
+
+```typescript
+// tests/custom/user-workflow.test.ts
+import { describe, it, expect } from 'vitest';
+import { createTestSDK, randomEmail } from '../generated/tests/setup';
+
+describe('User Registration Workflow', () => {
+  const sdk = createTestSDK();
+  
+  it('should handle complete registration flow', async () => {
+    // Your custom business logic tests
+    const user = await sdk.users.create({
+      email: randomEmail(),
+      name: 'Test User'
+    });
+    
+    // Verify welcome email was sent
+    // Check audit logs
+    // Validate permissions
+    // etc.
+  });
+});
+```
+
 ## CLI Commands
 
 ```bash

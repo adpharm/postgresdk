@@ -129,6 +129,38 @@ export default {
    */
   useJsExtensionsClient: false,
   
+  // ========== TEST GENERATION ==========
+  
+  /**
+   * Test generation configuration
+   * 
+   * Generates basic SDK tests to get you started quickly.
+   * These tests demonstrate CRUD operations for each table.
+   * Add your own business logic tests in separate files.
+   */
+  tests: {
+    /**
+     * Generate test files
+     * @default false
+     */
+    generate: false,
+    
+    /**
+     * Output directory for tests
+     * @default "./generated/tests"
+     */
+    output: "./generated/tests",
+    
+    /**
+     * Test framework to use
+     * - "vitest": Modern, Vite-based test runner (recommended)
+     * - "jest": Traditional test runner
+     * - "bun": Bun's built-in test runner
+     * @default "vitest"
+     */
+    framework: "vitest",
+  },
+  
   // ========== AUTHENTICATION ==========
   
   /**
@@ -292,7 +324,19 @@ export default {
  * };
  * 
  * 
- * 5. Client-side configuration (for pulling SDK):
+ * 5. Configuration with test generation:
+ * 
+ * export default {
+ *   connectionString: process.env.DATABASE_URL,
+ *   tests: {
+ *     generate: true,
+ *     output: "./tests/generated",
+ *     framework: "vitest"
+ *   }
+ * };
+ * 
+ * 
+ * 6. Client-side configuration (for pulling SDK):
  * 
  * export default {
  *   pull: {
