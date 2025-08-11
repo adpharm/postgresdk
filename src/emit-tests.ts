@@ -233,8 +233,14 @@ volumes:
 /**
  * Generate test runner script
  */
-export function emitTestScript(framework: "vitest" | "jest" | "bun" = "vitest") {
+export function emitTestScript(framework: "vitest" | "jest" | "bun" = "vitest", testDirPath?: string) {
   const runCommand = framework === "bun" ? "bun test" : framework;
+  
+  // Calculate how many levels up to get to project root from test directory
+  // Default assumes tests are in something like ./api/tests or ./tests
+  const pathToRoot = testDirPath 
+    ? testDirPath.split('/').filter(p => p && p !== '.').map(() => '..').join('/')
+    : '../..';
   
   return `#!/bin/bash
 # Test Runner Script
@@ -254,10 +260,10 @@ set -e
 
 SCRIPT_DIR="$( cd "$( dirname "\${BASH_SOURCE[0]}" )" && pwd )"
 
-# PROJECT_ROOT is the root of your project (3 levels up from tests directory)
+# PROJECT_ROOT is the root of your project
 # Use this to reference files from your project root
 # Example: $PROJECT_ROOT/src/server.ts
-PROJECT_ROOT="$( cd "$SCRIPT_DIR/../../.." && pwd )"
+PROJECT_ROOT="$( cd "$SCRIPT_DIR/${pathToRoot}" && pwd )"
 
 echo "📍 Project root: $PROJECT_ROOT"
 echo "📍 Test directory: $SCRIPT_DIR"
