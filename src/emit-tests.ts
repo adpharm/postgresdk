@@ -23,7 +23,12 @@ import type { Insert${Type}, Update${Type}, Select${Type} } from '${clientPath}/
  * Basic tests for ${tableName} table operations
  * 
  * These tests demonstrate basic CRUD operations.
- * Add your own business logic tests in separate files.
+ * The test data is auto-generated and may need adjustment for your specific schema.
+ * 
+ * If tests fail due to validation errors:
+ * 1. Check which fields are required by your API
+ * 2. Update the test data below to match your schema requirements
+ * 3. Consider adding your own business logic tests in separate files
  */
 describe('${Type} SDK Operations', () => {
   let sdk: SDK;
@@ -88,6 +93,46 @@ export function randomDate(): Date {
   const end = new Date();
   return new Date(start.getTime() + Math.random() * (end.getTime() - start.getTime()));
 }
+`;
+}
+
+/**
+ * Generate vitest config file
+ */
+export function emitVitestConfig() {
+  return `import { defineConfig } from 'vitest/config';
+
+export default defineConfig({
+  test: {
+    globals: true,
+    environment: 'node',
+    testTimeout: 30000,
+    hookTimeout: 30000,
+    // The reporters are configured via CLI in the test script
+  },
+});
+`;
+}
+
+/**
+ * Generate .gitignore for test directory
+ */
+export function emitTestGitignore() {
+  return `# Test results
+test-results/
+*.log
+
+# Node modules (if tests have their own dependencies)
+node_modules/
+
+# Environment files
+.env
+.env.local
+.env.test
+
+# Coverage reports
+coverage/
+*.lcov
 `;
 }
 
@@ -184,7 +229,14 @@ echo ""
 # sleep 3
 
 echo "🧪 Running tests..."
-${runCommand} "$@"
+TIMESTAMP=\$(date +%Y%m%d_%H%M%S)
+TEST_RESULTS_DIR="$SCRIPT_DIR/test-results"
+mkdir -p "$TEST_RESULTS_DIR"
+
+# Run tests with appropriate reporter based on framework
+${getTestCommand(framework, runCommand)}
+
+TEST_EXIT_CODE=$?
 
 # Cleanup
 # if [ ! -z "\${SERVER_PID}" ]; then
@@ -192,14 +244,40 @@ ${runCommand} "$@"
 #   kill $SERVER_PID 2>/dev/null || true
 # fi
 
-echo "✅ Tests completed!"
+if [ $TEST_EXIT_CODE -eq 0 ]; then
+  echo "✅ Tests completed successfully!"
+else
+  echo "❌ Tests failed with exit code $TEST_EXIT_CODE"
+fi
+
+echo ""
+echo "📊 Test results saved to:"
+echo "  $TEST_RESULTS_DIR/"
 echo ""
 echo "To stop the test database, run:"
 echo "  cd $SCRIPT_DIR && docker-compose down"
+
+exit $TEST_EXIT_CODE
 `;
 }
 
 // Helper functions
+
+function getTestCommand(framework: "vitest" | "jest" | "bun", baseCommand: string): string {
+  switch (framework) {
+    case "vitest":
+      // Vitest with both console and JSON/JUnit reporters
+      return `${baseCommand} --reporter=default --reporter=json --outputFile="$TEST_RESULTS_DIR/results-\${TIMESTAMP}.json" "$@"`;
+    case "jest":
+      // Jest with JSON reporter
+      return `${baseCommand} --json --outputFile="$TEST_RESULTS_DIR/results-\${TIMESTAMP}.json" "$@"`;
+    case "bun":
+      // Bun test doesn't have built-in file reporters yet, so we'll redirect output
+      return `${baseCommand} "$@" 2>&1 | tee "$TEST_RESULTS_DIR/results-\${TIMESTAMP}.txt"`;
+    default:
+      return `${baseCommand} "$@"`;
+  }
+}
 
 function getFrameworkImports(framework: "vitest" | "jest" | "bun"): string {
   switch (framework) {
@@ -218,21 +296,37 @@ function generateSampleData(table: Table): string {
   const fields: string[] = [];
   
   for (const col of table.columns) {
-    // Skip auto-generated columns
-    if (col.hasDefault ||
-        col.name === 'id' ||
-        col.name === 'created_at' ||
-        col.name === 'updated_at') {
+    // Skip only truly auto-generated columns
+    if (col.name === 'id' && col.hasDefault) {
+      continue;
+    }
+    if ((col.name === 'created_at' || col.name === 'updated_at') && col.hasDefault) {
       continue;
     }
     
-    // Skip nullable columns for simplicity
-    if (col.nullable) {
+    // Skip deleted_at (soft delete column)
+    if (col.name === 'deleted_at') {
       continue;
     }
     
-    const value = getSampleValue(col.pgType, col.name);
-    fields.push(`    ${col.name}: ${value}`);
+    // Include non-nullable columns and important nullable columns
+    // For nullable columns, include them if they look important (foreign keys, certain names, etc.)
+    const isImportant = col.name.endsWith('_id') || 
+                       col.name.endsWith('_by') ||
+                       col.name.includes('email') ||
+                       col.name.includes('name') ||
+                       col.name.includes('phone') ||
+                       col.name.includes('address') ||
+                       col.name.includes('description') ||
+                       col.name.includes('color') ||
+                       col.name.includes('type') ||
+                       col.name.includes('status') ||
+                       col.name.includes('subject');
+    
+    if (!col.nullable || isImportant) {
+      const value = getSampleValue(col.pgType, col.name);
+      fields.push(`    ${col.name}: ${value}`);
+    }
   }
   
   return fields.length > 0 ? `{\n${fields.join(',\n')}\n  }` : '{}';
@@ -264,8 +358,33 @@ function generateUpdateData(table: Table): string {
 function getSampleValue(type: string, name: string, isUpdate = false): string {
   const suffix = isUpdate ? ' + " (updated)"' : '';
   
+  // Handle foreign keys and special ID columns
+  if (name.endsWith('_id') || name.endsWith('_by')) {
+    // Generate valid UUID for foreign key references
+    return `'550e8400-e29b-41d4-a716-446655440000'`;
+  }
+  
+  // Handle specific column names
   if (name.includes('email')) {
     return `'test${isUpdate ? '.updated' : ''}@example.com'`;
+  }
+  if (name === 'color') {
+    return `'#${isUpdate ? 'FF0000' : '0000FF'}'`;
+  }
+  if (name === 'gender') {
+    return `'${isUpdate ? 'F' : 'M'}'`;
+  }
+  if (name.includes('phone')) {
+    return `'${isUpdate ? '555-0200' : '555-0100'}'`;
+  }
+  if (name.includes('address')) {
+    return `'123 ${isUpdate ? 'Updated' : 'Test'} Street'`;
+  }
+  if (name === 'type' || name === 'status') {
+    return `'${isUpdate ? 'updated' : 'active'}'`;
+  }
+  if (name === 'subject') {
+    return `'Test Subject${isUpdate ? ' Updated' : ''}'`;
   }
   if (name.includes('name') || name.includes('title')) {
     return `'Test ${pascal(name)}'${suffix}`;
@@ -273,7 +392,23 @@ function getSampleValue(type: string, name: string, isUpdate = false): string {
   if (name.includes('description') || name.includes('bio') || name.includes('content')) {
     return `'Test description'${suffix}`;
   }
+  if (name.includes('preferences') || name.includes('settings')) {
+    return `'Test preferences'${suffix}`;
+  }
+  if (name.includes('restrictions') || name.includes('dietary')) {
+    return `['vegetarian']`;
+  }
+  if (name.includes('location') || name.includes('clinic')) {
+    return `'Test Location'${suffix}`;
+  }
+  if (name.includes('specialty')) {
+    return `'General'`;
+  }
+  if (name.includes('tier')) {
+    return `'Standard'`;
+  }
   
+  // Handle PostgreSQL types
   switch (type) {
     case 'text':
     case 'varchar':
@@ -302,7 +437,10 @@ function getSampleValue(type: string, name: string, isUpdate = false): string {
     case 'jsonb':
       return `{ key: 'value' }`;
     case 'uuid':
-      return `'${isUpdate ? 'b' : 'a'}0e0e0e0-e0e0-e0e0-e0e0-e0e0e0e0e0e0'`;
+      return `'${isUpdate ? '550e8400-e29b-41d4-a716-446655440001' : '550e8400-e29b-41d4-a716-446655440000'}'`;
+    case 'text[]':
+    case 'varchar[]':
+      return `['item1', 'item2']`;
     default:
       return `'test'`;
   }

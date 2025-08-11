@@ -18,7 +18,7 @@ import { emitAuth } from "./emit-auth";
 import { emitHonoRouter } from "./emit-router-hono";
 import { emitSdkBundle } from "./emit-sdk-bundle";
 import { emitCoreOperations } from "./emit-core-operations";
-import { emitTableTest, emitTestSetup, emitDockerCompose, emitTestScript } from "./emit-tests";
+import { emitTableTest, emitTestSetup, emitDockerCompose, emitTestScript, emitVitestConfig, emitTestGitignore } from "./emit-tests";
 import { ensureDirs, writeFiles } from "./utils";
 import type { Config } from "./types";
 import { normalizeAuthConfig } from "./types";
@@ -203,6 +203,19 @@ export async function generate(configPath: string) {
       path: join(testDir, "run-tests.sh"),
       content: emitTestScript(testFramework),
     });
+    
+    files.push({
+      path: join(testDir, ".gitignore"),
+      content: emitTestGitignore(),
+    });
+    
+    // Add vitest config if using vitest
+    if (testFramework === "vitest") {
+      files.push({
+        path: join(testDir, "vitest.config.ts"),
+        content: emitVitestConfig(),
+      });
+    }
     
     // Generate test for each table
     for (const table of Object.values(model.tables)) {

@@ -115,7 +115,12 @@ function writeTestConfig(withAuth = false) {
   outClient: "${CLIENT_DIR}",
   softDeleteColumn: null,
   includeDepthLimit: 3,
-  dateType: "date"${authConfig}
+  dateType: "date"${authConfig},
+  tests: {
+    generate: true,
+    output: "${join("test", ".results", "tests")}",
+    framework: "vitest"
+  }
 };`;
   writeFileSync(CFG_PATH, cfg, "utf-8");
 }
