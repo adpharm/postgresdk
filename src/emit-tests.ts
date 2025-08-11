@@ -4,21 +4,69 @@ import { pascal } from "./utils";
 /**
  * Generate basic SDK tests for a table
  */
-export function emitTableTest(table: Table, clientPath: string, framework: "vitest" | "jest" | "bun" = "vitest") {
+export function emitTableTest(table: Table, model: Model, clientPath: string, framework: "vitest" | "jest" | "bun" = "vitest") {
   const Type = pascal(table.name);
   const tableName = table.name;
   
   // Import statements based on framework
   const imports = getFrameworkImports(framework);
   
+  // Check if this is a junction table (composite primary key)
+  const isJunctionTable = table.pk.length > 1;
+  
   // Check if this table has foreign keys
   const hasForeignKeys = table.fks.length > 0;
-  const foreignKeySetup = hasForeignKeys ? generateForeignKeySetup(table, clientPath) : null;
+  const foreignKeySetup = hasForeignKeys ? generateForeignKeySetup(table, model, clientPath) : null;
   
   // Generate sample data based on actual column schema
   const sampleData = generateSampleDataFromSchema(table, hasForeignKeys);
   const updateData = generateUpdateDataFromSchema(table);
   
+  // For junction tables, don't test CRUD operations the same way
+  if (isJunctionTable) {
+    return `${imports}
+import { SDK } from '${clientPath}';
+import type { Insert${Type}, Update${Type}, Select${Type} } from '${clientPath}/types/${tableName}';
+${foreignKeySetup?.imports || ''}
+
+/**
+ * Basic tests for ${tableName} table operations
+ * 
+ * This is a junction table with composite primary key.
+ * Tests are simplified since it represents a many-to-many relationship.
+ */
+describe('${Type} SDK Operations', () => {
+  let sdk: SDK;
+  ${foreignKeySetup?.variables || ''}
+  
+  beforeAll(async () => {
+    sdk = new SDK({ 
+      baseUrl: process.env.API_URL || 'http://localhost:3000',
+      auth: process.env.API_KEY ? { apiKey: process.env.API_KEY } : undefined
+    });
+    ${foreignKeySetup?.setup || ''}
+  });
+  
+  ${foreignKeySetup?.cleanup ? `afterAll(async () => {
+    ${foreignKeySetup.cleanup}
+  });
+  
+  ` : ''}it('should create a ${tableName} relationship', async () => {
+    const data: Insert${Type} = ${sampleData};
+    
+    const created = await sdk.${tableName}.create(data);
+    expect(created).toBeDefined();
+  });
+  
+  it('should list ${tableName} relationships', async () => {
+    const list = await sdk.${tableName}.list({ limit: 10 });
+    expect(Array.isArray(list)).toBe(true);
+  });
+});
+`;
+  }
+  
+  // Regular table with single primary key
   return `${imports}
 import { SDK } from '${clientPath}';
 import type { Insert${Type}, Update${Type}, Select${Type} } from '${clientPath}/types/${tableName}';
@@ -303,45 +351,72 @@ exit $TEST_EXIT_CODE
 
 // Helper functions
 
-function generateForeignKeySetup(table: Table, clientPath: string): any {
+function generateForeignKeySetup(table: Table, model: Model, clientPath: string): any {
   const imports: string[] = [];
   const variables: string[] = [];
   const setupStatements: string[] = [];
   const cleanupStatements: string[] = [];
   
   // Track unique foreign tables
-  const foreignTables = new Set<string>();
+  const foreignTablesData = new Map<string, Table>();
   
   for (const fk of table.fks) {
-    const foreignTable = fk.toTable;
-    if (!foreignTables.has(foreignTable)) {
-      foreignTables.add(foreignTable);
-      const ForeignType = pascal(foreignTable);
+    const foreignTableName = fk.toTable;
+    if (!foreignTablesData.has(foreignTableName)) {
+      const foreignTable = model.tables[foreignTableName];
+      if (!foreignTable) continue;
+      
+      foreignTablesData.set(foreignTableName, foreignTable);
+      const ForeignType = pascal(foreignTableName);
       
       // Add import for the foreign table types
-      imports.push(`import type { Insert${ForeignType} } from '${clientPath}/types/${foreignTable}';`);
+      imports.push(`import type { Insert${ForeignType} } from '${clientPath}/types/${foreignTableName}';`);
       
-      // Add variable to store created foreign record ID
-      variables.push(`let ${foreignTable}Id: string;`);
-      
-      // Add setup to create a parent record
-      // We'll need to generate minimal data for the foreign table too
-      setupStatements.push(`
-    // Create parent ${foreignTable} record for foreign key reference
-    const ${foreignTable}Data: Insert${ForeignType} = ${generateMinimalDataForTable(foreignTable)};
-    const created${ForeignType} = await sdk.${foreignTable}.create(${foreignTable}Data);
-    ${foreignTable}Id = created${ForeignType}.id;`);
-      
-      // Add cleanup to delete parent record
-      cleanupStatements.push(`
-    // Clean up parent ${foreignTable} record
-    if (${foreignTable}Id) {
+      // Determine if foreign table has single or composite PK
+      if (foreignTable.pk.length === 1) {
+        // Single PK - store just the ID
+        variables.push(`let ${foreignTableName}Id: string;`);
+        
+        // Generate valid data for the foreign table based on its ACTUAL schema
+        const foreignData = generateSampleDataFromSchema(foreignTable, false);
+        
+        setupStatements.push(`
+    // Create parent ${foreignTableName} record for foreign key reference
+    const ${foreignTableName}Data: Insert${ForeignType} = ${foreignData};
+    const created${ForeignType} = await sdk.${foreignTableName}.create(${foreignTableName}Data);
+    ${foreignTableName}Id = created${ForeignType}.${foreignTable.pk[0]};`);
+        
+        cleanupStatements.push(`
+    // Clean up parent ${foreignTableName} record
+    if (${foreignTableName}Id) {
       try {
-        await sdk.${foreignTable}.delete(${foreignTable}Id);
+        await sdk.${foreignTableName}.delete(${foreignTableName}Id);
       } catch (e) {
         // Parent might already be deleted due to cascading
       }
     }`);
+      } else {
+        // Composite PK - store the entire object
+        variables.push(`let ${foreignTableName}Key: any;`);
+        
+        const foreignData = generateSampleDataFromSchema(foreignTable, false);
+        
+        setupStatements.push(`
+    // Create parent ${foreignTableName} record for foreign key reference
+    const ${foreignTableName}Data: Insert${ForeignType} = ${foreignData};
+    const created${ForeignType} = await sdk.${foreignTableName}.create(${foreignTableName}Data);
+    ${foreignTableName}Key = { ${foreignTable.pk.map(pk => `${pk}: created${ForeignType}.${pk}`).join(', ')} };`);
+        
+        cleanupStatements.push(`
+    // Clean up parent ${foreignTableName} record
+    if (${foreignTableName}Key) {
+      try {
+        await sdk.${foreignTableName}.delete(${foreignTableName}Key);
+      } catch (e) {
+        // Parent might already be deleted due to cascading
+      }
+    }`);
+      }
     }
   }
   
@@ -351,38 +426,6 @@ function generateForeignKeySetup(table: Table, clientPath: string): any {
     setup: setupStatements.join(''),
     cleanup: cleanupStatements.join('')
   };
-}
-
-function generateMinimalDataForTable(tableName: string): string {
-  // Generate minimal valid data for creating a parent record
-  // Since we don't have the full table schema here, we'll use sensible defaults
-  // based on the table name
-  
-  // Common patterns - these would ideally be based on actual schema
-  if (tableName.includes('author')) {
-    return `{ name: 'Test Author' }`;
-  }
-  if (tableName.includes('book')) {
-    return `{ title: 'Test Book' }`;
-  }
-  if (tableName.includes('tag')) {
-    return `{ name: 'Test Tag' }`;
-  }
-  if (tableName.includes('user')) {
-    return `{ name: 'Test User', email: 'test@example.com' }`;
-  }
-  if (tableName.includes('category') || tableName.includes('categories')) {
-    return `{ name: 'Test Category' }`;
-  }
-  if (tableName.includes('product')) {
-    return `{ name: 'Test Product', price: 10.99 }`;
-  }
-  if (tableName.includes('order')) {
-    return `{ total: 100.00, status: 'pending' }`;
-  }
-  
-  // Default fallback - assume there's a name field
-  return `{ name: 'Test ${pascal(tableName)}' }`;
 }
 
 function getTestCommand(framework: "vitest" | "jest" | "bun", baseCommand: string): string {
@@ -440,20 +483,13 @@ function generateSampleDataFromSchema(table: Table, hasForeignKeys: boolean = fa
     const isAutoGenerated = col.hasDefault && 
       ['id', 'created_at', 'updated_at', 'created', 'updated', 'modified_at'].includes(col.name.toLowerCase());
     
-    if (isAutoGenerated) {
+    // Skip primary key columns if they're auto-generated
+    const isPrimaryKey = table.pk.includes(col.name);
+    if (isPrimaryKey && col.hasDefault) {
       continue;
     }
     
-    // Handle soft delete columns specially - they need to be included even if they have defaults
-    if (col.name === 'deleted_at' || col.name === 'deleted') {
-      // For nullable soft delete columns, explicitly set to null
-      if (col.nullable) {
-        fields.push(`    ${col.name}: null`);
-      } else {
-        // Non-nullable deleted_at is unusual but if it exists, provide a date
-        const value = generateValueForColumn(col);
-        fields.push(`    ${col.name}: ${value}`);
-      }
+    if (isAutoGenerated) {
       continue;
     }
     
@@ -463,15 +499,14 @@ function generateSampleDataFromSchema(table: Table, hasForeignKeys: boolean = fa
     // Include the field if:
     // 1. It's non-nullable (required)
     // 2. It's a foreign key
-    // 3. It has a default but is not auto-generated (like enums with defaults, status fields, etc.)
-    // 4. It looks important based on name patterns
+    // 3. It's part of a composite primary key
     
-    if (!col.nullable || foreignTable || (col.hasDefault && !isAutoGenerated) || shouldIncludeNullableColumn(col)) {
+    if (!col.nullable || foreignTable || isPrimaryKey) {
       if (foreignTable) {
         // Reference the variable created in beforeAll
         fields.push(`    ${col.name}: ${foreignTable}Id`);
       } else {
-        // Generate appropriate value based on column type and name
+        // Generate appropriate value based on column type
         const value = generateValueForColumn(col);
         fields.push(`    ${col.name}: ${value}`);
       }
@@ -490,11 +525,15 @@ function generateUpdateDataFromSchema(table: Table): string {
   // Find first updatable field (non-PK, non-auto-generated)
   for (const col of table.columns) {
     // Skip primary keys and auto-generated columns
-    if (table.pk.includes(col.name) || col.hasDefault) {
-      const autoGenerated = ['id', 'created_at', 'updated_at', 'created', 'updated', 'modified_at'];
-      if (autoGenerated.includes(col.name.toLowerCase())) {
-        continue;
-      }
+    if (table.pk.includes(col.name)) {
+      continue;
+    }
+    
+    const isAutoGenerated = col.hasDefault && 
+      ['id', 'created_at', 'updated_at', 'created', 'updated', 'modified_at'].includes(col.name.toLowerCase());
+    
+    if (isAutoGenerated) {
+      continue;
     }
     
     // Skip foreign keys for update (keep relationships stable)
@@ -502,16 +541,29 @@ function generateUpdateDataFromSchema(table: Table): string {
       continue;
     }
     
-    // Skip soft delete columns
-    if (col.name === 'deleted_at' || col.name === 'deleted') {
-      continue;
-    }
-    
-    // Use first suitable field for update
-    if (!col.nullable || shouldIncludeNullableColumn(col)) {
+    // Use first non-nullable field for update
+    if (!col.nullable) {
       const value = generateValueForColumn(col, true);
       fields.push(`    ${col.name}: ${value}`);
       break; // Only update one field for simplicity
+    }
+  }
+  
+  // If no non-nullable fields found, try nullable ones
+  if (fields.length === 0) {
+    for (const col of table.columns) {
+      if (table.pk.includes(col.name) || col.name.endsWith('_id')) {
+        continue;
+      }
+      
+      const isAutoGenerated = col.hasDefault && 
+        ['id', 'created_at', 'updated_at', 'created', 'updated', 'modified_at'].includes(col.name.toLowerCase());
+      
+      if (!isAutoGenerated) {
+        const value = generateValueForColumn(col, true);
+        fields.push(`    ${col.name}: ${value}`);
+        break;
+      }
     }
   }
   
@@ -579,15 +631,17 @@ function generateValueForColumn(col: { name: string, pgType: string }, isUpdate 
     
     // Date/Time types
     case 'date':
+      return `'2024-01-01'`;
     case 'timestamp':
     case 'timestamptz':
     case 'timestamp without time zone':
     case 'timestamp with time zone':
+      return `'2024-01-01T00:00:00.000Z'`;
     case 'time':
     case 'timetz':
     case 'time without time zone':
     case 'time with time zone':
-      return `new Date()`;
+      return `'12:00:00'`;
     
     case 'interval':
       return `'1 day'`;
@@ -690,32 +744,15 @@ function generateUUID(): string {
 function generateTestCases(table: Table, sampleData: string, updateData: string, hasForeignKeys: boolean = false): string {
   const Type = pascal(table.name);
   const hasData = sampleData !== '{}';
-  
-  // Skip CRUD tests for junction tables (M:N relationships)
-  const isJunctionTable = table.pk.length > 1 && table.columns.every(col => 
-    table.pk.includes(col.name) || col.name.endsWith('_id')
-  );
-  
-  if (isJunctionTable) {
-    return `it('should create a ${table.name} relationship', async () => {
-    // This is a junction table for M:N relationships
-    // Test data depends on parent records created in other tests
-    expect(true).toBe(true);
-  });
-  
-  it('should list ${table.name} relationships', async () => {
-    const list = await sdk.${table.name}.list({ limit: 10 });
-    expect(Array.isArray(list)).toBe(true);
-  });`;
-  }
+  const hasSinglePK = table.pk.length === 1;
   
   return `it('should create a ${table.name}', async () => {
     const data: Insert${Type} = ${sampleData};
     ${hasData ? `
     const created = await sdk.${table.name}.create(data);
     expect(created).toBeDefined();
-    expect(created.id).toBeDefined();
-    createdId = created.id;
+    ${hasSinglePK ? `expect(created.${table.pk[0]}).toBeDefined();
+    createdId = created.${table.pk[0]};` : ''}
     ` : `
     // Table has only auto-generated columns
     // Skip create test or add your own test data
@@ -728,7 +765,7 @@ function generateTestCases(table: Table, sampleData: string, updateData: string,
     expect(Array.isArray(list)).toBe(true);
   });
   
-  ${hasData ? `it('should get ${table.name} by id', async () => {
+  ${hasData && hasSinglePK ? `it('should get ${table.name} by id', async () => {
     if (!createdId) {
       console.warn('No ID from create test, skipping get test');
       return;
@@ -736,7 +773,7 @@ function generateTestCases(table: Table, sampleData: string, updateData: string,
     
     const item = await sdk.${table.name}.getByPk(createdId);
     expect(item).toBeDefined();
-    expect(item?.id).toBe(createdId);
+    expect(item?.${table.pk[0]}).toBe(createdId);
   });
   
   ${updateData !== '{}' ? `it('should update ${table.name}', async () => {

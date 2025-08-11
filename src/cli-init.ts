@@ -54,13 +54,6 @@ export default {
    */
   // includeDepthLimit: 3,
   
-  /**
-   * How to handle date/timestamp columns in TypeScript
-   * - "date": Use JavaScript Date objects
-   * - "string": Use ISO 8601 strings
-   * @default "date"
-   */
-  // dateType: "date",
   
   /**
    * Server framework for generated API routes

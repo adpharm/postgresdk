@@ -49,7 +49,6 @@ export async function generate(configPath: string) {
   if (sameDirectory) {
     clientDir = join(originalClientDir, "sdk");
   }
-  const normDateType = cfg.dateType === "string" ? "string" : "date";
   const serverFramework = cfg.serverFramework || "hono";
 
   // Test configuration
@@ -119,14 +118,14 @@ export async function generate(configPath: string) {
   // per-table outputs
   for (const table of Object.values(model.tables)) {
     // types (server + client)
-    const typesSrc = emitTypes(table, { dateType: normDateType, numericMode: "string" });
+    const typesSrc = emitTypes(table, { numericMode: "string" });
     files.push({ path: join(serverDir, "types", `${table.name}.ts`), content: typesSrc });
     files.push({ path: join(clientDir, "types", `${table.name}.ts`), content: typesSrc });
 
     // zod
     files.push({
       path: join(serverDir, "zod", `${table.name}.ts`),
-      content: emitZod(table, { dateType: normDateType, numericMode: "string" }),
+      content: emitZod(table, { numericMode: "string" }),
     });
 
     // routes (based on selected framework)
@@ -228,7 +227,7 @@ export async function generate(configPath: string) {
     for (const table of Object.values(model.tables)) {
       files.push({
         path: join(testDir, `${table.name}.test.ts`),
-        content: emitTableTest(table, relativeClientPath, testFramework),
+        content: emitTableTest(table, model, relativeClientPath, testFramework),
       });
     }
   }

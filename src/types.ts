@@ -34,7 +34,6 @@ export interface Config {
   outClient?: string;
   softDeleteColumn?: string | null;
   includeDepthLimit?: number;
-  dateType?: "date" | "string";
   
   // Server framework for generated routes
   serverFramework?: "hono" | "express" | "fastify";

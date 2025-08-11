@@ -1,7 +1,7 @@
 import type { Table } from "./introspect";
 import { pascal } from "./utils";
 
-export function emitZod(table: Table, opts: { dateType: "date" | "string"; numericMode: "string" | "number" }) {
+export function emitZod(table: Table, opts: { numericMode: "string" | "number" }) {
   const Type = pascal(table.name);
 
   const zFor = (pg: string): string => {
@@ -12,7 +12,7 @@ export function emitZod(table: Table, opts: { dateType: "date" | "string"; numer
     if (pg === "numeric" || pg === "float4" || pg === "float8")
       return opts.numericMode === "number" ? `z.number()` : `z.string()`;
     if (pg === "jsonb" || pg === "json") return `z.unknown()`;
-    if (pg === "date" || pg.startsWith("timestamp")) return opts.dateType === "date" ? `z.date()` : `z.string()`;
+    if (pg === "date" || pg.startsWith("timestamp")) return `z.string()`;
     if (pg.startsWith("_")) return `z.array(${zFor(pg.slice(1))})`;
     return `z.string()`; // text/varchar/unknown
   };
