@@ -36,8 +36,5 @@ ${fields}
 });
 
 export const Update${Type}Schema = Insert${Type}Schema.partial();
-
-export type Insert${Type} = z.infer<typeof Insert${Type}Schema>;
-export type Update${Type} = z.infer<typeof Update${Type}Schema>;
 `;
 }

@@ -73,9 +73,8 @@ export function emitClientIndex(tables: Table[], useJsExtensions?: boolean) {
     out += `import { ${pascal(t.name)}Client } from "./${t.name}${ext}";\n`;
   }
   
-  // Re-export auth types for backward compatibility
-  out += `\n// Re-export auth types for convenience\n`;
-  out += `export type { AuthConfig as SDKAuth, AuthConfig, HeaderMap, AuthHeadersProvider } from "./base-client${ext}";\n\n`;
+  // Export auth types
+  out += `\nexport type { AuthConfig, HeaderMap, AuthHeadersProvider } from "./base-client${ext}";\n\n`;
 
   // SDK class
   out += `/**\n`;
@@ -93,19 +92,17 @@ export function emitClientIndex(tables: Table[], useJsExtensions?: boolean) {
   out += `  }\n`;
   out += `}\n\n`;
   
-  // Export individual clients
-  out += `// Export individual table clients\n`;
-  for (const t of tables) {
-    out += `export { ${pascal(t.name)}Client } from "./${t.name}${ext}";\n`;
-  }
-  
   // Export base client for extension
-  out += `\n// Export base client for custom extensions\n`;
   out += `export { BaseClient } from "./base-client${ext}";\n`;
   
-  // Export include specs
-  out += `\n// Export include specifications\n`;
+  // Export include specs  
   out += `export * from "./include-spec${ext}";\n`;
+  
+  // Export Zod schemas
+  out += `\n// Zod schemas for form validation\n`;
+  for (const t of tables) {
+    out += `export { Insert${pascal(t.name)}Schema, Update${pascal(t.name)}Schema } from "./zod/${t.name}${ext}";\n`;
+  }
   
   return out;
 }

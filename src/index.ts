@@ -71,6 +71,7 @@ export async function generate(configPath: string) {
     join(serverDir, "routes"),
     clientDir,
     join(clientDir, "types"),
+    join(clientDir, "zod"),
   ];
   
   if (generateTests) {
@@ -125,11 +126,10 @@ export async function generate(configPath: string) {
     files.push({ path: join(serverDir, "types", `${table.name}.ts`), content: typesSrc });
     files.push({ path: join(clientDir, "types", `${table.name}.ts`), content: typesSrc });
 
-    // zod
-    files.push({
-      path: join(serverDir, "zod", `${table.name}.ts`),
-      content: emitZod(table, { numericMode: "string" }),
-    });
+    // zod (server + client)
+    const zodSrc = emitZod(table, { numericMode: "string" });
+    files.push({ path: join(serverDir, "zod", `${table.name}.ts`), content: zodSrc });
+    files.push({ path: join(clientDir, "zod", `${table.name}.ts`), content: zodSrc });
 
     // routes (based on selected framework)
     let routeContent: string;

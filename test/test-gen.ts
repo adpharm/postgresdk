@@ -431,11 +431,11 @@ async function main() {
   await new Promise(resolve => setTimeout(resolve, 100));
   
   try {
-    const { SDK: SDKAuth } = await import(`../${AUTH_CLIENT_DIR}/index.ts`);
+    const { SDK } = await import(`../${AUTH_CLIENT_DIR}/index.ts`);
     
     // Test without auth header - should fail
     console.log("\n📝 Testing Auth Protection:");
-    const sdkNoAuth = new SDKAuth({ baseUrl: "http://localhost:3457" });
+    const sdkNoAuth = new SDK({ baseUrl: "http://localhost:3457" });
     
     try {
       await sdkNoAuth.authors.list();
@@ -446,7 +446,7 @@ async function main() {
     }
     
     // Test with valid auth header using the simplified API
-    const sdkWithAuth = new SDKAuth({ 
+    const sdkWithAuth = new SDK({ 
       baseUrl: "http://localhost:3457",
       auth: { apiKey: "test-key-123" }
     });
@@ -456,7 +456,7 @@ async function main() {
     assert(Array.isArray(authAuthors), "Should get authors with valid key");
     
     // Test with invalid auth header
-    const sdkBadAuth = new SDKAuth({ 
+    const sdkBadAuth = new SDK({ 
       baseUrl: "http://localhost:3457",
       auth: { apiKey: "invalid-key" }
     });
