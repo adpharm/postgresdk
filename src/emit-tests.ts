@@ -105,7 +105,7 @@ version: '3.8'
 
 services:
   postgres:
-    image: postgres:16-alpine
+    image: postgres:17-alpine
     environment:
       POSTGRES_USER: testuser
       POSTGRES_PASSWORD: testpass
@@ -134,11 +134,23 @@ export function emitTestScript(framework: "vitest" | "jest" | "bun" = "vitest") 
   return `#!/bin/bash
 # Test Runner Script
 # 
-# This script sets up and runs tests with a Docker PostgreSQL database
+# This script sets up and runs tests with a Docker PostgreSQL database.
+# 
+# Usage:
+#   chmod +x run-tests.sh  # Make executable (first time only)
+#   ./run-tests.sh
+#
+# Prerequisites:
+#   - Docker installed and running
+#   - Your API server code in the parent directories
+#   - Test framework installed (${framework})
 
 set -e
 
+SCRIPT_DIR="$( cd "$( dirname "\${BASH_SOURCE[0]}" )" && pwd )"
+
 echo "🐳 Starting test database..."
+cd "$SCRIPT_DIR"
 docker-compose up -d --wait
 
 # Export test database URL
@@ -147,24 +159,43 @@ export TEST_API_URL="http://localhost:3000"
 
 # Wait for database to be ready
 echo "⏳ Waiting for database..."
-sleep 2
+sleep 3
 
-# Run migrations if needed (customize this)
-# npm run migrate
+# TODO: Run your migrations on the test database
+# Example:
+# echo "📊 Running migrations..."
+# npm run migrate -- --database-url="$TEST_DATABASE_URL"
 
 echo "🚀 Starting API server..."
-# Start your API server in the background
-# npm run dev &
+echo "⚠️  TODO: Uncomment and customize the API server startup command below:"
+echo ""
+echo "  # Example for Node.js/Bun:"
+echo "  # cd ../.. && npm run dev &"
+echo "  # SERVER_PID=\$!"
+echo ""
+echo "  # Example for custom server file:"
+echo "  # cd ../.. && node server.js &"
+echo "  # SERVER_PID=\$!"
+echo ""
+echo "  Please edit this script to start your API server."
+echo ""
+# cd ../.. && npm run dev &
 # SERVER_PID=$!
 # sleep 3
 
 echo "🧪 Running tests..."
-${runCommand} $@
+${runCommand} "$@"
 
 # Cleanup
-# kill $SERVER_PID 2>/dev/null || true
+# if [ ! -z "\${SERVER_PID}" ]; then
+#   echo "🛑 Stopping API server..."
+#   kill $SERVER_PID 2>/dev/null || true
+# fi
 
 echo "✅ Tests completed!"
+echo ""
+echo "To stop the test database, run:"
+echo "  cd $SCRIPT_DIR && docker-compose down"
 `;
 }
 

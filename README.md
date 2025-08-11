@@ -1005,37 +1005,29 @@ When tests are enabled, postgresdk generates:
 
 ### Running Tests with Docker
 
-The generated Docker setup makes it easy to run tests in isolation:
+The generated test setup includes a Docker Compose file and a test runner script:
 
 ```bash
-# Navigate to test directory
-cd api/tests
+# 1. Make the test script executable (first time only)
+chmod +x api/tests/run-tests.sh
 
-# Start test database
-docker-compose up -d
+# 2. Edit api/tests/run-tests.sh to configure:
+#    - Your API server startup command
+#    - Migration commands (if needed)
+#    - Any other setup specific to your project
 
-# Wait for database to be ready
-sleep 3
+# 3. Run the tests
+./api/tests/run-tests.sh
 
-# Set environment variables
-export TEST_DATABASE_URL="postgres://testuser:testpass@localhost:5432/testdb"
-export TEST_API_URL="http://localhost:3000"
-
-# Run your migrations on test database
-# (your migration command here)
-
-# Start your API server
-npm run dev &
-
-# Run tests
-npm test
-
-# Stop database when done
-docker-compose down
-
-# Or use the generated script
-bash run-tests.sh
+# The script will:
+# - Start a PostgreSQL 17 test database in Docker
+# - Wait for it to be ready
+# - Run your API server (once configured)
+# - Execute the test suite
+# - Provide cleanup instructions
 ```
+
+The test script includes detailed comments and examples for common setups. You'll need to uncomment and customize the API server startup section for your specific project.
 
 ### Customizing Tests
 

@@ -220,7 +220,9 @@ export async function generate(configPath: string) {
   if (generateTests) {
     const testsInSubdir = originalTestDir === serverDir || originalTestDir === originalClientDir;
     console.log(`  Tests: ${testsInSubdir ? testDir + " (in tests subdir due to same output dir)" : testDir}`);
-    console.log(`  🐳 Run 'cd ${testDir} && docker-compose up -d' to start test database`);
-    console.log(`  🧪 Run 'bash ${testDir}/run-tests.sh' to execute tests`);
+    console.log(`  📝 Test setup:`);
+    console.log(`     1. Make script executable: chmod +x ${testDir}/run-tests.sh`);
+    console.log(`     2. Edit the script to configure your API server startup`);
+    console.log(`     3. Run tests: ${testDir}/run-tests.sh`);
   }
 }
