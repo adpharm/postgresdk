@@ -7,7 +7,7 @@ import type { Model } from "./introspect";
  * - Loads children in batches per edge kind
  * - Stitches onto parent rows (mutates copies)
  */
-export function emitIncludeLoader(graph: Graph, model: Model, maxDepth: number) {
+export function emitIncludeLoader(graph: Graph, model: Model, maxDepth: number, useJsExtensions?: boolean) {
   // Precompute helpful maps for FK discovery
   const fkIndex: Record<
     string,
@@ -22,8 +22,10 @@ export function emitIncludeLoader(graph: Graph, model: Model, maxDepth: number) 
     fkIndex[t.name] = t.fks.map((f) => ({ from: f.from, toTable: f.toTable, to: f.to }));
   }
 
+  const ext = useJsExtensions ? ".js" : "";
+  
   return `/* Generated. Do not edit. */
-import { RELATION_GRAPH } from "./include-builder";
+import { RELATION_GRAPH } from "./include-builder${ext}";
 
 // Minimal types to keep the file self-contained
 type Graph = typeof RELATION_GRAPH;

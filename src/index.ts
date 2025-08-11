@@ -8,15 +8,16 @@ import { buildGraph } from "./rel-classify";
 import { emitIncludeSpec } from "./emit-include-spec";
 import { emitIncludeBuilder } from "./emit-include-builder";
 import { emitZod } from "./emit-zod";
-import { emitRoutes } from "./emit-routes";
+import { emitHonoRoutes } from "./emit-routes-hono";
 import { emitClient, emitClientIndex } from "./emit-client";
 import { emitBaseClient } from "./emit-base-client";
 import { emitIncludeLoader } from "./emit-include-loader";
 import { emitTypes } from "./emit-types";
 import { emitLogger } from "./emit-logger";
 import { emitAuth } from "./emit-auth";
-import { emitRouter } from "./emit-router";
+import { emitHonoRouter } from "./emit-router-hono";
 import { emitSdkBundle } from "./emit-sdk-bundle";
+import { emitCoreOperations } from "./emit-core-operations";
 import { ensureDirs, writeFiles } from "./utils";
 import type { Config } from "./types";
 import { normalizeAuthConfig } from "./types";
@@ -47,6 +48,7 @@ export async function generate(configPath: string) {
     clientDir = join(originalClientDir, "sdk");
   }
   const normDateType = cfg.dateType === "string" ? "string" : "date";
+  const serverFramework = cfg.serverFramework || "hono";
 
   console.log("📁 Creating directories...");
   await ensureDirs([
@@ -77,7 +79,7 @@ export async function generate(configPath: string) {
   // include-loader (server)
   files.push({
     path: join(serverDir, "include-loader.ts"),
-    content: emitIncludeLoader(graph, model, cfg.includeDepthLimit || 3),
+    content: emitIncludeLoader(graph, model, cfg.includeDepthLimit || 3, cfg.useJsExtensions),
   });
 
   // logger (server)
@@ -87,6 +89,12 @@ export async function generate(configPath: string) {
   if (normalizedAuth?.strategy && normalizedAuth.strategy !== "none") {
     files.push({ path: join(serverDir, "auth.ts"), content: emitAuth(normalizedAuth) });
   }
+
+  // core operations (server) - framework-agnostic database operations
+  files.push({ 
+    path: join(serverDir, "core", "operations.ts"), 
+    content: emitCoreOperations() 
+  });
 
   // per-table outputs
   for (const table of Object.values(model.tables)) {
@@ -101,14 +109,23 @@ export async function generate(configPath: string) {
       content: emitZod(table, { dateType: normDateType, numericMode: "string" }),
     });
 
-    // routes
-    files.push({
-      path: join(serverDir, "routes", `${table.name}.ts`),
-      content: emitRoutes(table, graph, {
+    // routes (based on selected framework)
+    let routeContent: string;
+    if (serverFramework === "hono") {
+      routeContent = emitHonoRoutes(table, graph, {
         softDeleteColumn: cfg.softDeleteColumn || null,
         includeDepthLimit: cfg.includeDepthLimit || 3,
         authStrategy: normalizedAuth?.strategy,
-      }),
+        useJsExtensions: cfg.useJsExtensions,
+      });
+    } else {
+      // For future framework support (express, fastify, etc.)
+      throw new Error(`Framework "${serverFramework}" is not yet supported. Currently only "hono" is available.`);
+    }
+    
+    files.push({
+      path: join(serverDir, "routes", `${table.name}.ts`),
+      content: routeContent,
     });
 
     // client
@@ -125,10 +142,13 @@ export async function generate(configPath: string) {
   });
 
   // server router (with createRouter and registerAllRoutes helpers)
-  files.push({
-    path: join(serverDir, "router.ts"),
-    content: emitRouter(Object.values(model.tables), !!normalizedAuth?.strategy && normalizedAuth.strategy !== "none"),
-  });
+  if (serverFramework === "hono") {
+    files.push({
+      path: join(serverDir, "router.ts"),
+      content: emitHonoRouter(Object.values(model.tables), !!normalizedAuth?.strategy && normalizedAuth.strategy !== "none", cfg.useJsExtensions),
+    });
+  }
+  // Future: Add emitExpressRouter, emitFastifyRouter, etc.
 
   // Generate SDK bundle for serving from API
   // When looking for client files, we need to use the actual path where they were written

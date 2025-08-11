@@ -36,11 +36,17 @@ export interface Config {
   includeDepthLimit?: number;
   dateType?: "date" | "string";
   
+  // Server framework for generated routes
+  serverFramework?: "hono" | "express" | "fastify";
+  
   // Auth
   auth?: AuthConfigInput;
   
   // Pull configuration (for client repos)
   pull?: PullConfig;
+  
+  // Use .js extensions in imports (for Vercel Edge compatibility)
+  useJsExtensions?: boolean;
 }
 
 export interface PullConfig {

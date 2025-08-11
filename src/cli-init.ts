@@ -62,6 +62,21 @@ export default {
    */
   // dateType: "date",
   
+  /**
+   * Server framework for generated API routes
+   * - "hono": Lightweight, edge-compatible web framework (default)
+   * - "express": Traditional Node.js framework (planned)
+   * - "fastify": High-performance Node.js framework (planned)
+   * @default "hono"
+   */
+  // serverFramework: "hono",
+  
+  /**
+   * Use .js extensions in imports (for Vercel Edge, Deno, etc.)
+   * @default false
+   */
+  // useJsExtensions: false,
+  
   // ========== AUTHENTICATION ==========
   
   /**

@@ -2,14 +2,16 @@ import type { Table } from "./introspect";
 import { pascal } from "./utils";
 
 /**
- * Emits the server router file that exports helper functions for route registration
+ * Emits the Hono server router file that exports helper functions for route registration
  */
-export function emitRouter(tables: Table[], hasAuth: boolean) {
+export function emitHonoRouter(tables: Table[], hasAuth: boolean, useJsExtensions?: boolean) {
   const tableNames = tables.map(t => t.name).sort();
+  const ext = useJsExtensions ? ".js" : "";
+  
   const imports = tableNames
     .map(name => {
       const Type = pascal(name);
-      return `import { register${Type}Routes } from "./routes/${name}";`;
+      return `import { register${Type}Routes } from "./routes/${name}${ext}";`;
     })
     .join("\n");
 
@@ -23,15 +25,15 @@ export function emitRouter(tables: Table[], hasAuth: boolean) {
   const reExports = tableNames
     .map(name => {
       const Type = pascal(name);
-      return `export { register${Type}Routes } from "./routes/${name}";`;
+      return `export { register${Type}Routes } from "./routes/${name}${ext}";`;
     })
     .join("\n");
 
   return `/* Generated. Do not edit. */
 import { Hono } from "hono";
-import { SDK_MANIFEST } from "./sdk-bundle";
+import { SDK_MANIFEST } from "./sdk-bundle${ext}";
 ${imports}
-${hasAuth ? `export { authMiddleware } from "./auth";` : ""}
+${hasAuth ? `export { authMiddleware } from "./auth${ext}";` : ""}
 
 /**
  * Creates a Hono router with all generated routes that can be mounted into your existing app.

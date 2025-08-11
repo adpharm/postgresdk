@@ -139,7 +139,7 @@ All from your existing database schema. No manual coding required.
 - 🔗 **Smart Relationships** - Automatic handling of 1:N and M:N relationships with eager loading
 - 🔐 **Built-in Auth** - API key and JWT authentication with zero configuration
 - 🎯 **Zero Config** - Works out of the box with sensible defaults
-- 🏗️ **Framework Ready** - Server routes built for Hono, client SDK works anywhere
+- 🏗️ **Framework Ready** - Server routes for Hono (Express & Fastify coming soon), client SDK works anywhere
 - 📦 **Lightweight** - Minimal dependencies, optimized bundle size with shared BaseClient
 - 🔄 **SDK Distribution** - Built-in SDK bundling and pull mechanism for easy client distribution
 
@@ -218,6 +218,8 @@ export default {
   softDeleteColumn: null,              // Column name for soft deletes (e.g., "deleted_at")
   includeDepthLimit: 3,                 // Max depth for nested includes
   dateType: "date",                    // "date" | "string" - How to handle timestamps
+  serverFramework: "hono",             // "hono" | "express" | "fastify" (currently only hono)
+  useJsExtensions: false,              // Add .js to imports (for Vercel Edge, Deno)
   
   // Authentication (optional) - simplified syntax
   auth: {
@@ -521,6 +523,18 @@ app.route("/", apiRouter);
 ### Neon Serverless Driver (Edge-Compatible)
 
 For edge environments like Vercel Edge Functions or Cloudflare Workers. Uses HTTP/WebSocket instead of TCP connections.
+
+Configuration for Vercel Edge:
+```typescript
+// postgresdk.config.ts
+export default {
+  connectionString: process.env.DATABASE_URL,
+  serverFramework: "hono",     // Hono is edge-compatible
+  useJsExtensions: true,        // Required for Vercel Edge
+  dateType: "string",           // Better for JSON serialization
+  auth: { apiKey: process.env.API_KEY }
+};
+```
 
 Server setup:
 ```typescript
