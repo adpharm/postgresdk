@@ -5,7 +5,7 @@ export function emitZod(table: Table, opts: { dateType: "date" | "string"; numer
   const Type = pascal(table.name);
 
   const zFor = (pg: string): string => {
-    if (pg === "uuid") return `z.string().uuid()`;
+    if (pg === "uuid") return `z.string()`;
     if (pg === "bool" || pg === "boolean") return `z.boolean()`;
     if (pg === "int2" || pg === "int4" || pg === "int8")
       return opts.numericMode === "number" ? `z.number()` : `z.string()`;
