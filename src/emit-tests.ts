@@ -4,7 +4,7 @@ import { pascal } from "./utils";
 /**
  * Generate basic SDK tests for a table
  */
-export function emitTableTest(table: Table, framework: "vitest" | "jest" | "bun" = "vitest") {
+export function emitTableTest(table: Table, clientPath: string, framework: "vitest" | "jest" | "bun" = "vitest") {
   const Type = pascal(table.name);
   const tableName = table.name;
   
@@ -16,8 +16,8 @@ export function emitTableTest(table: Table, framework: "vitest" | "jest" | "bun"
   const updateData = generateUpdateData(table);
   
   return `${imports}
-import { SDK } from '../client';
-import type { Insert${Type}, Update${Type}, Select${Type} } from '../client/types/${tableName}';
+import { SDK } from '${clientPath}';
+import type { Insert${Type}, Update${Type}, Select${Type} } from '${clientPath}/types/${tableName}';
 
 /**
  * Basic tests for ${tableName} table operations
@@ -44,7 +44,7 @@ describe('${Type} SDK Operations', () => {
 /**
  * Generate a test setup file
  */
-export function emitTestSetup(framework: "vitest" | "jest" | "bun" = "vitest") {
+export function emitTestSetup(clientPath: string, framework: "vitest" | "jest" | "bun" = "vitest") {
   return `/**
  * Test Setup and Utilities
  * 
@@ -63,7 +63,7 @@ export const TEST_API_KEY = process.env.TEST_API_KEY;
 
 // Utility to create SDK instance
 export function createTestSDK() {
-  const { SDK } = require('../client');
+  const { SDK } = require('${clientPath}');
   return new SDK({
     baseUrl: TEST_API_URL,
     auth: TEST_API_KEY ? { apiKey: TEST_API_KEY } : undefined

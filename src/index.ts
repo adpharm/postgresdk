@@ -1,7 +1,7 @@
 // Load environment variables first, before any other imports
 import "dotenv/config";
 
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import { pathToFileURL } from "node:url";
 import { introspect } from "./introspect";
 import { buildGraph } from "./rel-classify";
@@ -185,10 +185,13 @@ export async function generate(configPath: string) {
   if (generateTests) {
     console.log("🧪 Generating tests...");
     
+    // Calculate relative path from test dir to client dir
+    const relativeClientPath = relative(testDir, clientDir);
+    
     // Test setup files
     files.push({
       path: join(testDir, "setup.ts"),
-      content: emitTestSetup(testFramework),
+      content: emitTestSetup(relativeClientPath, testFramework),
     });
     
     files.push({
@@ -205,7 +208,7 @@ export async function generate(configPath: string) {
     for (const table of Object.values(model.tables)) {
       files.push({
         path: join(testDir, `${table.name}.test.ts`),
-        content: emitTableTest(table, testFramework),
+        content: emitTableTest(table, relativeClientPath, testFramework),
       });
     }
   }
