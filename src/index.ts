@@ -19,6 +19,7 @@ import { emitHonoRouter } from "./emit-router-hono";
 import { emitSdkBundle } from "./emit-sdk-bundle";
 import { emitCoreOperations } from "./emit-core-operations";
 import { emitTableTest, emitTestSetup, emitDockerCompose, emitTestScript, emitVitestConfig, emitTestGitignore } from "./emit-tests";
+import { emitApiContract } from "./emit-api-contract";
 import { ensureDirs, writeFiles } from "./utils";
 import type { Config } from "./types";
 import { normalizeAuthConfig } from "./types";
@@ -179,6 +180,12 @@ export async function generate(configPath: string) {
   files.push({
     path: join(serverDir, "sdk-bundle.ts"),
     content: emitSdkBundle(clientFiles, clientDir),
+  });
+
+  // Generate API contract that describes the entire API
+  files.push({
+    path: join(serverDir, "api-contract.ts"),
+    content: emitApiContract(model, cfg),
   });
 
   // Generate tests if configured

@@ -28,6 +28,7 @@
     "test:gen-with-tests": "bun src/cli.ts generate -c test/test-with-tests.config.ts",
     "test:pull": "bun test/test-pull.ts",
     "test:typecheck": "bun test/test-typecheck.ts",
+    "typecheck": "tsc --noEmit",
     "prepublishOnly": "npm run build",
     "publish:patch": "./publish.sh",
     "publish:minor": "./publish.sh",

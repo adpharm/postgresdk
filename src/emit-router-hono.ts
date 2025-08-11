@@ -32,6 +32,7 @@ export function emitHonoRouter(tables: Table[], hasAuth: boolean, useJsExtension
   return `/* Generated. Do not edit. */
 import { Hono } from "hono";
 import { SDK_MANIFEST } from "./sdk-bundle${ext}";
+import { getApiContract } from "./api-contract${ext}";
 ${imports}
 ${hasAuth ? `export { authMiddleware } from "./auth${ext}";` : ""}
 
@@ -90,6 +91,29 @@ ${registrations}
     }
     return c.text(content, 200, {
       "Content-Type": "text/plain; charset=utf-8"
+    });
+  });
+  
+  // API Contract endpoints - describes the entire API
+  router.get("/api/contract", (c) => {
+    const format = c.req.query("format") || "json";
+    
+    if (format === "markdown") {
+      return c.text(getApiContract("markdown") as string, 200, {
+        "Content-Type": "text/markdown; charset=utf-8"
+      });
+    }
+    
+    return c.json(getApiContract("json"));
+  });
+  
+  router.get("/api/contract.json", (c) => {
+    return c.json(getApiContract("json"));
+  });
+  
+  router.get("/api/contract.md", (c) => {
+    return c.text(getApiContract("markdown") as string, 200, {
+      "Content-Type": "text/markdown; charset=utf-8"
     });
   });
   

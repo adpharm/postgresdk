@@ -11,13 +11,18 @@ export function emitTableTest(table: Table, clientPath: string, framework: "vite
   // Import statements based on framework
   const imports = getFrameworkImports(framework);
   
+  // Check if this table has foreign keys
+  const hasForeignKeys = table.fks.length > 0;
+  const foreignKeySetup = hasForeignKeys ? generateForeignKeySetup(table, clientPath) : null;
+  
   // Generate sample data based on column types
-  const sampleData = generateSampleData(table);
+  const sampleData = generateSampleData(table, hasForeignKeys);
   const updateData = generateUpdateData(table);
   
   return `${imports}
 import { SDK } from '${clientPath}';
 import type { Insert${Type}, Update${Type}, Select${Type} } from '${clientPath}/types/${tableName}';
+${foreignKeySetup?.imports || ''}
 
 /**
  * Basic tests for ${tableName} table operations
@@ -33,15 +38,21 @@ import type { Insert${Type}, Update${Type}, Select${Type} } from '${clientPath}/
 describe('${Type} SDK Operations', () => {
   let sdk: SDK;
   let createdId: string;
+  ${foreignKeySetup?.variables || ''}
   
-  beforeAll(() => {
+  beforeAll(async () => {
     sdk = new SDK({ 
       baseUrl: process.env.API_URL || 'http://localhost:3000',
       auth: process.env.API_KEY ? { apiKey: process.env.API_KEY } : undefined
     });
+    ${foreignKeySetup?.setup || ''}
   });
   
-  ${generateTestCases(table, sampleData, updateData)}
+  ${hasForeignKeys && foreignKeySetup?.cleanup ? `afterAll(async () => {
+    ${foreignKeySetup.cleanup}
+  });
+  
+  ` : ''}${generateTestCases(table, sampleData, updateData, hasForeignKeys)}
 });
 `;
 }
@@ -109,6 +120,13 @@ export default defineConfig({
     testTimeout: 30000,
     hookTimeout: 30000,
     // The reporters are configured via CLI in the test script
+    // Force color output in terminal
+    pool: 'forks',
+    poolOptions: {
+      forks: {
+        singleFork: true,
+      }
+    }
   },
 });
 `;
@@ -202,6 +220,10 @@ docker-compose up -d --wait
 export TEST_DATABASE_URL="postgres://testuser:testpass@localhost:5432/testdb"
 export TEST_API_URL="http://localhost:3000"
 
+# Force color output for better terminal experience
+export FORCE_COLOR=1
+export CI=""
+
 # Wait for database to be ready
 echo "⏳ Waiting for database..."
 sleep 3
@@ -263,19 +285,85 @@ exit $TEST_EXIT_CODE
 
 // Helper functions
 
+function generateForeignKeySetup(table: Table, clientPath: string): any {
+  const imports: string[] = [];
+  const variables: string[] = [];
+  const setupStatements: string[] = [];
+  const cleanupStatements: string[] = [];
+  
+  // Track unique foreign tables
+  const foreignTables = new Set<string>();
+  
+  for (const fk of table.fks) {
+    const foreignTable = fk.toTable;
+    if (!foreignTables.has(foreignTable)) {
+      foreignTables.add(foreignTable);
+      const ForeignType = pascal(foreignTable);
+      
+      // Add import for the foreign table types
+      imports.push(`import type { Insert${ForeignType} } from '${clientPath}/types/${foreignTable}';`);
+      
+      // Add variable to store created foreign record ID
+      variables.push(`let ${foreignTable}Id: string;`);
+      
+      // Add setup to create a parent record
+      setupStatements.push(`
+    // Create parent ${foreignTable} record for foreign key reference
+    const ${foreignTable}Data = ${generateMinimalSampleData(foreignTable)};
+    const created${ForeignType} = await sdk.${foreignTable}.create(${foreignTable}Data);
+    ${foreignTable}Id = created${ForeignType}.id;`);
+      
+      // Add cleanup to delete parent record
+      cleanupStatements.push(`
+    // Clean up parent ${foreignTable} record
+    if (${foreignTable}Id) {
+      try {
+        await sdk.${foreignTable}.delete(${foreignTable}Id);
+      } catch (e) {
+        // Parent might already be deleted due to cascading
+      }
+    }`);
+    }
+  }
+  
+  return {
+    imports: imports.join('\n'),
+    variables: variables.join('\n  '),
+    setup: setupStatements.join(''),
+    cleanup: cleanupStatements.join('')
+  };
+}
+
+function generateMinimalSampleData(tableName: string): string {
+  // Generate minimal valid data for creating a parent record
+  // This is a simplified version - in reality would need the table schema
+  const commonPatterns: Record<string, string> = {
+    'contacts': `{ name: 'Test Contact', email: 'test@example.com', gender: 'M', date_of_birth: new Date('1990-01-01'), emergency_contact: 'Emergency Contact', clinic_location: 'Main Clinic', specialty: 'General', fmv_tiering: 'Standard', flight_preferences: 'Economy', dietary_restrictions: [], special_accommodations: 'None' }`,
+    'tags': `{ name: 'Test Tag' }`,
+    'authors': `{ name: 'Test Author' }`,
+    'books': `{ title: 'Test Book' }`, // Don't include author_id here - it might not exist
+    'users': `{ name: 'Test User', email: 'test@example.com' }`,
+    'categories': `{ name: 'Test Category' }`,
+    'products': `{ name: 'Test Product', price: 10.99 }`,
+    'orders': `{ total: 100.00 }`, // Don't include customer_id - might not exist
+  };
+  
+  return commonPatterns[tableName] || `{ name: 'Test ${pascal(tableName)}' }`;
+}
+
 function getTestCommand(framework: "vitest" | "jest" | "bun", baseCommand: string): string {
   switch (framework) {
     case "vitest":
-      // Vitest with both console and JSON/JUnit reporters
-      return `${baseCommand} --reporter=default --reporter=json --outputFile="$TEST_RESULTS_DIR/results-\${TIMESTAMP}.json" "$@"`;
+      // Vitest with both console and JSON reporters, force colors
+      return `FORCE_COLOR=1 ${baseCommand} --reporter=default --reporter=json --outputFile="$TEST_RESULTS_DIR/results-\${TIMESTAMP}.json" "$@"`;
     case "jest":
-      // Jest with JSON reporter
-      return `${baseCommand} --json --outputFile="$TEST_RESULTS_DIR/results-\${TIMESTAMP}.json" "$@"`;
+      // Jest with both console and JSON output, force colors
+      return `FORCE_COLOR=1 ${baseCommand} --colors --json --outputFile="$TEST_RESULTS_DIR/results-\${TIMESTAMP}.json" "$@"`;
     case "bun":
-      // Bun test doesn't have built-in file reporters yet, so we'll redirect output
-      return `${baseCommand} "$@" 2>&1 | tee "$TEST_RESULTS_DIR/results-\${TIMESTAMP}.txt"`;
+      // Bun test with color output preserved via tee
+      return `FORCE_COLOR=1 ${baseCommand} "$@" 2>&1 | tee "$TEST_RESULTS_DIR/results-\${TIMESTAMP}.txt"`;
     default:
-      return `${baseCommand} "$@"`;
+      return `FORCE_COLOR=1 ${baseCommand} "$@"`;
   }
 }
 
@@ -292,8 +380,19 @@ function getFrameworkImports(framework: "vitest" | "jest" | "bun"): string {
   }
 }
 
-function generateSampleData(table: Table): string {
+function generateSampleData(table: Table, hasForeignKeys: boolean = false): string {
   const fields: string[] = [];
+  
+  // Track which columns are foreign keys
+  const foreignKeyColumns = new Map<string, string>();
+  if (hasForeignKeys) {
+    for (const fk of table.fks) {
+      // Assuming single column foreign keys for simplicity
+      if (fk.from.length === 1 && fk.from[0]) {
+        foreignKeyColumns.set(fk.from[0], fk.toTable);
+      }
+    }
+  }
   
   for (const col of table.columns) {
     // Skip only truly auto-generated columns
@@ -309,23 +408,36 @@ function generateSampleData(table: Table): string {
       continue;
     }
     
-    // Include non-nullable columns and important nullable columns
-    // For nullable columns, include them if they look important (foreign keys, certain names, etc.)
-    const isImportant = col.name.endsWith('_id') || 
-                       col.name.endsWith('_by') ||
-                       col.name.includes('email') ||
-                       col.name.includes('name') ||
-                       col.name.includes('phone') ||
-                       col.name.includes('address') ||
-                       col.name.includes('description') ||
-                       col.name.includes('color') ||
-                       col.name.includes('type') ||
-                       col.name.includes('status') ||
-                       col.name.includes('subject');
-    
-    if (!col.nullable || isImportant) {
-      const value = getSampleValue(col.pgType, col.name);
+    // ALWAYS include non-nullable columns
+    if (!col.nullable) {
+      // Check if this is a foreign key column
+      const foreignTable = foreignKeyColumns.get(col.name);
+      const value = foreignTable 
+        ? `${foreignTable}Id` // Use the variable created in beforeAll
+        : getSampleValue(col.pgType, col.name);
       fields.push(`    ${col.name}: ${value}`);
+    } else {
+      // For nullable columns, include them if they look important (foreign keys, certain names, etc.)
+      const isImportant = col.name.endsWith('_id') || 
+                         col.name.endsWith('_by') ||
+                         col.name.includes('email') ||
+                         col.name.includes('name') ||
+                         col.name.includes('phone') ||
+                         col.name.includes('address') ||
+                         col.name.includes('description') ||
+                         col.name.includes('color') ||
+                         col.name.includes('type') ||
+                         col.name.includes('status') ||
+                         col.name.includes('subject');
+      
+      if (isImportant) {
+        // Check if this is a foreign key column even if nullable
+        const foreignTable = foreignKeyColumns.get(col.name);
+        const value = foreignTable 
+          ? `${foreignTable}Id` // Use the variable created in beforeAll
+          : getSampleValue(col.pgType, col.name);
+        fields.push(`    ${col.name}: ${value}`);
+      }
     }
   }
   
@@ -407,6 +519,18 @@ function getSampleValue(type: string, name: string, isUpdate = false): string {
   if (name.includes('tier')) {
     return `'Standard'`;
   }
+  if (name.includes('emergency')) {
+    return `'Emergency Contact ${isUpdate ? 'Updated' : 'Name'}'`;
+  }
+  if (name === 'date_of_birth' || name.includes('birth')) {
+    return `new Date('1990-01-01')`;
+  }
+  if (name.includes('accommodations')) {
+    return `'No special accommodations'`;
+  }
+  if (name.includes('flight')) {
+    return `'Economy'`;
+  }
   
   // Handle PostgreSQL types
   switch (type) {
@@ -432,7 +556,7 @@ function getSampleValue(type: string, name: string, isUpdate = false): string {
       return `'2024-01-01'`;
     case 'timestamp':
     case 'timestamptz':
-      return `new Date().toISOString()`;
+      return `new Date()`;
     case 'json':
     case 'jsonb':
       return `{ key: 'value' }`;
@@ -446,7 +570,7 @@ function getSampleValue(type: string, name: string, isUpdate = false): string {
   }
 }
 
-function generateTestCases(table: Table, sampleData: string, updateData: string): string {
+function generateTestCases(table: Table, sampleData: string, updateData: string, hasForeignKeys: boolean = false): string {
   const Type = pascal(table.name);
   const hasData = sampleData !== '{}';
   
