@@ -1,6 +1,6 @@
 {
   "name": "postgresdk",
-  "version": "0.6.11",
+  "version": "0.6.12",
   "description": "Generate a typed server/client SDK from a Postgres schema (includes, Zod, Hono).",
   "type": "module",
   "bin": {
@@ -25,7 +25,7 @@
     "test": "bun test:init && bun test:gen && bun test:gen-with-tests && bun test:pull && bun test:typecheck && bun test:drizzle-e2e",
     "test:init": "bun test/test-init.ts",
     "test:gen": "bun test/test-gen.ts",
-    "test:gen-with-tests": "bun src/cli.ts generate -c test/test-with-tests.config.ts",
+    "test:gen-with-tests": "bun test/test-gen-with-tests.ts",
     "test:pull": "bun test/test-pull.ts",
     "test:typecheck": "bun test/test-typecheck.ts",
     "test:drizzle-e2e": "bun test/test-drizzle-e2e.ts",
