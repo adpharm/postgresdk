@@ -20,8 +20,11 @@ export function emitZod(table: Table, opts: { numericMode: "string" | "number" }
   const fields = table.columns
     .map((c) => {
       let z = zFor(c.pgType);
-      if (c.nullable) z += `.nullable()`;
-      if (c.hasDefault) z += `.optional()`;
+      if (c.nullable) {
+        z += `.nullish()`;
+      } else if (c.hasDefault) {
+        z += `.optional()`;
+      }
       return `  ${c.name}: ${z}`;
     })
     .join(",\n");
