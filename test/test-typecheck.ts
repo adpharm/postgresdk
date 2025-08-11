@@ -76,17 +76,6 @@ const testCases: TestCase[] = [
       }
     };`,
   },
-  {
-    name: "With string dates",
-    serverDir: `${TEST_DIR}/string-dates/server`,
-    clientDir: `${TEST_DIR}/string-dates/client`,
-    config: `export default {
-      connectionString: "${PG_URL}",
-      outServer: "${TEST_DIR}/string-dates/server",
-      outClient: "${TEST_DIR}/string-dates/client",
-      dateType: "string"
-    };`,
-  },
 ];
 
 async function cleanup() {

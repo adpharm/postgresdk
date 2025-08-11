@@ -4,6 +4,5 @@ export default {
   outServer: "test/.results-same-dir",
   outClient: "test/.results-same-dir",
   softDeleteColumn: null,
-  includeDepthLimit: 3,
-  dateType: "date"
+  includeDepthLimit: 3
 };

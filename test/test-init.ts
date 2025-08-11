@@ -124,7 +124,6 @@ async function testInitConfigStructure() {
     "outClient",
     "softDeleteColumn",
     "includeDepthLimit",
-    "dateType",
     "apiKeyHeader",
     "apiKeys",
     "jwt",

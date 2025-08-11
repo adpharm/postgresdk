@@ -114,8 +114,7 @@ function writeTestConfig(withAuth = false) {
   outServer: "${SERVER_DIR}",
   outClient: "${CLIENT_DIR}",
   softDeleteColumn: null,
-  includeDepthLimit: 3,
-  dateType: "date"${authConfig},
+  includeDepthLimit: 3${authConfig},
   tests: {
     generate: true,
     output: "${join("test", ".results", "tests")}",
@@ -400,7 +399,6 @@ async function main() {
   outClient: "${AUTH_CLIENT_DIR}",
   softDeleteColumn: null,
   includeDepthLimit: 3,
-  dateType: "date",
   auth: {
     strategy: "api-key",
     apiKeyHeader: "x-api-key",
@@ -498,7 +496,6 @@ async function main() {
   outClient: "${JWT_CLIENT_DIR}",
   softDeleteColumn: null,
   includeDepthLimit: 3,
-  dateType: "date",
   auth: {
     strategy: "jwt-hs256",
     jwt: {
@@ -619,8 +616,7 @@ async function main() {
   outServer: "${SAME_DIR}",
   outClient: "${SAME_DIR}",
   softDeleteColumn: null,
-  includeDepthLimit: 3,
-  dateType: "date"
+  includeDepthLimit: 3
 };`;
   writeFileSync(CFG_PATH, sameDirConfig, "utf-8");
   execSync(`bun run src/cli.ts generate -c ${CFG_PATH}`, { stdio: "inherit" });
