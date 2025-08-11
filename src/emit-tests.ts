@@ -254,6 +254,14 @@ set -e
 
 SCRIPT_DIR="$( cd "$( dirname "\${BASH_SOURCE[0]}" )" && pwd )"
 
+# PROJECT_ROOT is the root of your project (3 levels up from tests directory)
+# Use this to reference files from your project root
+# Example: $PROJECT_ROOT/src/server.ts
+PROJECT_ROOT="$( cd "$SCRIPT_DIR/../../.." && pwd )"
+
+echo "📍 Project root: $PROJECT_ROOT"
+echo "📍 Test directory: $SCRIPT_DIR"
+
 # Cleanup function to ensure database is stopped
 cleanup() {
   echo ""
@@ -335,10 +343,11 @@ echo "========================================="
 echo ""
 
 # MIGRATION_COMMAND:
-# Add your migration command here. Examples:
-# MIGRATION_COMMAND="npx prisma migrate deploy"
-# MIGRATION_COMMAND="npx drizzle-kit push --config=./drizzle.config.ts"
-# MIGRATION_COMMAND="npm run migrate up"
+# Add your migration command here. Examples using PROJECT_ROOT:
+# MIGRATION_COMMAND="cd $PROJECT_ROOT && npx prisma migrate deploy"
+# MIGRATION_COMMAND="cd $PROJECT_ROOT && npx drizzle-kit push --config=./drizzle.config.ts"
+# MIGRATION_COMMAND="cd $PROJECT_ROOT && npm run migrate up"
+# MIGRATION_COMMAND="DATABASE_URL=$TEST_DATABASE_URL node $PROJECT_ROOT/scripts/migrate.js"
 
 # Or skip migrations if your database is pre-configured:
 # SKIP_MIGRATIONS=true
@@ -375,17 +384,21 @@ echo ""
 echo "🚀 Starting API server..."
 echo "⚠️  TODO: Uncomment and customize the API server startup command below:"
 echo ""
-echo "  # Example for Node.js/Bun:"
-echo "  # cd ../.. && npm run dev &"
+echo "  # Example for Node.js/Bun using PROJECT_ROOT:"
+echo "  # cd \\$PROJECT_ROOT && npm run dev &"
 echo "  # SERVER_PID=\\$!"
 echo ""
 echo "  # Example for custom server file:"
-echo "  # cd ../.. && node server.js &"
+echo "  # DATABASE_URL=\\$TEST_DATABASE_URL node \\$PROJECT_ROOT/src/server.js &"
+echo "  # SERVER_PID=\\$!"
+echo ""
+echo "  # Example for Bun:"
+echo "  # DATABASE_URL=\\$TEST_DATABASE_URL bun \\$PROJECT_ROOT/src/index.ts &"
 echo "  # SERVER_PID=\\$!"
 echo ""
 echo "  Please edit this script to start your API server."
 echo ""
-# cd ../.. && npm run dev &
+# cd $PROJECT_ROOT && npm run dev &
 # SERVER_PID=$!
 # sleep 3
 
