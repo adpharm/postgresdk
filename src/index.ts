@@ -8,6 +8,8 @@ import { buildGraph } from "./rel-classify";
 import { emitIncludeSpec } from "./emit-include-spec";
 import { emitIncludeBuilder } from "./emit-include-builder";
 import { emitZod } from "./emit-zod";
+import { emitParamsZod } from "./emit-params-zod";
+import { emitSharedParamsZod } from "./emit-shared-params-zod";
 import { emitHonoRoutes } from "./emit-routes-hono";
 import { emitClient, emitClientIndex } from "./emit-client";
 import { emitBaseClient } from "./emit-base-client";
@@ -72,6 +74,7 @@ export async function generate(configPath: string) {
     clientDir,
     join(clientDir, "types"),
     join(clientDir, "zod"),
+    join(clientDir, "params"),
   ];
   
   if (generateTests) {
@@ -86,6 +89,9 @@ export async function generate(configPath: string) {
   const includeSpec = emitIncludeSpec(graph);
   files.push({ path: join(serverDir, "include-spec.ts"), content: includeSpec });
   files.push({ path: join(clientDir, "include-spec.ts"), content: includeSpec });
+
+  // shared params zod (client only)
+  files.push({ path: join(clientDir, "params", "shared.ts"), content: emitSharedParamsZod() });
 
   // base-client (client only)
   files.push({ path: join(clientDir, "base-client.ts"), content: emitBaseClient() });
@@ -130,6 +136,10 @@ export async function generate(configPath: string) {
     const zodSrc = emitZod(table, { numericMode: "string" });
     files.push({ path: join(serverDir, "zod", `${table.name}.ts`), content: zodSrc });
     files.push({ path: join(clientDir, "zod", `${table.name}.ts`), content: zodSrc });
+
+    // params zod (client only)
+    const paramsZodSrc = emitParamsZod(table, graph);
+    files.push({ path: join(clientDir, "params", `${table.name}.ts`), content: paramsZodSrc });
 
     // routes (based on selected framework)
     let routeContent: string;

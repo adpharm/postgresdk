@@ -103,6 +103,14 @@ export function emitClientIndex(tables: Table[], useJsExtensions?: boolean) {
   for (const t of tables) {
     out += `export { Insert${pascal(t.name)}Schema, Update${pascal(t.name)}Schema } from "./zod/${t.name}${ext}";\n`;
   }
+
+  // Export parameter schemas
+  out += `\n// Zod schemas for query parameters\n`;
+  out += `export { PaginationParamsSchema } from "./params/shared${ext}";\n`;
+  for (const t of tables) {
+    const Type = pascal(t.name);
+    out += `export { ${Type}PkSchema, ${Type}ListParamsSchema, ${Type}OrderParamsSchema } from "./params/${t.name}${ext}";\n`;
+  }
   
   return out;
 }
