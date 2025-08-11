@@ -1,8 +1,9 @@
 import type { Table } from "./introspect";
 import { pascal } from "./utils";
 
-export function emitClient(table: Table) {
+export function emitClient(table: Table, useJsExtensions?: boolean) {
   const Type = pascal(table.name);
+  const ext = useJsExtensions ? ".js" : "";
 
   // Normalize PKs
   const pkCols: string[] = Array.isArray((table as any).pk)
@@ -17,9 +18,9 @@ export function emitClient(table: Table) {
   const pkPathExpr = hasCompositePk ? safePk.map((c) => `pk.${c}`).join(` + "/" + `) : `pk`;
 
   return `/* Generated. Do not edit. */
-import { BaseClient } from "./base-client";
-import type { ${Type}IncludeSpec } from "./include-spec";
-import type { Insert${Type}, Update${Type}, Select${Type} } from "./types/${table.name}";
+import { BaseClient } from "./base-client${ext}";
+import type { ${Type}IncludeSpec } from "./include-spec${ext}";
+import type { Insert${Type}, Update${Type}, Select${Type} } from "./types/${table.name}${ext}";
 
 /**
  * Client for ${table.name} table operations
@@ -60,20 +61,21 @@ export class ${Type}Client extends BaseClient {
 `;
 }
 
-export function emitClientIndex(tables: Table[]) {
+export function emitClientIndex(tables: Table[], useJsExtensions?: boolean) {
+  const ext = useJsExtensions ? ".js" : "";
   let out = `/* Generated. Do not edit. */\n`;
   
   // Import BaseClient and its types
-  out += `import { BaseClient, type AuthConfig } from "./base-client";\n`;
+  out += `import { BaseClient, type AuthConfig } from "./base-client${ext}";\n`;
   
   // Import all table clients
   for (const t of tables) {
-    out += `import { ${pascal(t.name)}Client } from "./${t.name}";\n`;
+    out += `import { ${pascal(t.name)}Client } from "./${t.name}${ext}";\n`;
   }
   
   // Re-export auth types for backward compatibility
   out += `\n// Re-export auth types for convenience\n`;
-  out += `export type { AuthConfig as SDKAuth, AuthConfig, HeaderMap, AuthHeadersProvider } from "./base-client";\n\n`;
+  out += `export type { AuthConfig as SDKAuth, AuthConfig, HeaderMap, AuthHeadersProvider } from "./base-client${ext}";\n\n`;
 
   // SDK class
   out += `/**\n`;
@@ -94,16 +96,16 @@ export function emitClientIndex(tables: Table[]) {
   // Export individual clients
   out += `// Export individual table clients\n`;
   for (const t of tables) {
-    out += `export { ${pascal(t.name)}Client } from "./${t.name}";\n`;
+    out += `export { ${pascal(t.name)}Client } from "./${t.name}${ext}";\n`;
   }
   
   // Export base client for extension
   out += `\n// Export base client for custom extensions\n`;
-  out += `export { BaseClient } from "./base-client";\n`;
+  out += `export { BaseClient } from "./base-client${ext}";\n`;
   
   // Export include specs
   out += `\n// Export include specifications\n`;
-  out += `export * from "./include-spec";\n`;
+  out += `export * from "./include-spec${ext}";\n`;
   
   return out;
 }

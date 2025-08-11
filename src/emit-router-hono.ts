@@ -122,6 +122,6 @@ ${registrations.replace(/router/g, 'app')}
 ${reExports}
 
 // Re-export types and schemas for convenience
-export * from "./include-spec";
+export * from "./include-spec${ext}";
 `;
 }

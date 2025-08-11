@@ -72,10 +72,16 @@ export default {
   // serverFramework: "hono",
   
   /**
-   * Use .js extensions in imports (for Vercel Edge, Deno, etc.)
+   * Use .js extensions in server imports (for Vercel Edge, Deno, etc.)
    * @default false
    */
   // useJsExtensions: false,
+  
+  /**
+   * Use .js extensions in client SDK imports (rarely needed)
+   * @default false
+   */
+  // useJsExtensionsClient: false,
   
   // ========== AUTHENTICATION ==========
   

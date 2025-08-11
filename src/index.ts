@@ -131,14 +131,14 @@ export async function generate(configPath: string) {
     // client
     files.push({
       path: join(clientDir, `${table.name}.ts`),
-      content: emitClient(table),
+      content: emitClient(table, cfg.useJsExtensionsClient),
     });
   }
 
   // client index (SDK)
   files.push({
     path: join(clientDir, "index.ts"),
-    content: emitClientIndex(Object.values(model.tables)),
+    content: emitClientIndex(Object.values(model.tables), cfg.useJsExtensionsClient),
   });
 
   // server router (with createRouter and registerAllRoutes helpers)

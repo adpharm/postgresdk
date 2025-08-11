@@ -45,8 +45,11 @@ export interface Config {
   // Pull configuration (for client repos)
   pull?: PullConfig;
   
-  // Use .js extensions in imports (for Vercel Edge compatibility)
+  // Use .js extensions in server imports (for Vercel Edge compatibility)
   useJsExtensions?: boolean;
+  
+  // Use .js extensions in client SDK imports (for specific bundlers/environments)
+  useJsExtensionsClient?: boolean;
 }
 
 export interface PullConfig {

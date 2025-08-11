@@ -104,10 +104,10 @@ export default {
   serverFramework: "hono",
   
   /**
-   * Use .js extensions in imports for compatibility with runtimes that require
-   * explicit file extensions (e.g., Vercel Edge, Deno).
+   * Use .js extensions in server-side imports for compatibility with runtimes 
+   * that require explicit file extensions (e.g., Vercel Edge, Deno).
    * 
-   * When true, imports will be:
+   * When true, server imports will be:
    *   import { something } from "./module.js"
    * Instead of:
    *   import { something } from "./module"
@@ -118,6 +118,16 @@ export default {
    * @default false
    */
   useJsExtensions: false,
+  
+  /**
+   * Use .js extensions in client SDK imports. Most bundlers (Webpack, Vite, etc.)
+   * handle module resolution automatically, so this is rarely needed.
+   * 
+   * Enable this if your client environment requires explicit extensions.
+   * 
+   * @default false
+   */
+  useJsExtensionsClient: false,
   
   // ========== AUTHENTICATION ==========
   
