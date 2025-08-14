@@ -1,5 +1,5 @@
 {
-  "name": "drizzle-sdk-generator",
+  "name": "postgresdk",
   "build": {
     "dockerfile": "Dockerfile",
     "args": {
