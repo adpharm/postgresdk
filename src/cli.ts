@@ -34,7 +34,7 @@ Usage:
 
 Commands:
   init                 Create a postgresdk.config.ts file
-  generate             Generate SDK from database
+  generate, gen        Generate SDK from database
   pull                 Pull SDK from API endpoint
   version              Show version
   help                 Show help
@@ -54,6 +54,7 @@ Pull Options:
 Examples:
   postgresdk init                        # Create config file
   postgresdk generate                    # Generate using postgresdk.config.ts
+  postgresdk gen                         # Short alias for generate
   postgresdk generate -c custom.config.ts
   postgresdk pull --from=https://api.com --output=./src/sdk
   postgresdk pull                        # Pull using config file
@@ -67,8 +68,8 @@ if (command === "init") {
   await initCommand(args.slice(1));
 }
 
-// Handle generate command
-else if (command === "generate") {
+// Handle generate command (both 'generate' and 'gen')
+else if (command === "generate" || command === "gen") {
   // Get config path
   let configPath = "postgresdk.config.ts";
   const configIndex = args.findIndex(a => a === "-c" || a === "--config");
