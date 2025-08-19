@@ -211,7 +211,7 @@ export async function generate(configPath: string) {
   if (process.env.SDK_DEBUG) {
     console.log(`[Index] Model has ${Object.keys(model.tables || {}).length} tables before contract generation`);
   }
-  const contract = generateUnifiedContract(model, cfg);
+  const contract = generateUnifiedContract(model, cfg, graph);
   files.push({
     path: join(serverDir, "CONTRACT.md"),
     content: generateUnifiedContractMarkdown(contract),

@@ -1,6 +1,8 @@
 import type { Table, Model } from "./introspect";
 import type { Config, AuthConfig } from "./types";
+import type { Graph } from "./rel-classify";
 import { pascal } from "./utils";
+import { generateIncludeMethods } from "./emit-include-methods";
 
 export interface UnifiedContract {
   version: string;
@@ -78,7 +80,7 @@ export interface RelationshipContract {
 /**
  * Generate a unified contract showing both API and SDK usage
  */
-export function generateUnifiedContract(model: Model, config: Config & { auth?: AuthConfig }): UnifiedContract {
+export function generateUnifiedContract(model: Model, config: Config & { auth?: AuthConfig }, graph?: Graph): UnifiedContract {
   const resources: ResourceWithSDK[] = [];
   const relationships: RelationshipContract[] = [];
   
@@ -88,7 +90,7 @@ export function generateUnifiedContract(model: Model, config: Config & { auth?: 
     console.log(`[SDK Contract] Processing ${tables.length} tables`);
   }
   for (const table of tables) {
-    resources.push(generateResourceWithSDK(table, model));
+    resources.push(generateResourceWithSDK(table, model, graph, config));
     
     // Extract relationships
     for (const fk of table.fks) {
@@ -220,7 +222,7 @@ function generateSDKAuthExamples(auth?: AuthConfig): SDKAuthExample[] {
   return examples;
 }
 
-function generateResourceWithSDK(table: Table, model: Model): ResourceWithSDK {
+function generateResourceWithSDK(table: Table, model: Model, graph?: Graph, config?: Config & { auth?: AuthConfig }): ResourceWithSDK {
   const Type = pascal(table.name);
   const tableName = table.name;
   const basePath = `/v1/${tableName}`;
@@ -245,11 +247,6 @@ const filtered = await sdk.${tableName}.list({
   ${table.columns[0]?.name || 'field'}_like: 'search',
   order_by: '${table.columns[0]?.name || 'created_at'}',
   order_dir: 'desc'
-});
-
-// With related data
-const withRelations = await sdk.${tableName}.list({
-  include: '${table.fks[0]?.toTable || 'related_table'}'
 });`,
     correspondsTo: `GET ${basePath}`
   });
@@ -266,15 +263,10 @@ const withRelations = await sdk.${tableName}.list({
   if (hasSinglePK) {
     sdkMethods.push({
       name: "getByPk",
-      signature: `getByPk(${pkField}: string, params?: GetParams): Promise<${Type} | null>`,
+      signature: `getByPk(${pkField}: string): Promise<${Type} | null>`,
       description: `Get a single ${tableName} by primary key`,
       example: `// Get by ID
 const item = await sdk.${tableName}.getByPk('123e4567-e89b-12d3-a456-426614174000');
-
-// With related data
-const withRelations = await sdk.${tableName}.getByPk('123', {
-  include: '${table.fks[0]?.toTable || 'related_table'}'
-});
 
 // Check if exists
 if (item === null) {
@@ -287,9 +279,6 @@ if (item === null) {
       method: "GET",
       path: `${basePath}/:${pkField}`,
       description: `Get ${tableName} by ID`,
-      queryParameters: {
-        include: "string - Comma-separated list of related resources"
-      },
       responseBody: `${Type}`
     });
   }
@@ -360,6 +349,37 @@ console.log('Deleted:', deleted);`,
       description: `Delete ${tableName}`,
       responseBody: `${Type}`
     });
+  }
+  
+  // Add include methods if we have the graph
+  if (graph && config) {
+    const allTables = model && model.tables ? Object.values(model.tables) : undefined;
+    const includeMethods = generateIncludeMethods(table, graph, {
+      maxDepth: config.includeMethodsDepth ?? 2,
+      skipJunctionTables: config.skipJunctionTables ?? true
+    }, allTables);
+    
+    for (const method of includeMethods) {
+      const isGetByPk = method.name.startsWith("getByPk");
+      const exampleCall = isGetByPk 
+        ? `const result = await sdk.${tableName}.${method.name}('123e4567-e89b-12d3-a456-426614174000');`
+        : `const results = await sdk.${tableName}.${method.name}();
+
+// With filters and pagination
+const filtered = await sdk.${tableName}.${method.name}({
+  limit: 20,
+  offset: 0,
+  where: { /* filter conditions */ }
+});`;
+
+      sdkMethods.push({
+        name: method.name,
+        signature: `${method.name}(${isGetByPk ? `${pkField}: string` : 'params?: ListParams'}): ${method.returnType}`,
+        description: `Get ${tableName} with included ${method.path.join(', ')} data`,
+        example: exampleCall,
+        correspondsTo: `POST ${basePath}/list`
+      });
+    }
   }
   
   // Process fields
@@ -523,8 +543,7 @@ function generateQueryParams(table: Table): Record<string, string> {
     limit: "number - Max records to return (default: 50)",
     offset: "number - Records to skip",
     order_by: "string - Field to sort by",
-    order_dir: "'asc' | 'desc' - Sort direction",
-    include: "string - Related resources to include"
+    order_dir: "'asc' | 'desc' - Sort direction"
   };
   
   // Add a few example filters
@@ -750,8 +769,8 @@ export function generateUnifiedContractMarkdown(contract: UnifiedContract): stri
 /**
  * Emit the unified contract as TypeScript code
  */
-export function emitUnifiedContract(model: Model, config: Config & { auth?: AuthConfig }): string {
-  const contract = generateUnifiedContract(model, config);
+export function emitUnifiedContract(model: Model, config: Config & { auth?: AuthConfig }, graph?: Graph): string {
+  const contract = generateUnifiedContract(model, config, graph);
   const contractJson = JSON.stringify(contract, null, 2);
   
   return `/**
