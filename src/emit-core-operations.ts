@@ -19,7 +19,7 @@ export interface OperationContext {
   table: string;
   pkColumns: string[];
   softDeleteColumn?: string | null;
-  includeDepthLimit: number;
+  includeMethodsDepth: number;
 }
 
 const DEBUG = process.env.SDK_DEBUG === "1" || process.env.SDK_DEBUG === "true";

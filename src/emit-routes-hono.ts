@@ -9,7 +9,7 @@ import { pascal } from "./utils";
 export function emitHonoRoutes(
   table: Table,
   _graph: Graph,
-  opts: { softDeleteColumn: string | null; includeDepthLimit: number; authStrategy?: string; useJsExtensions?: boolean }
+  opts: { softDeleteColumn: string | null; includeMethodsDepth: number; authStrategy?: string; useJsExtensions?: boolean }
 ) {
   const fileTableName = table.name;
   const Type = pascal(table.name);
@@ -58,7 +58,7 @@ export function register${Type}Routes(app: Hono, deps: { pg: { query: (text: str
     table: "${fileTableName}",
     pkColumns: ${JSON.stringify(safePkCols)},
     softDeleteColumn: ${softDel ? `"${softDel}"` : "null"},
-    includeDepthLimit: ${opts.includeDepthLimit}
+    includeMethodsDepth: ${opts.includeMethodsDepth}
   };
 ${hasAuth ? `
   // 🔐 Auth: protect all routes for this table
@@ -119,7 +119,7 @@ ${hasAuth ? `
           result.data, 
           result.includeSpec, 
           deps.pg, 
-          ${opts.includeDepthLimit}
+          ${opts.includeMethodsDepth}
         );
         return c.json(stitched);
       } catch (e: any) {

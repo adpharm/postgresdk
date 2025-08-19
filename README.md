@@ -88,7 +88,7 @@ export default {
   outServer: "./api/server",           // Server code output directory  
   outClient: "./api/client",           // Client SDK output directory
   softDeleteColumn: null,              // Column name for soft deletes (e.g., "deleted_at")
-  includeDepthLimit: 3,                 // Max depth for nested includes
+  includeMethodsDepth: 2,               // Max depth for nested includes
   dateType: "date",                    // "date" | "string" - How to handle timestamps
   serverFramework: "hono",             // Currently only hono is supported
   useJsExtensions: false,              // Add .js to imports (for Vercel Edge, Deno)

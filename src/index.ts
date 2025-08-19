@@ -146,7 +146,7 @@ export async function generate(configPath: string) {
     if (serverFramework === "hono") {
       routeContent = emitHonoRoutes(table, graph, {
         softDeleteColumn: cfg.softDeleteColumn || null,
-        includeDepthLimit: cfg.includeMethodsDepth || 2,
+        includeMethodsDepth: cfg.includeMethodsDepth || 2,
         authStrategy: normalizedAuth?.strategy,
         useJsExtensions: cfg.useJsExtensions,
       });

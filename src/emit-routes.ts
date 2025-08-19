@@ -19,7 +19,7 @@ import { pascal } from "./utils";
 export function emitRoutes(
   table: Table,
   _graph: Graph,
-  opts: { softDeleteColumn: string | null; includeDepthLimit: number; authStrategy?: string }
+  opts: { softDeleteColumn: string | null; includeMethodsDepth: number; authStrategy?: string }
 ) {
   const fileTableName = table.name; // SQL table name for file/route
   const Type = pascal(table.name); // PascalCase for type/schemas
@@ -156,7 +156,7 @@ ${hasAuth ? `
       // Attempt include stitching with explicit error handling
       log.debug("LIST ${fileTableName} include spec:", include);
       try {
-        const stitched = await loadIncludes("${fileTableName}", rows, include, deps.pg, ${opts.includeDepthLimit});
+        const stitched = await loadIncludes("${fileTableName}", rows, include, deps.pg, ${opts.includeMethodsDepth});
         log.debug("LIST ${fileTableName} stitched count:", Array.isArray(stitched) ? stitched.length : "n/a");
         return c.json(stitched);
       } catch (e: any) {

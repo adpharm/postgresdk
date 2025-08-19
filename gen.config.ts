@@ -4,5 +4,5 @@ export default {
   outServer: "test/.results-same-dir",
   outClient: "test/.results-same-dir",
   softDeleteColumn: null,
-  includeDepthLimit: 3
+  includeMethodsDepth: 2
 };
