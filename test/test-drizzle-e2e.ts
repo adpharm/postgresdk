@@ -118,11 +118,13 @@ async function generatePostgreSDK() {
   }
   mkdirSync(OUTPUT_DIR, { recursive: true });
   
-  // Create config for PostgreSDK
+  // Create config for PostgreSDK with include methods generation
   const config = `export default {
   connectionString: "${TEST_URL}",
   outServer: "${OUTPUT_DIR}/server",
   outClient: "${OUTPUT_DIR}/client",
+  includeMethodsDepth: 2,  // Enable include methods generation
+  skipJunctionTables: true,
   tests: {
     generate: true,
     output: "${OUTPUT_DIR}/tests",
@@ -155,6 +157,47 @@ async function waitForServer(url: string, maxAttempts = 30): Promise<boolean> {
     await new Promise(resolve => setTimeout(resolve, 1000));
   }
   return false;
+}
+
+async function verifyIncludeMethods() {
+  console.log("\n🔍 Verifying include methods generation...");
+  
+  const fs = require("fs");
+  
+  // Check if Select schemas are generated
+  const zodPath = `${OUTPUT_DIR}/server/zod/contacts.ts`;
+  if (existsSync(zodPath)) {
+    const zodContent = fs.readFileSync(zodPath, "utf-8");
+    if (zodContent.includes("SelectContactsSchema")) {
+      console.log("  ✓ Select schemas are generated");
+    } else {
+      console.error("  ❌ Select schemas not found");
+      return false;
+    }
+  }
+  
+  // Check if include methods are generated in client
+  const clientPath = `${OUTPUT_DIR}/client/contacts.ts`;
+  if (existsSync(clientPath)) {
+    const clientContent = fs.readFileSync(clientPath, "utf-8");
+    const methods = clientContent.match(/async (list|getByPk)With[A-Z]\w+/g) || [];
+    
+    if (methods.length > 0) {
+      console.log("  ✓ Include methods are generated");
+      console.log(`  → Generated ${methods.length} include methods:`);
+      methods.slice(0, 5).forEach(m => console.log(`    - ${m.replace('async ', '')}`));
+      if (methods.length > 5) {
+        console.log(`    ... and ${methods.length - 5} more`);
+      }
+    } else {
+      console.error("  ❌ Include methods not found");
+      console.log("  → Client content preview:");
+      console.log(clientContent.split('\n').slice(40, 50).join('\n'));
+      return false;
+    }
+  }
+  
+  return true;
 }
 
 async function runGeneratedTests() {
@@ -254,7 +297,13 @@ async function main() {
     // Step 3: Generate PostgreSDK API
     await generatePostgreSDK();
     
-    // Step 4: Show what was generated
+    // Step 4: Verify include methods were generated
+    const includeMethodsValid = await verifyIncludeMethods();
+    if (!includeMethodsValid) {
+      throw new Error("Include methods generation failed");
+    }
+    
+    // Step 5: Show what was generated
     console.log("\n📁 Generated files:");
     execSync(`find ${OUTPUT_DIR} -type f -name "*.ts" | head -20`, { stdio: "inherit" });
     

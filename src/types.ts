@@ -35,6 +35,10 @@ export interface Config {
   softDeleteColumn?: string | null;
   includeDepthLimit?: number;
   
+  // Include methods generation
+  includeMethodsDepth?: number;  // How deep to generate include methods (default: 2)
+  skipJunctionTables?: boolean;  // Skip junction tables in include methods (default: true)
+  
   // Server framework for generated routes
   serverFramework?: "hono" | "express" | "fastify";
   

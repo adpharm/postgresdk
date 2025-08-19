@@ -1,9 +1,19 @@
 import type { Table } from "./introspect";
+import type { Graph } from "./rel-classify";
 import { pascal } from "./utils";
+import { generateIncludeMethods } from "./emit-include-methods";
 
-export function emitClient(table: Table, useJsExtensions?: boolean) {
+export function emitClient(
+  table: Table, 
+  graph: Graph,
+  opts: { 
+    useJsExtensions?: boolean;
+    includeMethodsDepth?: number;
+    skipJunctionTables?: boolean;
+  }
+) {
   const Type = pascal(table.name);
-  const ext = useJsExtensions ? ".js" : "";
+  const ext = opts.useJsExtensions ? ".js" : "";
 
   // Normalize PKs
   const pkCols: string[] = Array.isArray((table as any).pk)
@@ -17,10 +27,71 @@ export function emitClient(table: Table, useJsExtensions?: boolean) {
   const pkType = hasCompositePk ? `{ ${safePk.map((c) => `${c}: string`).join("; ")} }` : `string`;
   const pkPathExpr = hasCompositePk ? safePk.map((c) => `pk.${c}`).join(` + "/" + `) : `pk`;
 
+  // Generate include methods
+  const includeMethods = generateIncludeMethods(table, graph, {
+    maxDepth: opts.includeMethodsDepth ?? 2,
+    skipJunctionTables: opts.skipJunctionTables ?? true
+  });
+
+  // Build import for types needed by include methods
+  const importedTypes = new Set<string>();
+  importedTypes.add(table.name); // Always need base type
+  
+  for (const method of includeMethods) {
+    for (const target of method.targets) {
+      importedTypes.add(target);
+    }
+  }
+
+  // Generate type imports - base types for this table
+  const typeImports = `import type { Insert${Type}, Update${Type}, Select${Type} } from "./types/${table.name}${ext}";`;
+  
+  // If we have includes from other tables, we need those types too
+  const otherTableImports: string[] = [];
+  for (const target of importedTypes) {
+    if (target !== table.name) {
+      otherTableImports.push(`import type { Select${pascal(target)} } from "./types/${target}${ext}";`);
+    }
+  }
+
+  // Generate include method implementations
+  let includeMethodsCode = "";
+  for (const method of includeMethods) {
+    const isGetByPk = method.name.startsWith("getByPk");
+    const baseParams = isGetByPk ? "" : `params?: Omit<{ limit?: number; offset?: number; where?: any; orderBy?: string; order?: "asc" | "desc"; }, "include">`;
+    
+    if (isGetByPk) {
+      // For getByPk with includes, we use the list endpoint with a where clause
+      const pkWhere = hasCompositePk 
+        ? `{ ${safePk.map(col => `${col}: pk.${col}`).join(", ")} }`
+        : `{ ${safePk[0] || 'id'}: pk }`;
+      
+      // Extract the base return type (without the "| null" part)
+      const baseReturnType = method.returnType.replace(" | null", "");
+      
+      includeMethodsCode += `
+  async ${method.name}(pk: ${pkType}): Promise<${method.returnType}> {
+    const results = await this.post<${baseReturnType}[]>(\`\${this.resource}/list\`, { 
+      where: ${pkWhere},
+      include: ${JSON.stringify(method.includeSpec)},
+      limit: 1 
+    });
+    return (results[0] as ${baseReturnType}) ?? null;
+  }
+`;
+    } else {
+      includeMethodsCode += `
+  async ${method.name}(${baseParams}): Promise<${method.returnType}> {
+    return this.post<${method.returnType}>(\`\${this.resource}/list\`, { ...params, include: ${JSON.stringify(method.includeSpec)} });
+  }
+`;
+    }
+  }
+
   return `/* Generated. Do not edit. */
 import { BaseClient } from "./base-client${ext}";
-import type { ${Type}IncludeSpec } from "./include-spec${ext}";
-import type { Insert${Type}, Update${Type}, Select${Type} } from "./types/${table.name}${ext}";
+${typeImports}
+${otherTableImports.join("\n")}
 
 /**
  * Client for ${table.name} table operations
@@ -38,7 +109,6 @@ export class ${Type}Client extends BaseClient {
   }
 
   async list(params?: { 
-    include?: ${Type}IncludeSpec; 
     limit?: number; 
     offset?: number;
     where?: any;
@@ -57,7 +127,7 @@ export class ${Type}Client extends BaseClient {
     const path = ${pkPathExpr};
     return this.del<Select${Type} | null>(\`\${this.resource}/\${path}\`);
   }
-}
+${includeMethodsCode}}
 `;
 }
 
@@ -95,8 +165,7 @@ export function emitClientIndex(tables: Table[], useJsExtensions?: boolean) {
   // Export base client for extension
   out += `export { BaseClient } from "./base-client${ext}";\n`;
   
-  // Export include specs  
-  out += `export * from "./include-spec${ext}";\n`;
+  // Include specs removed - using explicit methods instead
   
   // Export Zod schemas
   out += `\n// Zod schemas for form validation\n`;

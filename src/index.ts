@@ -163,7 +163,11 @@ export async function generate(configPath: string) {
     // client
     files.push({
       path: join(clientDir, `${table.name}.ts`),
-      content: emitClient(table, cfg.useJsExtensionsClient),
+      content: emitClient(table, graph, {
+        useJsExtensions: cfg.useJsExtensionsClient,
+        includeMethodsDepth: cfg.includeMethodsDepth ?? 2,
+        skipJunctionTables: cfg.skipJunctionTables ?? true
+      }),
     });
   }
 
