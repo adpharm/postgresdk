@@ -189,19 +189,19 @@ export default {
    * Database schema to introspect
    * @default "public"
    */
-  ${getFieldLine("schema", existingFields, mergeStrategy, userChoices, '"public"')}
+  ${getFieldLine("schema", existingFields, mergeStrategy, '"public"', userChoices)}
   
   /**
    * Output directory for server-side code (routes, validators, etc.)
    * @default "./api/server"
    */
-  ${getFieldLine("outServer", existingFields, mergeStrategy, userChoices, '"./api/server"')}
+  ${getFieldLine("outServer", existingFields, mergeStrategy, '"./api/server"', userChoices)}
   
   /**
    * Output directory for client SDK
    * @default "./api/client"
    */
-  ${getFieldLine("outClient", existingFields, mergeStrategy, userChoices, '"./api/client"')}
+  ${getFieldLine("outClient", existingFields, mergeStrategy, '"./api/client"', userChoices)}
   
   // ========== ADVANCED OPTIONS ==========
   
@@ -211,13 +211,13 @@ export default {
    * @default null (hard deletes)
    * @example "deleted_at"
    */
-  ${getFieldLine("softDeleteColumn", existingFields, mergeStrategy, userChoices, 'null')}
+  ${getFieldLine("softDeleteColumn", existingFields, mergeStrategy, 'null', userChoices)}
   
   /**
    * Maximum depth for nested relationship includes to prevent infinite loops
    * @default 3
    */
-  ${getFieldLine("includeDepthLimit", existingFields, mergeStrategy, userChoices, '3')}
+  ${getFieldLine("includeDepthLimit", existingFields, mergeStrategy, '3', userChoices)}
   
   
   /**
@@ -227,19 +227,19 @@ export default {
    * - "fastify": High-performance Node.js framework (planned)
    * @default "hono"
    */
-  ${getFieldLine("serverFramework", existingFields, mergeStrategy, userChoices, '"hono"')}
+  ${getFieldLine("serverFramework", existingFields, mergeStrategy, '"hono"', userChoices)}
   
   /**
    * Use .js extensions in server imports (for Vercel Edge, Deno, etc.)
    * @default false
    */
-  ${getFieldLine("useJsExtensions", existingFields, mergeStrategy, userChoices, 'false')}
+  ${getFieldLine("useJsExtensions", existingFields, mergeStrategy, 'false', userChoices)}
   
   /**
    * Use .js extensions in client SDK imports (rarely needed)
    * @default false
    */
-  ${getFieldLine("useJsExtensionsClient", existingFields, mergeStrategy, userChoices, 'false')}
+  ${getFieldLine("useJsExtensionsClient", existingFields, mergeStrategy, 'false', userChoices)}
   
   // ========== TEST GENERATION ==========
   
@@ -329,8 +329,8 @@ function getFieldLine(
   key: string,
   existingFields: ConfigField[],
   mergeStrategy: "keep-existing" | "use-defaults" | "interactive",
-  userChoices?: Map<string, any>,
-  defaultValue: string
+  defaultValue: string,
+  userChoices?: Map<string, any>
 ): string {
   const existing = existingFields.find(f => f.key === key);
   

@@ -1,6 +1,6 @@
 {
   "name": "postgresdk",
-  "version": "0.9.3",
+  "version": "0.9.4",
   "description": "Generate a typed server/client SDK from a Postgres schema (includes, Zod, Hono).",
   "type": "module",
   "bin": {
@@ -21,7 +21,7 @@
     "node": ">=18.17"
   },
   "scripts": {
-    "build": "bun build src/cli.ts src/index.ts --outdir dist --target node --format esm --external=pg --external=zod --external=hono --external=node:* && tsc -p tsconfig.build.json --emitDeclarationOnly",
+    "build": "bun build src/cli.ts src/index.ts --outdir dist --target node --format esm --external=pg --external=zod --external=hono --external=prompts --external=node:* && tsc -p tsconfig.build.json --emitDeclarationOnly",
     "test": "bun test:init && bun test:gen && bun test:gen-with-tests && bun test:pull && bun test:typecheck && bun test:drizzle-e2e",
     "test:init": "bun test/test-init.ts",
     "test:gen": "bun test/test-gen.ts",
