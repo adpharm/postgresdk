@@ -17,7 +17,17 @@ export function emitZod(table: Table, opts: { numericMode: "string" | "number" }
     return `z.string()`; // text/varchar/unknown
   };
 
-  const fields = table.columns
+  const selectFields = table.columns
+    .map((c) => {
+      let z = zFor(c.pgType);
+      if (c.nullable) {
+        z += `.nullable()`;
+      }
+      return `  ${c.name}: ${z}`;
+    })
+    .join(",\n");
+
+  const insertFields = table.columns
     .map((c) => {
       let z = zFor(c.pgType);
       if (c.nullable) {
@@ -31,8 +41,12 @@ export function emitZod(table: Table, opts: { numericMode: "string" | "number" }
 
   return `import { z } from "zod";
 
+export const Select${Type}Schema = z.object({
+${selectFields}
+});
+
 export const Insert${Type}Schema = z.object({
-${fields}
+${insertFields}
 });
 
 export const Update${Type}Schema = Insert${Type}Schema.partial();
