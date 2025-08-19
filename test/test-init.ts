@@ -108,7 +108,7 @@ async function testInitConfigStructure() {
     "outServer",
     "outClient",
     "softDeleteColumn",
-    "includeDepthLimit",
+    "includeMethodsDepth",
     "apiKeyHeader",
     "apiKeys",
     "jwt",

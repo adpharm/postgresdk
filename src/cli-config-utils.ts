@@ -81,12 +81,12 @@ export function extractConfigFields(configContent: string): ConfigField[] {
     });
   }
   
-  // Extract includeDepthLimit
-  const depthMatch = configContent.match(/^\s*(\/\/)?\s*includeDepthLimit:\s*(\d+)/m);
+  // Extract includeMethodsDepth (also check for old name includeDepthLimit)
+  const depthMatch = configContent.match(/^\s*(\/\/)?\s*(includeMethodsDepth|includeDepthLimit):\s*(\d+)/m);
   if (depthMatch) {
     fields.push({
-      key: "includeDepthLimit",
-      value: parseInt(depthMatch[2]!),
+      key: "includeMethodsDepth",
+      value: parseInt(depthMatch[3]!),
       description: "Maximum depth for nested relationship includes",
       isCommented: !!depthMatch[1],
     });
@@ -215,9 +215,9 @@ export default {
   
   /**
    * Maximum depth for nested relationship includes to prevent infinite loops
-   * @default 3
+   * @default 2
    */
-  ${getFieldLine("includeDepthLimit", existingFields, mergeStrategy, '3', userChoices)}
+  ${getFieldLine("includeMethodsDepth", existingFields, mergeStrategy, '2', userChoices)}
   
   
   /**

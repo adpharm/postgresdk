@@ -53,9 +53,9 @@ export default {
   
   /**
    * Maximum depth for nested relationship includes to prevent infinite loops
-   * @default 3
+   * @default 2
    */
-  // includeDepthLimit: 3,
+  // includeMethodsDepth: 2,
   
   
   /**
