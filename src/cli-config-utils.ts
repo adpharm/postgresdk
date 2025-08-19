@@ -125,40 +125,114 @@ export function extractConfigFields(configContent: string): ConfigField[] {
     });
   }
   
-  // Check for tests configuration
-  const testsMatch = configContent.match(/^\s*(\/\/)?\s*tests:\s*\{/m);
-  if (testsMatch) {
+  // Extract tests configuration block
+  const testsBlock = extractComplexBlock(configContent, "tests");
+  if (testsBlock) {
     fields.push({
       key: "tests",
-      value: "configured",
+      value: testsBlock.content,
       description: "Test generation configuration",
-      isCommented: !!testsMatch[1],
+      isCommented: testsBlock.isCommented,
     });
   }
   
-  // Check for auth configuration
-  const authMatch = configContent.match(/^\s*(\/\/)?\s*auth:\s*\{/m);
-  if (authMatch) {
+  // Extract auth configuration block
+  const authBlock = extractComplexBlock(configContent, "auth");
+  if (authBlock) {
     fields.push({
       key: "auth",
-      value: "configured",
+      value: authBlock.content,
       description: "Authentication configuration",
-      isCommented: !!authMatch[1],
+      isCommented: authBlock.isCommented,
     });
   }
   
-  // Check for pull configuration
-  const pullMatch = configContent.match(/^\s*(\/\/)?\s*pull:\s*\{/m);
-  if (pullMatch) {
+  // Extract pull configuration block
+  const pullBlock = extractComplexBlock(configContent, "pull");
+  if (pullBlock) {
     fields.push({
       key: "pull",
-      value: "configured",
+      value: pullBlock.content,
       description: "SDK distribution configuration",
-      isCommented: !!pullMatch[1],
+      isCommented: pullBlock.isCommented,
     });
   }
   
   return fields;
+}
+
+function extractComplexBlock(configContent: string, blockName: string): { content: string; isCommented: boolean } | null {
+  // Look for the block start (e.g., "tests: {" or "// tests: {")
+  const blockStartRegex = new RegExp(`^\\s*(//)?\\s*${blockName}:\\s*\\{`, 'm');
+  const match = configContent.match(blockStartRegex);
+  
+  if (!match) return null;
+  
+  const isCommented = !!match[1];
+  const startIndex = match.index!;
+  
+  // Find the matching closing brace
+  let braceCount = 0;
+  let inString = false;
+  let inComment = false;
+  let stringChar = '';
+  let i = startIndex;
+  
+  // Skip to the opening brace
+  while (i < configContent.length && configContent[i] !== '{') {
+    i++;
+  }
+  
+  const blockStart = i;
+  braceCount = 1;
+  i++; // Move past the opening brace
+  
+  while (i < configContent.length && braceCount > 0) {
+    const char = configContent[i];
+    const prevChar = i > 0 ? configContent[i - 1] : '';
+    
+    // Handle string literals
+    if (!inComment && (char === '"' || char === "'" || char === '`')) {
+      if (!inString) {
+        inString = true;
+        stringChar = char;
+      } else if (char === stringChar && prevChar !== '\\') {
+        inString = false;
+        stringChar = '';
+      }
+    }
+    
+    // Handle line comments
+    if (!inString && char === '/' && configContent[i + 1] === '/') {
+      inComment = true;
+    }
+    
+    if (inComment && char === '\n') {
+      inComment = false;
+    }
+    
+    // Count braces only when not in strings or comments
+    if (!inString && !inComment) {
+      if (char === '{') {
+        braceCount++;
+      } else if (char === '}') {
+        braceCount--;
+      }
+    }
+    
+    i++;
+  }
+  
+  if (braceCount === 0) {
+    // Extract the content between the braces (excluding the braces themselves)
+    const blockContent = configContent.slice(blockStart + 1, i - 1);
+    return {
+      content: `{${blockContent}}`,
+      isCommented
+    };
+  }
+  
+  return null;
 }
 
 export function generateMergedConfig(
@@ -247,11 +321,7 @@ export default {
    * Generate basic SDK tests
    * Uncomment to enable test generation with Docker setup
    */
-  // tests: {
-  //   generate: true,
-  //   output: "./api/tests",
-  //   framework: "vitest"  // or "jest" or "bun"
-  // },
+  ${getComplexBlockLine("tests", existingFields, mergeStrategy, userChoices)}
   
   // ========== AUTHENTICATION ==========
   
@@ -267,24 +337,7 @@ export default {
    * 
    * Full syntax for advanced options:
    */
-  // auth: {
-  //   // Strategy: "none" | "api-key" | "jwt-hs256"
-  //   strategy: "none",
-  //   
-  //   // For API Key authentication
-  //   apiKeyHeader: "x-api-key",  // Header name for API key
-  //   apiKeys: [                  // List of valid API keys
-  //     process.env.API_KEY_1,
-  //     process.env.API_KEY_2,
-  //   ],
-  //   
-  //   // For JWT (HS256) authentication
-  //   jwt: {
-  //     sharedSecret: process.env.JWT_SECRET,  // Secret for signing/verifying
-  //     issuer: "my-app",                      // Optional: validate 'iss' claim
-  //     audience: "my-users",                  // Optional: validate 'aud' claim
-  //   }
-  // },
+  ${getComplexBlockLine("auth", existingFields, mergeStrategy, userChoices)}
   
   // ========== SDK DISTRIBUTION (Pull Configuration) ==========
   
@@ -292,11 +345,7 @@ export default {
    * Configuration for pulling SDK from a remote API
    * Used when running 'postgresdk pull' command
    */
-  // pull: {
-  //   from: "https://api.myapp.com",     // API URL to pull SDK from
-  //   output: "./src/sdk",                // Local directory for pulled SDK
-  //   token: process.env.API_TOKEN,       // Optional authentication token
-  // },
+  ${getComplexBlockLine("pull", existingFields, mergeStrategy, userChoices)}
 };
 `;
 
@@ -368,4 +417,75 @@ function getFieldLine(
   
   // Comment out by default
   return `// ${key}: ${defaultValue},`;
+}
+
+function getComplexBlockLine(
+  key: string,
+  existingFields: ConfigField[],
+  mergeStrategy: "keep-existing" | "use-defaults" | "interactive",
+  userChoices?: Map<string, any>
+): string {
+  const existing = existingFields.find(f => f.key === key);
+  
+  const shouldUseExisting = 
+    (mergeStrategy === "keep-existing" && existing && !existing.isCommented) ||
+    (mergeStrategy === "interactive" && userChoices?.get(key) === "keep" && existing && !existing.isCommented);
+  
+  const shouldUseNew = 
+    (mergeStrategy === "use-defaults") ||
+    (mergeStrategy === "interactive" && userChoices?.get(key) === "new");
+  
+  if (shouldUseExisting && existing) {
+    // Use the existing block content
+    return `${key}: ${existing.value},`;
+  }
+  
+  if (shouldUseNew) {
+    // Return commented default blocks
+    return getDefaultComplexBlock(key);
+  }
+  
+  // Comment out by default
+  return getDefaultComplexBlock(key);
+}
+
+function getDefaultComplexBlock(key: string): string {
+  switch (key) {
+    case "tests":
+      return `// tests: {
+  //   generate: true,
+  //   output: "./api/tests",
+  //   framework: "vitest"  // or "jest" or "bun"
+  // },`;
+    
+    case "auth":
+      return `// auth: {
+  //   // Strategy: "none" | "api-key" | "jwt-hs256"
+  //   strategy: "none",
+  //   
+  //   // For API Key authentication
+  //   apiKeyHeader: "x-api-key",  // Header name for API key
+  //   apiKeys: [                  // List of valid API keys
+  //     process.env.API_KEY_1,
+  //     process.env.API_KEY_2,
+  //   ],
+  //   
+  //   // For JWT (HS256) authentication
+  //   jwt: {
+  //     sharedSecret: process.env.JWT_SECRET,  // Secret for signing/verifying
+  //     issuer: "my-app",                      // Optional: validate 'iss' claim
+  //     audience: "my-users",                  // Optional: validate 'aud' claim
+  //   }
+  // },`;
+    
+    case "pull":
+      return `// pull: {
+  //   from: "https://api.myapp.com",     // API URL to pull SDK from
+  //   output: "./src/sdk",                // Local directory for pulled SDK
+  //   token: process.env.API_TOKEN,       // Optional authentication token
+  // },`;
+    
+    default:
+      return `// ${key}: {},`;
+  }
 }
