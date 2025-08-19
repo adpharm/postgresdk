@@ -318,7 +318,20 @@ function getFieldValue(
   }
   
   if (mergeStrategy === "interactive" && userChoices?.has(key)) {
-    return userChoices.get(key);
+    const choice = userChoices.get(key);
+    if (choice === "keep") {
+      if (existing && !existing.isCommented) {
+        // Clean up the value - remove trailing comma if present
+        const value = existing.value.toString().replace(/,\s*$/, '');
+        return value;
+      } else {
+        // Field doesn't exist or is commented, use default
+        return 'process.env.DATABASE_URL || "postgres://user:password@localhost:5432/mydb"';
+      }
+    } else if (choice === "new") {
+      // Return default value
+      return 'process.env.DATABASE_URL || "postgres://user:password@localhost:5432/mydb"';
+    }
   }
   
   // Default value for connectionString
@@ -336,7 +349,7 @@ function getFieldLine(
   
   const shouldUseExisting = 
     (mergeStrategy === "keep-existing" && existing && !existing.isCommented) ||
-    (mergeStrategy === "interactive" && userChoices?.get(key) === "keep");
+    (mergeStrategy === "interactive" && userChoices?.get(key) === "keep" && existing && !existing.isCommented);
   
   const shouldUseNew = 
     (mergeStrategy === "use-defaults") ||
