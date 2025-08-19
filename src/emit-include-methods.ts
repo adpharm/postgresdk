@@ -209,8 +209,12 @@ export function generateIncludeMethods(
             const [key2, edge2] = entry2;
             
             // Skip if either is a junction table
-            if (opts.skipJunctionTables && (edge1.target.includes("_") || edge2.target.includes("_"))) {
-              continue;
+            if (opts.skipJunctionTables && allTables) {
+              const table1 = allTables.find(t => t.name === edge1.target);
+              const table2 = allTables.find(t => t.name === edge2.target);
+              if ((table1 && isJunctionTable(table1)) || (table2 && isJunctionTable(table2))) {
+                continue;
+              }
             }
             
             const combinedPath = [key1, key2];
