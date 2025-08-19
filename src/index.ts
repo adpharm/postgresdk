@@ -99,13 +99,13 @@ export async function generate(configPath: string) {
   // include-builder (server)
   files.push({
     path: join(serverDir, "include-builder.ts"),
-    content: emitIncludeBuilder(graph, cfg.includeDepthLimit || 3),
+    content: emitIncludeBuilder(graph, cfg.includeMethodsDepth || 2),
   });
 
   // include-loader (server)
   files.push({
     path: join(serverDir, "include-loader.ts"),
-    content: emitIncludeLoader(graph, model, cfg.includeDepthLimit || 3, cfg.useJsExtensions),
+    content: emitIncludeLoader(graph, model, cfg.includeMethodsDepth || 2, cfg.useJsExtensions),
   });
 
   // logger (server)
@@ -146,7 +146,7 @@ export async function generate(configPath: string) {
     if (serverFramework === "hono") {
       routeContent = emitHonoRoutes(table, graph, {
         softDeleteColumn: cfg.softDeleteColumn || null,
-        includeDepthLimit: cfg.includeDepthLimit || 3,
+        includeDepthLimit: cfg.includeMethodsDepth || 2,
         authStrategy: normalizedAuth?.strategy,
         useJsExtensions: cfg.useJsExtensions,
       });
@@ -167,7 +167,7 @@ export async function generate(configPath: string) {
         useJsExtensions: cfg.useJsExtensionsClient,
         includeMethodsDepth: cfg.includeMethodsDepth ?? 2,
         skipJunctionTables: cfg.skipJunctionTables ?? true
-      }),
+      }, model),
     });
   }
 

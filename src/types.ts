@@ -33,7 +33,7 @@ export interface Config {
   outServer?: string;
   outClient?: string;
   softDeleteColumn?: string | null;
-  includeDepthLimit?: number;
+  dateType?: "date" | "string";
   
   // Include methods generation
   includeMethodsDepth?: number;  // How deep to generate include methods (default: 2)

@@ -116,7 +116,8 @@ export function generateIncludeMethods(
   opts: { 
     maxDepth: number;
     skipJunctionTables: boolean;
-  }
+  },
+  allTables?: Table[]
 ): IncludeMethod[] {
   const methods: IncludeMethod[] = [];
   const baseTableName = table.name;
@@ -148,10 +149,11 @@ export function generateIncludeMethods(
       if (visited.has(edge.target)) continue;
       
       // Skip junction tables if configured
-      const targetTable = Object.values(graph).find(t => Object.values(t).some(e => e.target === edge.target));
-      if (opts.skipJunctionTables && edge.target.includes("_")) {
-        // Simple heuristic for junction tables
-        continue;
+      if (opts.skipJunctionTables && allTables) {
+        const targetTable = allTables.find(t => t.name === edge.target);
+        if (targetTable && isJunctionTable(targetTable)) {
+          continue;
+        }
       }
       
       const newPath = [...path, key];

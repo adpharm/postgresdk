@@ -1,4 +1,4 @@
-import type { Table } from "./introspect";
+import type { Table, Model } from "./introspect";
 import type { Graph } from "./rel-classify";
 import { pascal } from "./utils";
 import { generateIncludeMethods } from "./emit-include-methods";
@@ -10,7 +10,8 @@ export function emitClient(
     useJsExtensions?: boolean;
     includeMethodsDepth?: number;
     skipJunctionTables?: boolean;
-  }
+  },
+  model?: Model
 ) {
   const Type = pascal(table.name);
   const ext = opts.useJsExtensions ? ".js" : "";
@@ -28,10 +29,11 @@ export function emitClient(
   const pkPathExpr = hasCompositePk ? safePk.map((c) => `pk.${c}`).join(` + "/" + `) : `pk`;
 
   // Generate include methods
+  const allTables = model ? Object.values(model.tables) : undefined;
   const includeMethods = generateIncludeMethods(table, graph, {
     maxDepth: opts.includeMethodsDepth ?? 2,
     skipJunctionTables: opts.skipJunctionTables ?? true
-  });
+  }, allTables);
 
   // Build import for types needed by include methods
   const importedTypes = new Set<string>();
@@ -48,7 +50,7 @@ export function emitClient(
   
   // If we have includes from other tables, we need those types too
   const otherTableImports: string[] = [];
-  for (const target of importedTypes) {
+  for (const target of Array.from(importedTypes)) {
     if (target !== table.name) {
       otherTableImports.push(`import type { Select${pascal(target)} } from "./types/${target}${ext}";`);
     }
