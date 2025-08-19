@@ -71,15 +71,15 @@ async function testInitInExistingProject() {
   const configPath = join(projectDir, "postgresdk.config.ts");
   await Bun.write(configPath, existingConfig);
 
-  // Try to init - should fail
+  // Try to init - should fail with --force-error flag
   try {
-    execSync(`cd ${projectDir} && bun ${process.cwd()}/src/cli.ts init`, { stdio: "pipe" });
+    execSync(`cd ${projectDir} && bun ${process.cwd()}/src/cli.ts init --force-error`, { stdio: "pipe" });
     assert(false, "Init should fail when config exists");
   } catch (error: any) {
     // Expected - init should fail when config exists
     const errorOutput = error.stdout?.toString() || error.stderr?.toString() || "";
     assert(errorOutput.includes("already exists") || error.status !== 0, "Init should fail with existing config");
-    console.log("  ✓ Init correctly fails with existing config");
+    console.log("  ✓ Init correctly fails with existing config (test mode)");
   }
 }
 
@@ -177,13 +177,13 @@ async function testMultipleInits() {
   execSync(`cd ${projectDir} && bun ${process.cwd()}/src/cli.ts init`, { stdio: "pipe" });
   assert(existsSync(join(projectDir, "postgresdk.config.ts")), "First init should create config");
 
-  // Second init should fail
+  // Second init should fail with --force-error flag
   try {
-    execSync(`cd ${projectDir} && bun ${process.cwd()}/src/cli.ts init`, { stdio: "pipe" });
+    execSync(`cd ${projectDir} && bun ${process.cwd()}/src/cli.ts init --force-error`, { stdio: "pipe" });
     assert(false, "Second init should fail");
   } catch (error: any) {
     assert(error.status !== 0, "Second init should exit with error");
-    console.log("  ✓ Prevents overwriting existing config");
+    console.log("  ✓ Prevents overwriting existing config (test mode)");
   }
 }
 

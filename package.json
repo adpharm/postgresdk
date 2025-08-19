@@ -36,9 +36,11 @@
     "publish:major": "./publish.sh"
   },
   "dependencies": {
+    "@types/prompts": "^2.4.9",
     "dotenv": "^17.2.1",
     "hono": "^4.9.0",
     "pg": "^8.16.3",
+    "prompts": "^2.4.2",
     "zod": "^4.0.15"
   },
   "devDependencies": {

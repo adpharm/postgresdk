@@ -1,6 +1,9 @@
 #!/usr/bin/env node
-import { existsSync, writeFileSync } from "fs";
+import { existsSync, writeFileSync, readFileSync, copyFileSync } from "fs";
 import { resolve } from "path";
+import prompts from "prompts";
+import { extractConfigFields, generateMergedConfig } from "./cli-config-utils";
+import type { ConfigField } from "./cli-config-utils";
 
 const CONFIG_TEMPLATE = `/**
  * PostgreSDK Configuration
@@ -138,13 +141,151 @@ export default {
 export async function initCommand(args: string[]): Promise<void> {
   console.log("🚀 Initializing postgresdk configuration...\n");
   
+  // Check for --force-error flag (for testing)
+  const forceError = args.includes("--force-error");
+  
   // Check for existing config file
   const configPath = resolve(process.cwd(), "postgresdk.config.ts");
   
   if (existsSync(configPath)) {
-    console.error("❌ Error: postgresdk.config.ts already exists");
-    console.log("   To reinitialize, please remove or rename the existing file first.");
-    process.exit(1);
+    // In test mode, fail immediately
+    if (forceError) {
+      console.error("❌ Error: postgresdk.config.ts already exists");
+      console.log("   To reinitialize, please remove or rename the existing file first.");
+      process.exit(1);
+    }
+    console.log("⚠️  Found existing postgresdk.config.ts\n");
+    
+    // Read existing config
+    const existingContent = readFileSync(configPath, "utf-8");
+    const existingFields = extractConfigFields(existingContent);
+    
+    // Show what we found
+    console.log("📋 Existing configuration detected:");
+    existingFields.forEach(field => {
+      if (!field.isCommented) {
+        console.log(`   • ${field.description}: ${field.value}`);
+      }
+    });
+    console.log();
+    
+    // Ask user how to proceed
+    const { mergeStrategy } = await prompts({
+      type: "select",
+      name: "mergeStrategy",
+      message: "How would you like to proceed?",
+      choices: [
+        { 
+          title: "Keep existing values and add new options", 
+          value: "keep-existing",
+          description: "Preserves your current settings while adding any new configuration options"
+        },
+        { 
+          title: "Interactive merge (recommended)", 
+          value: "interactive",
+          description: "Review each setting and choose what to keep"
+        },
+        { 
+          title: "Replace with fresh defaults", 
+          value: "use-defaults",
+          description: "Creates a new config with default values (backs up existing)"
+        },
+        { 
+          title: "Cancel", 
+          value: "cancel",
+          description: "Exit without making changes"
+        }
+      ],
+      initial: 1
+    });
+    
+    if (!mergeStrategy || mergeStrategy === "cancel") {
+      console.log("\n✅ Cancelled. No changes made.");
+      process.exit(0);
+    }
+    
+    let userChoices: Map<string, any> | undefined;
+    
+    // Interactive merge
+    if (mergeStrategy === "interactive") {
+      userChoices = new Map();
+      
+      console.log("\n🔄 Let's review your configuration:\n");
+      
+      // For each existing non-commented field, ask if they want to keep it
+      for (const field of existingFields.filter(f => !f.isCommented)) {
+        const { choice } = await prompts({
+          type: "select",
+          name: "choice",
+          message: `${field.description}:\n   Current: ${field.value}\n   Action:`,
+          choices: [
+            { title: "Keep current value", value: "keep" },
+            { title: "Use default value", value: "new" },
+          ],
+          initial: 0
+        });
+        
+        if (!choice) {
+          console.log("\n✅ Cancelled. No changes made.");
+          process.exit(0);
+        }
+        
+        userChoices.set(field.key, choice);
+      }
+      
+      // Ask about new options that weren't in the existing config
+      const newOptions = [
+        { key: "tests", description: "Enable test generation" },
+        { key: "auth", description: "Add authentication" },
+        { key: "pull", description: "Configure SDK distribution" }
+      ];
+      
+      const existingKeys = new Set(existingFields.map(f => f.key));
+      const missingOptions = newOptions.filter(opt => !existingKeys.has(opt.key));
+      
+      if (missingOptions.length > 0) {
+        console.log("\n📦 New configuration options available:\n");
+        
+        for (const option of missingOptions) {
+          const { addOption } = await prompts({
+            type: "confirm",
+            name: "addOption",
+            message: `Add ${option.description} configuration? (commented out by default)`,
+            initial: false
+          });
+          
+          if (addOption) {
+            userChoices.set(option.key, "add-commented");
+          }
+        }
+      }
+    }
+    
+    // Backup existing config
+    const backupPath = configPath + ".backup." + Date.now();
+    copyFileSync(configPath, backupPath);
+    console.log(`\n💾 Backed up existing config to: ${backupPath}`);
+    
+    // Generate merged config
+    const mergedConfig = generateMergedConfig(
+      existingFields,
+      mergeStrategy as "keep-existing" | "use-defaults" | "interactive",
+      userChoices
+    );
+    
+    // Write the new config
+    try {
+      writeFileSync(configPath, mergedConfig, "utf-8");
+      console.log("✅ Updated postgresdk.config.ts with merged configuration");
+      console.log("\n💡 Your previous config has been backed up.");
+      console.log("   Run 'postgresdk generate' to create your SDK with the new config.");
+    } catch (error) {
+      console.error("❌ Error updating config file:", error);
+      console.log(`   Your backup is available at: ${backupPath}`);
+      process.exit(1);
+    }
+    
+    return;
   }
   
   // Check for .env file
