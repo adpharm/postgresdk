@@ -186,6 +186,31 @@ export async function generate(configPath: string) {
   }
   // Future: Add emitExpressRouter, emitFastifyRouter, etc.
 
+  // Generate unified contract with both API and SDK documentation
+  const { generateUnifiedContract, generateUnifiedContractMarkdown } = await import("./emit-sdk-contract");
+  // Debug: Check model before passing it
+  if (process.env.SDK_DEBUG) {
+    console.log(`[Index] Model has ${Object.keys(model.tables || {}).length} tables before contract generation`);
+  }
+  const contract = generateUnifiedContract(model, cfg, graph);
+  files.push({
+    path: join(serverDir, "CONTRACT.md"),
+    content: generateUnifiedContractMarkdown(contract),
+  });
+  
+  // Also include contract with the client SDK for postgresdk pull
+  files.push({
+    path: join(clientDir, "CONTRACT.md"),
+    content: generateUnifiedContractMarkdown(contract),
+  });
+
+  // Generate unified contract TypeScript code
+  const contractCode = emitUnifiedContract(model, cfg, graph);
+  files.push({
+    path: join(serverDir, "contract.ts"),
+    content: contractCode,
+  });
+
   // Generate SDK bundle for serving from API
   // When looking for client files, we need to use the actual path where they were written
   const clientFiles = files.filter(f => {
@@ -196,25 +221,6 @@ export async function generate(configPath: string) {
   files.push({
     path: join(serverDir, "sdk-bundle.ts"),
     content: emitSdkBundle(clientFiles, clientDir),
-  });
-
-  // Generate unified contract with both API and SDK documentation
-  const contractCode = emitUnifiedContract(model, cfg);
-  files.push({
-    path: join(serverDir, "contract.ts"),
-    content: contractCode,
-  });
-  
-  // Also generate a markdown version for easy reading
-  const { generateUnifiedContract, generateUnifiedContractMarkdown } = await import("./emit-sdk-contract");
-  // Debug: Check model before passing it
-  if (process.env.SDK_DEBUG) {
-    console.log(`[Index] Model has ${Object.keys(model.tables || {}).length} tables before contract generation`);
-  }
-  const contract = generateUnifiedContract(model, cfg, graph);
-  files.push({
-    path: join(serverDir, "CONTRACT.md"),
-    content: generateUnifiedContractMarkdown(contract),
   });
 
   // Generate tests if configured
