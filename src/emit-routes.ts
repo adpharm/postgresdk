@@ -74,6 +74,7 @@ const log = {
 };
 
 const listSchema = z.object({
+  where: z.any().optional(),           // TODO: typed where clause in later pass
   include: z.any().optional(),         // TODO: typed include spec in later pass
   limit: z.number().int().positive().max(100).optional(),
   offset: z.number().int().min(0).optional(),

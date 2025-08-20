@@ -43,6 +43,7 @@ import * as coreOps from "../core/operations${ext}";
 ${authImport}
 
 const listSchema = z.object({
+  where: z.any().optional(),
   include: z.any().optional(),
   limit: z.number().int().positive().max(100).optional(),
   offset: z.number().int().min(0).optional(),

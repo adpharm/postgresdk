@@ -100,19 +100,48 @@ export async function getByPk(
  */
 export async function listRecords(
   ctx: OperationContext,
-  params: { limit?: number; offset?: number; include?: any }
-): Promise<{ data?: any; error?: string; issues?: any; status: number; needsIncludes?: boolean; includeSpec?: any }> {
+  params: { where?: any; limit?: number; offset?: number; include?: any }
+): Promise<{ data?: any; error?: string; issues?: any; needsIncludes?: boolean; includeSpec?: any; status: number }> {
   try {
-    const { limit = 50, offset = 0, include } = params;
+    const { where: whereClause, limit = 50, offset = 0, include } = params;
     
-    const where = ctx.softDeleteColumn 
-      ? \`WHERE "\${ctx.softDeleteColumn}" IS NULL\` 
-      : "";
+    // Build WHERE clause
+    const whereParts: string[] = [];
+    const whereParams: any[] = [];
+    let paramIndex = 1;
     
-    const text = \`SELECT * FROM "\${ctx.table}" \${where} LIMIT $1 OFFSET $2\`;
-    log.debug(\`LIST \${ctx.table} SQL:\`, text, "params:", [limit, offset]);
+    // Add soft delete filter if applicable
+    if (ctx.softDeleteColumn) {
+      whereParts.push(\`"\${ctx.softDeleteColumn}" IS NULL\`);
+    }
     
-    const { rows } = await ctx.pg.query(text, [limit, offset]);
+    // Add user-provided where conditions
+    if (whereClause && typeof whereClause === 'object') {
+      for (const [key, value] of Object.entries(whereClause)) {
+        if (value === null) {
+          whereParts.push(\`"\${key}" IS NULL\`);
+        } else if (value === undefined) {
+          // Skip undefined values
+          continue;
+        } else {
+          whereParts.push(\`"\${key}" = $\${paramIndex}\`);
+          whereParams.push(value);
+          paramIndex++;
+        }
+      }
+    }
+    
+    const whereSQL = whereParts.length > 0 ? \`WHERE \${whereParts.join(" AND ")}\` : "";
+    
+    // Add limit and offset params
+    const limitParam = \`$\${paramIndex}\`;
+    const offsetParam = \`$\${paramIndex + 1}\`;
+    const allParams = [...whereParams, limit, offset];
+    
+    const text = \`SELECT * FROM "\${ctx.table}" \${whereSQL} LIMIT \${limitParam} OFFSET \${offsetParam}\`;
+    log.debug(\`LIST \${ctx.table} SQL:\`, text, "params:", allParams);
+    
+    const { rows } = await ctx.pg.query(text, allParams);
     
     if (!include) {
       log.debug(\`LIST \${ctx.table} rows:\`, rows.length);
