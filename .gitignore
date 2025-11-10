@@ -191,7 +191,6 @@ terraform.rc
 
 .react-router/
 
-.claude/
 sftp-build/
 
 # don't add recordings to the repo
