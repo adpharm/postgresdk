@@ -1,8 +1,8 @@
 #!/usr/bin/env bun
 // Confirm that include types are still fully functional
 
-import { SDK } from "./.results-with-tests/client";
-import type { AuthorsIncludeSpec, BooksIncludeSpec } from "./.results-with-tests/client";
+import { SDK } from "../test/.results-with-tests/client";
+import type { AuthorsIncludeSpec, BooksIncludeSpec } from "../test/.results-with-tests/client";
 
 console.log("Confirming include types are still fully functional...\n");
 

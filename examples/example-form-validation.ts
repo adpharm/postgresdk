@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 // Example: Using SDK Zod schemas for form validation in a client app
 
-import { SDK, InsertBooksSchema, UpdateBooksSchema } from "./.results-with-tests/client";
+import { SDK, InsertBooksSchema, UpdateBooksSchema } from "../test/.results-with-tests/client";
 
 // Simulated form data (e.g., from a React form)
 const formData = {
@@ -20,7 +20,7 @@ const validation = InsertBooksSchema.safeParse(formData);
 
 if (!validation.success) {
   console.log("❌ Validation failed:");
-  validation.error.errors.forEach(err => {
+  validation.error.issues.forEach((err: any) => {
     console.log(`  - Field '${err.path.join('.')}': ${err.message}`);
   });
   process.exit(1);

@@ -112,6 +112,7 @@ export class ${Type}Client extends BaseClient {
   }
 
   async list(params?: {
+    include?: any;
     limit?: number;
     offset?: number;
     where?: Where<Select${Type}>;
@@ -167,9 +168,15 @@ export function emitClientIndex(tables: Table[], useJsExtensions?: boolean) {
   
   // Export base client for extension
   out += `export { BaseClient } from "./base-client${ext}";\n`;
-  
-  // Include specs removed - using explicit methods instead
-  
+
+  // Export IncludeSpec types for advanced usage
+  out += `\n// Include specification types for custom queries\n`;
+  out += `export type {\n`;
+  for (const t of tables) {
+    out += `  ${pascal(t.name)}IncludeSpec,\n`;
+  }
+  out += `} from "./include-spec${ext}";\n`;
+
   // Export Zod schemas
   out += `\n// Zod schemas for form validation\n`;
   for (const t of tables) {

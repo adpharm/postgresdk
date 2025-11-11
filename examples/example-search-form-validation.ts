@@ -6,7 +6,7 @@ import {
   BooksListParamsSchema, 
   PaginationParamsSchema,
   BooksOrderParamsSchema
-} from "./.results-with-tests/client";
+} from "../test/.results-with-tests/client";
 
 console.log("📋 Search Form Validation Example\n");
 
@@ -39,7 +39,7 @@ const listValidation = BooksListParamsSchema.safeParse(searchFormData);
 
 if (!listValidation.success) {
   console.log("❌ Search form validation failed:");
-  listValidation.error.errors.forEach(err => {
+  listValidation.error.issues.forEach((err: any) => {
     console.log(`  - Field '${err.path.join('.')}': ${err.message}`);
   });
   process.exit(1);

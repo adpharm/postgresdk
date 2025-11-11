@@ -131,7 +131,7 @@ test("getByPkWith* methods return the correct record", async () => {
     expect(thirdBook).not.toBeNull();
     expect(thirdBook!.id).toBe(book3.rows[0].id);
     expect(thirdBook!.title).toBe("Third Book");
-    expect(thirdBook!.tags[0].name).toBe("Tag One");
+    expect(thirdBook!.tags[0]!.name).toBe("Tag One");
     
     // Test 3: Get FIRST book with author (to ensure it also works)
     const firstBook = await sdk.books.getByPkWithAuthor(book1.rows[0].id);
@@ -146,7 +146,7 @@ test("getByPkWith* methods return the correct record", async () => {
     expect(secondAuthor!.id).toBe(author2.rows[0].id);
     expect(secondAuthor!.name).toBe("Author Two");
     expect(secondAuthor!.books).toHaveLength(1);
-    expect(secondAuthor!.books[0].title).toBe("Second Book");
+    expect(secondAuthor!.books[0]!.title).toBe("Second Book");
     
     // Test 5: Non-existent ID should return null
     const nonExistent = await sdk.books.getByPkWithAuthor("00000000-0000-0000-0000-000000000000");
@@ -184,7 +184,7 @@ test("list with where clause filters correctly", async () => {
     // Test WHERE clause filtering
     const bobAuthors = await sdk.authors.list({ where: { name: "Bob" } });
     expect(bobAuthors).toHaveLength(1);
-    expect(bobAuthors[0].name).toBe("Bob");
+    expect(bobAuthors[0]!.name).toBe("Bob");
     
     const allAuthors = await sdk.authors.list();
     expect(allAuthors.length).toBeGreaterThanOrEqual(3);

@@ -185,7 +185,7 @@ async function verifyIncludeMethods() {
     if (methods.length > 0) {
       console.log("  ✓ Include methods are generated");
       console.log(`  → Generated ${methods.length} include methods:`);
-      methods.slice(0, 5).forEach(m => console.log(`    - ${m.replace('async ', '')}`));
+      methods.slice(0, 5).forEach((m: string) => console.log(`    - ${m.replace('async ', '')}`));
       if (methods.length > 5) {
         console.log(`    ... and ${methods.length - 5} more`);
       }

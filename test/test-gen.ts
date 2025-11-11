@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { readFileSync, writeFileSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, rmSync } from "node:fs";
 import { execSync, exec } from "node:child_process";
 import { Client } from "pg";
 import { Hono } from "hono";
@@ -148,6 +148,14 @@ async function main() {
     startedContainer = true;
   } else {
     console.log("✓ PostgreSQL container is running");
+  }
+
+  // Clean up all test result directories before running tests
+  const testDirs = ["test/.results", "test/.results-apikey", "test/.results-jwt", "test/.results-same-dir"];
+  for (const dir of testDirs) {
+    if (existsSync(dir)) {
+      rmSync(dir, { recursive: true, force: true });
+    }
   }
 
   console.log("\n0) Write test gen.config.ts …");

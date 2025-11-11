@@ -11,6 +11,14 @@
   - WhereOperator<T> type for all supported operators
   - WhereCondition<T> union type for direct values or operator objects
   - Where<T> mapped type for complete WHERE clause typing
+- feat: Export IncludeSpec types from SDK for advanced usage
+  - Allows building complex include specifications outside SDK methods
+  - Useful for dynamic query builders and custom abstractions
+- refactor: Reorganize project structure and clean up tests
+  - Moved validation examples to examples/ directory for better discoverability
+  - Removed obsolete test files that tested old patterns
+  - Added test cleanup before runs to prevent stale data issues
+  - Updated drizzle-e2e config to use current config format
 - refactor: Improve config template with better structure and examples
   - Added quick start section with CLI commands
   - Better organized sections with clearer comments

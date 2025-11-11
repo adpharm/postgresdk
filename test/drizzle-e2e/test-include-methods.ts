@@ -89,9 +89,9 @@ async function testIncludeMethods() {
   console.log(`   ✓ Found ${contactsWithInteractions.length} contacts`);
   const johnWithInteractions = contactsWithInteractions.find(c => c.email === 'john@example.com');
   if (johnWithInteractions) {
-    console.log(`   ✓ John Doe has ${johnWithInteractions.contactInteractions.length} interactions`);
-    // TypeScript knows contactInteractions exists and is an array
-    const firstInteraction = johnWithInteractions.contactInteractions[0];
+    console.log(`   ✓ John Doe has ${johnWithInteractions.contact_interactions.length} interactions`);
+    // TypeScript knows contact_interactions exists and is an array
+    const firstInteraction = johnWithInteractions.contact_interactions[0];
     if (firstInteraction) {
       console.log(`   ✓ First interaction type: ${firstInteraction.type}`);
     }
@@ -102,28 +102,28 @@ async function testIncludeMethods() {
   console.log(`   ✓ Found ${contactsWithTags.length} contacts`);
   for (const contact of contactsWithTags) {
     if (contact.tags && contact.tags.length > 0) {
-      console.log(`   ✓ ${contact.firstName} ${contact.lastName} has tag: ${contact.tags[0].name}`);
+      console.log(`   ✓ ${contact.first_name} ${contact.last_name} has tag: ${contact.tags[0]?.name}`);
     }
   }
   
   console.log("\n3. Testing contacts.getByPkWithContactInteractions()");
   const singleContactWithInteractions = await sdk.contacts.getByPkWithContactInteractions(contact1Id);
   if (singleContactWithInteractions) {
-    console.log(`   ✓ Retrieved ${singleContactWithInteractions.firstName} with ${singleContactWithInteractions.contactInteractions.length} interactions`);
+    console.log(`   ✓ Retrieved ${singleContactWithInteractions.first_name} with ${singleContactWithInteractions.contact_interactions.length} interactions`);
   }
-  
+
   console.log("\n4. Testing contacts.getByPkWithTags()");
   const singleContactWithTags = await sdk.contacts.getByPkWithTags(contact2Id);
   if (singleContactWithTags) {
-    console.log(`   ✓ Retrieved ${singleContactWithTags.firstName} with tags: ${singleContactWithTags.tags.map(t => t.name).join(', ')}`);
+    console.log(`   ✓ Retrieved ${singleContactWithTags.first_name} with tags: ${singleContactWithTags.tags.map(t => t.name).join(', ')}`);
   }
-  
-  console.log("\n5. Testing contactInteractions.listWithContact()");
-  const interactionsWithContact = await sdk.contactInteractions.listWithContact();
+
+  console.log("\n5. Testing contact_interactions.listWithContact()");
+  const interactionsWithContact = await sdk.contact_interactions.listWithContact();
   console.log(`   ✓ Found ${interactionsWithContact.length} interactions`);
   if (interactionsWithContact[0]) {
     // TypeScript knows contact exists and is of the correct type
-    console.log(`   ✓ First interaction belongs to: ${interactionsWithContact[0].contact.firstName} ${interactionsWithContact[0].contact.lastName}`);
+    console.log(`   ✓ First interaction belongs to: ${interactionsWithContact[0].contact.first_name} ${interactionsWithContact[0].contact.last_name}`);
   }
   
   console.log("\n✅ All include method tests passed!");

@@ -4,7 +4,7 @@
  */
 
 import { execSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, rmSync } from "node:fs";
 import { promisify } from "node:util";
 import { exec } from "node:child_process";
 
@@ -74,9 +74,15 @@ async function main() {
   } else {
     console.log("✓ PostgreSQL container is already running");
   }
-  
+
+  // Clean up test results directory before running tests
+  const outputDir = "test/.results-with-tests";
+  if (existsSync(outputDir)) {
+    rmSync(outputDir, { recursive: true, force: true });
+  }
+
   console.log("\n📦 Running generator with test generation enabled...");
-  
+
   try {
     // Run the generator with test generation
     execSync("bun src/cli.ts generate -c test/test-with-tests.config.ts", {

@@ -6,7 +6,10 @@
       "Bash(bun run typecheck:*)",
       "Bash(bun run:*)",
       "Bash(bun test)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(bun test:gen:*)",
+      "Bash(bun test:gen-with-tests:*)",
+      "Bash(find:*)"
     ],
     "deny": [],
     "ask": []
