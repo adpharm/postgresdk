@@ -205,6 +205,13 @@ export function emitClientIndex(tables: Table[], useJsExtensions?: boolean) {
     const Type = pascal(t.name);
     out += `export { ${Type}PkSchema, ${Type}ListParamsSchema, ${Type}OrderParamsSchema } from "./params/${t.name}${ext}";\n`;
   }
-  
+
+  // Export table types (Insert, Update, Select)
+  out += `\n// Table types (Select, Insert, Update)\n`;
+  for (const t of tables) {
+    const Type = pascal(t.name);
+    out += `export type { Insert${Type}, Update${Type}, Select${Type} } from "./types/${t.name}${ext}";\n`;
+  }
+
   return out;
 }
