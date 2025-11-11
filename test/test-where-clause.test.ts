@@ -1,10 +1,63 @@
 #!/usr/bin/env bun
 
-import { test, expect } from "bun:test";
+import { test, expect, beforeAll, afterAll } from "bun:test";
 import { Hono } from "hono";
 import { serve } from "@hono/node-server";
 import { Client } from "pg";
 import { SDK } from "./.results/client";
+import { exec } from "node:child_process";
+import { promisify } from "node:util";
+
+const execAsync = promisify(exec);
+const CONTAINER_NAME = "postgresdk-test-db";
+
+async function ensurePostgresRunning(): Promise<void> {
+  try {
+    const { stdout } = await execAsync(`docker ps --filter "name=${CONTAINER_NAME}" --format "{{.Names}}"`);
+    if (stdout.trim() === CONTAINER_NAME) {
+      return; // Already running
+    }
+  } catch {}
+
+  // Container not running, start it
+  console.log("🐳 Starting PostgreSQL container for WHERE clause tests...");
+  try {
+    const { stdout } = await execAsync(`docker ps -a --filter "name=${CONTAINER_NAME}" --format "{{.Names}}"`);
+    if (stdout.trim() === CONTAINER_NAME) {
+      await execAsync(`docker start ${CONTAINER_NAME}`);
+    } else {
+      await execAsync(`docker run -d --name ${CONTAINER_NAME} -e POSTGRES_USER=user -e POSTGRES_PASSWORD=pass -e POSTGRES_DB=testdb -p 5432:5432 postgres:17-alpine`);
+    }
+  } catch (error) {
+    console.error("Failed to start container:", error);
+    throw error;
+  }
+
+  // Wait for PostgreSQL to be ready
+  console.log("  → Waiting for PostgreSQL to be ready...");
+  let attempts = 0;
+  const maxAttempts = 30;
+
+  while (attempts < maxAttempts) {
+    try {
+      const pg = new Client({ connectionString: "postgres://user:pass@localhost:5432/testdb" });
+      await pg.connect();
+      await pg.query("SELECT 1");
+      await pg.end();
+      console.log("  ✓ PostgreSQL is ready!");
+      return;
+    } catch {
+      attempts++;
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+  }
+
+  throw new Error("PostgreSQL failed to start in time");
+}
+
+beforeAll(async () => {
+  await ensurePostgresRunning();
+});
 
 test("getByPkWith* methods return the correct record", async () => {
   // Setup database

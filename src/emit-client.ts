@@ -60,7 +60,7 @@ export function emitClient(
   let includeMethodsCode = "";
   for (const method of includeMethods) {
     const isGetByPk = method.name.startsWith("getByPk");
-    const baseParams = isGetByPk ? "" : `params?: Omit<{ limit?: number; offset?: number; where?: any; orderBy?: string; order?: "asc" | "desc"; }, "include">`;
+    const baseParams = isGetByPk ? "" : `params?: Omit<{ limit?: number; offset?: number; where?: Where<Select${Type}>; orderBy?: string; order?: "asc" | "desc"; }, "include">`;
     
     if (isGetByPk) {
       // For getByPk with includes, we use the list endpoint with a where clause
@@ -92,6 +92,7 @@ export function emitClient(
 
   return `/* Generated. Do not edit. */
 import { BaseClient } from "./base-client${ext}";
+import type { Where } from "./where-types${ext}";
 ${typeImports}
 ${otherTableImports.join("\n")}
 
@@ -110,10 +111,10 @@ export class ${Type}Client extends BaseClient {
     return this.get<Select${Type} | null>(\`\${this.resource}/\${path}\`);
   }
 
-  async list(params?: { 
-    limit?: number; 
+  async list(params?: {
+    limit?: number;
     offset?: number;
-    where?: any;
+    where?: Where<Select${Type}>;
     orderBy?: string;
     order?: "asc" | "desc";
   }): Promise<Select${Type}[]> {

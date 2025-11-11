@@ -10,6 +10,38 @@ Make sure to:
 
 When updating CHANGELOG.md, focus on **outcomes and capabilities**, not implementation details.
 
+### Format
+
+Entries must follow this exact structure:
+
+```markdown
+## YYYY-MM-DD
+
+- type: Main change description
+  - Sub-point explaining detail
+  - Sub-point explaining detail
+  - Sub-point explaining detail
+- type: Another main change description
+  - Sub-point explaining detail
+```
+
+**Type prefixes:**
+
+- `feat:` - New features or capabilities
+- `refactor:` - Code restructuring that changes behavior
+- `fix:` - Bug fixes with user-visible impact
+- `docs:` - Documentation updates
+- `chore:` - Build, tooling, or maintenance changes
+
+**Formatting rules:**
+
+- Use date-based sections (## YYYY-MM-DD) for today's changes
+- First line: type prefix + concise main change (one sentence)
+- Sub-points: 2-space indent, start with hyphen, explain specifics
+- Sub-points explain "what changed" and "why it matters"
+- No empty lines between related sub-points
+- One empty line between unrelated changes
+
 **Include:**
 
 - New capabilities users can now do

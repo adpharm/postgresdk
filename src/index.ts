@@ -16,6 +16,7 @@ import { emitBaseClient } from "./emit-base-client";
 import { emitIncludeLoader } from "./emit-include-loader";
 import { emitTypes } from "./emit-types";
 import { emitLogger } from "./emit-logger";
+import { emitWhereTypes } from "./emit-where-types";
 import { emitAuth } from "./emit-auth";
 import { emitHonoRouter } from "./emit-router-hono";
 import { emitSdkBundle } from "./emit-sdk-bundle";
@@ -95,6 +96,9 @@ export async function generate(configPath: string) {
 
   // base-client (client only)
   files.push({ path: join(clientDir, "base-client.ts"), content: emitBaseClient() });
+
+  // where-types (client only)
+  files.push({ path: join(clientDir, "where-types.ts"), content: emitWhereTypes() });
 
   // include-builder (server)
   files.push({

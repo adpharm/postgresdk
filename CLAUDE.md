@@ -133,3 +133,5 @@ Before considering any task complete, ensure every item on this list is checked:
 # Project-specific settings
 
 We use Bun. Not NPM.
+
+We have tests defined in package.json. Use them.

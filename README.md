@@ -160,6 +160,7 @@ const authors = await sdk.authors.list({
 ### Filtering & Pagination
 
 ```typescript
+// Simple equality filtering
 const users = await sdk.users.list({
   where: { status: "active" },
   orderBy: "created_at",
@@ -167,7 +168,19 @@ const users = await sdk.users.list({
   limit: 20,
   offset: 40
 });
+
+// Advanced WHERE operators
+const filtered = await sdk.users.list({
+  where: {
+    age: { $gte: 18, $lt: 65 },           // Range queries
+    email: { $ilike: '%@company.com' },   // Pattern matching
+    status: { $in: ['active', 'pending'] }, // Array matching
+    deleted_at: { $is: null }              // NULL checks
+  }
+});
 ```
+
+See the generated SDK documentation for all available operators: `$eq`, `$ne`, `$gt`, `$gte`, `$lt`, `$lte`, `$in`, `$nin`, `$like`, `$ilike`, `$is`, `$isNot`.
 
 ## Authentication
 

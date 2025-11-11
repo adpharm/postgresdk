@@ -118,12 +118,88 @@ export async function listRecords(
     // Add user-provided where conditions
     if (whereClause && typeof whereClause === 'object') {
       for (const [key, value] of Object.entries(whereClause)) {
-        if (value === null) {
-          whereParts.push(\`"\${key}" IS NULL\`);
-        } else if (value === undefined) {
+        if (value === undefined) {
           // Skip undefined values
           continue;
+        }
+
+        // Handle operator objects like { $gt: 5, $like: "%test%" }
+        if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+          for (const [op, opValue] of Object.entries(value)) {
+            if (opValue === undefined) continue;
+
+            switch (op) {
+              case '$eq':
+                whereParts.push(\`"\${key}" = $\${paramIndex}\`);
+                whereParams.push(opValue);
+                paramIndex++;
+                break;
+              case '$ne':
+                whereParts.push(\`"\${key}" != $\${paramIndex}\`);
+                whereParams.push(opValue);
+                paramIndex++;
+                break;
+              case '$gt':
+                whereParts.push(\`"\${key}" > $\${paramIndex}\`);
+                whereParams.push(opValue);
+                paramIndex++;
+                break;
+              case '$gte':
+                whereParts.push(\`"\${key}" >= $\${paramIndex}\`);
+                whereParams.push(opValue);
+                paramIndex++;
+                break;
+              case '$lt':
+                whereParts.push(\`"\${key}" < $\${paramIndex}\`);
+                whereParams.push(opValue);
+                paramIndex++;
+                break;
+              case '$lte':
+                whereParts.push(\`"\${key}" <= $\${paramIndex}\`);
+                whereParams.push(opValue);
+                paramIndex++;
+                break;
+              case '$in':
+                if (Array.isArray(opValue) && opValue.length > 0) {
+                  whereParts.push(\`"\${key}" = ANY($\${paramIndex})\`);
+                  whereParams.push(opValue);
+                  paramIndex++;
+                }
+                break;
+              case '$nin':
+                if (Array.isArray(opValue) && opValue.length > 0) {
+                  whereParts.push(\`"\${key}" != ALL($\${paramIndex})\`);
+                  whereParams.push(opValue);
+                  paramIndex++;
+                }
+                break;
+              case '$like':
+                whereParts.push(\`"\${key}" LIKE $\${paramIndex}\`);
+                whereParams.push(opValue);
+                paramIndex++;
+                break;
+              case '$ilike':
+                whereParts.push(\`"\${key}" ILIKE $\${paramIndex}\`);
+                whereParams.push(opValue);
+                paramIndex++;
+                break;
+              case '$is':
+                if (opValue === null) {
+                  whereParts.push(\`"\${key}" IS NULL\`);
+                }
+                break;
+              case '$isNot':
+                if (opValue === null) {
+                  whereParts.push(\`"\${key}" IS NOT NULL\`);
+                }
+                break;
+            }
+          }
+        } else if (value === null) {
+          // Direct null value
+          whereParts.push(\`"\${key}" IS NULL\`);
         } else {
+          // Direct value (simple equality)
           whereParts.push(\`"\${key}" = $\${paramIndex}\`);
           whereParams.push(value);
           paramIndex++;
