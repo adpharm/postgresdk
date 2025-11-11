@@ -12,16 +12,23 @@ When updating CHANGELOG.md, focus on **outcomes and capabilities**, not implemen
 
 ### Format
 
+This project follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format with release-based sections.
+
 Entries must follow this exact structure:
 
 ```markdown
-## YYYY-MM-DD
+## [Unreleased]
 
 - type: Main change description
   - Sub-point explaining detail
   - Sub-point explaining detail
   - Sub-point explaining detail
 - type: Another main change description
+  - Sub-point explaining detail
+
+## [vX.Y.Z] - YYYY-MM-DD
+
+- type: Main change description
   - Sub-point explaining detail
 ```
 
@@ -35,7 +42,8 @@ Entries must follow this exact structure:
 
 **Formatting rules:**
 
-- Use date-based sections (## YYYY-MM-DD) for today's changes
+- Add new changes to the `[Unreleased]` section at the top
+- When a release is tagged, changes move from Unreleased to a new `[vX.Y.Z] - YYYY-MM-DD` section
 - First line: type prefix + concise main change (one sentence)
 - Sub-points: 2-space indent, start with hyphen, explain specifics
 - Sub-points explain "what changed" and "why it matters"
@@ -61,3 +69,9 @@ Entries must follow this exact structure:
 
 **Test: Would a developer returning after 1 month need to know this?**
 If the answer is no, omit it.
+
+**Release Process:**
+
+When adding changes:
+1. Always add to `[Unreleased]` section
+2. When creating a release, the maintainer will move Unreleased changes to a new `[vX.Y.Z]` section with the release date
