@@ -9,7 +9,9 @@
       "Bash(cat:*)",
       "Bash(bun test:gen:*)",
       "Bash(bun test:gen-with-tests:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(bun test:*)",
+      "Bash(SDK_DEBUG=1 bun test:*)"
     ],
     "deny": [],
     "ask": []

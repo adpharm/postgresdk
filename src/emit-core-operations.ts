@@ -96,6 +96,155 @@ export async function getByPk(
 }
 
 /**
+ * Build WHERE clause recursively, supporting $or/$and operators
+ * Returns { sql: string, params: any[], nextParamIndex: number }
+ */
+function buildWhereClause(
+  whereClause: any,
+  startParamIndex: number
+): { sql: string; params: any[]; nextParamIndex: number } {
+  const whereParts: string[] = [];
+  const whereParams: any[] = [];
+  let paramIndex = startParamIndex;
+
+  if (!whereClause || typeof whereClause !== 'object') {
+    return { sql: '', params: [], nextParamIndex: paramIndex };
+  }
+
+  // Separate logical operators from field conditions
+  const { $or, $and, ...fieldConditions } = whereClause;
+
+  // Process field-level conditions
+  for (const [key, value] of Object.entries(fieldConditions)) {
+    if (value === undefined) {
+      continue;
+    }
+
+    // Handle operator objects like { $gt: 5, $like: "%test%" }
+    if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+      for (const [op, opValue] of Object.entries(value)) {
+        if (opValue === undefined) continue;
+
+        switch (op) {
+          case '$eq':
+            whereParts.push(\`"\${key}" = $\${paramIndex}\`);
+            whereParams.push(opValue);
+            paramIndex++;
+            break;
+          case '$ne':
+            whereParts.push(\`"\${key}" != $\${paramIndex}\`);
+            whereParams.push(opValue);
+            paramIndex++;
+            break;
+          case '$gt':
+            whereParts.push(\`"\${key}" > $\${paramIndex}\`);
+            whereParams.push(opValue);
+            paramIndex++;
+            break;
+          case '$gte':
+            whereParts.push(\`"\${key}" >= $\${paramIndex}\`);
+            whereParams.push(opValue);
+            paramIndex++;
+            break;
+          case '$lt':
+            whereParts.push(\`"\${key}" < $\${paramIndex}\`);
+            whereParams.push(opValue);
+            paramIndex++;
+            break;
+          case '$lte':
+            whereParts.push(\`"\${key}" <= $\${paramIndex}\`);
+            whereParams.push(opValue);
+            paramIndex++;
+            break;
+          case '$in':
+            if (Array.isArray(opValue) && opValue.length > 0) {
+              whereParts.push(\`"\${key}" = ANY($\${paramIndex})\`);
+              whereParams.push(opValue);
+              paramIndex++;
+            }
+            break;
+          case '$nin':
+            if (Array.isArray(opValue) && opValue.length > 0) {
+              whereParts.push(\`"\${key}" != ALL($\${paramIndex})\`);
+              whereParams.push(opValue);
+              paramIndex++;
+            }
+            break;
+          case '$like':
+            whereParts.push(\`"\${key}" LIKE $\${paramIndex}\`);
+            whereParams.push(opValue);
+            paramIndex++;
+            break;
+          case '$ilike':
+            whereParts.push(\`"\${key}" ILIKE $\${paramIndex}\`);
+            whereParams.push(opValue);
+            paramIndex++;
+            break;
+          case '$is':
+            if (opValue === null) {
+              whereParts.push(\`"\${key}" IS NULL\`);
+            }
+            break;
+          case '$isNot':
+            if (opValue === null) {
+              whereParts.push(\`"\${key}" IS NOT NULL\`);
+            }
+            break;
+        }
+      }
+    } else if (value === null) {
+      // Direct null value
+      whereParts.push(\`"\${key}" IS NULL\`);
+    } else {
+      // Direct value (simple equality)
+      whereParts.push(\`"\${key}" = $\${paramIndex}\`);
+      whereParams.push(value);
+      paramIndex++;
+    }
+  }
+
+  // Handle $or operator
+  if ($or && Array.isArray($or)) {
+    if ($or.length === 0) {
+      // Empty OR is logically FALSE - matches nothing
+      whereParts.push('FALSE');
+    } else {
+      const orParts: string[] = [];
+      for (const orCondition of $or) {
+        const result = buildWhereClause(orCondition, paramIndex);
+        if (result.sql) {
+          orParts.push(result.sql);
+          whereParams.push(...result.params);
+          paramIndex = result.nextParamIndex;
+        }
+      }
+      if (orParts.length > 0) {
+        whereParts.push(\`(\${orParts.join(' OR ')})\`);
+      }
+    }
+  }
+
+  // Handle $and operator
+  if ($and && Array.isArray($and) && $and.length > 0) {
+    const andParts: string[] = [];
+    for (const andCondition of $and) {
+      const result = buildWhereClause(andCondition, paramIndex);
+      if (result.sql) {
+        andParts.push(result.sql);
+        whereParams.push(...result.params);
+        paramIndex = result.nextParamIndex;
+      }
+    }
+    if (andParts.length > 0) {
+      whereParts.push(\`(\${andParts.join(' AND ')})\`);
+    }
+  }
+
+  const sql = whereParts.join(' AND ');
+  return { sql, params: whereParams, nextParamIndex: paramIndex };
+}
+
+/**
  * LIST operation - Get multiple records with optional filters
  */
 export async function listRecords(
@@ -104,136 +253,54 @@ export async function listRecords(
 ): Promise<{ data?: any; error?: string; issues?: any; needsIncludes?: boolean; includeSpec?: any; status: number }> {
   try {
     const { where: whereClause, limit = 50, offset = 0, include } = params;
-    
+
     // Build WHERE clause
-    const whereParts: string[] = [];
-    const whereParams: any[] = [];
     let paramIndex = 1;
-    
+    const whereParts: string[] = [];
+    let whereParams: any[] = [];
+
     // Add soft delete filter if applicable
     if (ctx.softDeleteColumn) {
       whereParts.push(\`"\${ctx.softDeleteColumn}" IS NULL\`);
     }
-    
+
     // Add user-provided where conditions
-    if (whereClause && typeof whereClause === 'object') {
-      for (const [key, value] of Object.entries(whereClause)) {
-        if (value === undefined) {
-          // Skip undefined values
-          continue;
-        }
-
-        // Handle operator objects like { $gt: 5, $like: "%test%" }
-        if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
-          for (const [op, opValue] of Object.entries(value)) {
-            if (opValue === undefined) continue;
-
-            switch (op) {
-              case '$eq':
-                whereParts.push(\`"\${key}" = $\${paramIndex}\`);
-                whereParams.push(opValue);
-                paramIndex++;
-                break;
-              case '$ne':
-                whereParts.push(\`"\${key}" != $\${paramIndex}\`);
-                whereParams.push(opValue);
-                paramIndex++;
-                break;
-              case '$gt':
-                whereParts.push(\`"\${key}" > $\${paramIndex}\`);
-                whereParams.push(opValue);
-                paramIndex++;
-                break;
-              case '$gte':
-                whereParts.push(\`"\${key}" >= $\${paramIndex}\`);
-                whereParams.push(opValue);
-                paramIndex++;
-                break;
-              case '$lt':
-                whereParts.push(\`"\${key}" < $\${paramIndex}\`);
-                whereParams.push(opValue);
-                paramIndex++;
-                break;
-              case '$lte':
-                whereParts.push(\`"\${key}" <= $\${paramIndex}\`);
-                whereParams.push(opValue);
-                paramIndex++;
-                break;
-              case '$in':
-                if (Array.isArray(opValue) && opValue.length > 0) {
-                  whereParts.push(\`"\${key}" = ANY($\${paramIndex})\`);
-                  whereParams.push(opValue);
-                  paramIndex++;
-                }
-                break;
-              case '$nin':
-                if (Array.isArray(opValue) && opValue.length > 0) {
-                  whereParts.push(\`"\${key}" != ALL($\${paramIndex})\`);
-                  whereParams.push(opValue);
-                  paramIndex++;
-                }
-                break;
-              case '$like':
-                whereParts.push(\`"\${key}" LIKE $\${paramIndex}\`);
-                whereParams.push(opValue);
-                paramIndex++;
-                break;
-              case '$ilike':
-                whereParts.push(\`"\${key}" ILIKE $\${paramIndex}\`);
-                whereParams.push(opValue);
-                paramIndex++;
-                break;
-              case '$is':
-                if (opValue === null) {
-                  whereParts.push(\`"\${key}" IS NULL\`);
-                }
-                break;
-              case '$isNot':
-                if (opValue === null) {
-                  whereParts.push(\`"\${key}" IS NOT NULL\`);
-                }
-                break;
-            }
-          }
-        } else if (value === null) {
-          // Direct null value
-          whereParts.push(\`"\${key}" IS NULL\`);
-        } else {
-          // Direct value (simple equality)
-          whereParts.push(\`"\${key}" = $\${paramIndex}\`);
-          whereParams.push(value);
-          paramIndex++;
-        }
+    if (whereClause) {
+      const result = buildWhereClause(whereClause, paramIndex);
+      if (result.sql) {
+        whereParts.push(result.sql);
+        whereParams = result.params;
+        paramIndex = result.nextParamIndex;
       }
     }
-    
+
     const whereSQL = whereParts.length > 0 ? \`WHERE \${whereParts.join(" AND ")}\` : "";
-    
+
     // Add limit and offset params
     const limitParam = \`$\${paramIndex}\`;
     const offsetParam = \`$\${paramIndex + 1}\`;
     const allParams = [...whereParams, limit, offset];
-    
+
     const text = \`SELECT * FROM "\${ctx.table}" \${whereSQL} LIMIT \${limitParam} OFFSET \${offsetParam}\`;
     log.debug(\`LIST \${ctx.table} SQL:\`, text, "params:", allParams);
-    
+
     const { rows } = await ctx.pg.query(text, allParams);
-    
+
     if (!include) {
       log.debug(\`LIST \${ctx.table} rows:\`, rows.length);
       return { data: rows, status: 200 };
     }
-    
+
     // Include logic will be handled by the include-loader
     // For now, just return the rows with a note that includes need to be applied
     log.debug(\`LIST \${ctx.table} include spec:\`, include);
     return { data: rows, needsIncludes: true, includeSpec: include, status: 200 };
   } catch (e: any) {
     log.error(\`LIST \${ctx.table} error:\`, e?.stack ?? e);
-    return { 
-      error: e?.message ?? "Internal error", 
+    return {
+      error: e?.message ?? "Internal error",
       ...(DEBUG ? { stack: e?.stack } : {}),
-      status: 500 
+      status: 500
     };
   }
 }

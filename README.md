@@ -178,9 +178,46 @@ const filtered = await sdk.users.list({
     deleted_at: { $is: null }              // NULL checks
   }
 });
+
+// OR logic - match any condition
+const results = await sdk.users.list({
+  where: {
+    $or: [
+      { email: { $ilike: '%@gmail.com' } },
+      { email: { $ilike: '%@yahoo.com' } },
+      { status: 'premium' }
+    ]
+  }
+});
+
+// Complex queries with AND/OR
+const complex = await sdk.users.list({
+  where: {
+    status: 'active',  // Implicit AND at root level
+    $or: [
+      { age: { $lt: 18 } },
+      { age: { $gt: 65 } }
+    ]
+  }
+});
+
+// Nested logic (2 levels)
+const nested = await sdk.users.list({
+  where: {
+    $and: [
+      {
+        $or: [
+          { firstName: { $ilike: '%john%' } },
+          { lastName: { $ilike: '%john%' } }
+        ]
+      },
+      { status: 'active' }
+    ]
+  }
+});
 ```
 
-See the generated SDK documentation for all available operators: `$eq`, `$ne`, `$gt`, `$gte`, `$lt`, `$lte`, `$in`, `$nin`, `$like`, `$ilike`, `$is`, `$isNot`.
+See the generated SDK documentation for all available operators: `$eq`, `$ne`, `$gt`, `$gte`, `$lt`, `$lte`, `$in`, `$nin`, `$like`, `$ilike`, `$is`, `$isNot`, `$or`, `$and`.
 
 ## Authentication
 

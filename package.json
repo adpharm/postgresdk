@@ -22,7 +22,7 @@
   },
   "scripts": {
     "build": "bun build src/cli.ts src/index.ts --outdir dist --target node --format esm --external=pg --external=zod --external=hono --external=prompts --external=node:* && tsc -p tsconfig.build.json --emitDeclarationOnly",
-    "test": "bun test:init && bun test:gen && bun test test/test-where-clause.test.ts && bun test:gen-with-tests && bun test:pull && bun test:typecheck && bun test:drizzle-e2e",
+    "test": "bun test:init && bun test:gen && bun test test/test-where-clause.test.ts && bun test test/test-where-or-and.test.ts && bun test:gen-with-tests && bun test:pull && bun test:typecheck && bun test:drizzle-e2e",
     "test:init": "bun test/test-init.ts",
     "test:gen": "bun test/test-gen.ts",
     "test:gen-with-tests": "bun test/test-gen-with-tests.ts",
@@ -53,7 +53,16 @@
     "typescript": "^5.5.0",
     "vitest": "^3.2.4"
   },
+  "author": "Ben Honda <ben@theadpharm.com>",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/adpharm/postgresdk.git"
+  },
+  "homepage": "https://github.com/adpharm/postgresdk#readme",
+  "bugs": {
+    "url": "https://github.com/adpharm/postgresdk/issues"
+  },
   "keywords": [
     "postgres",
     "sdk",

@@ -2,6 +2,12 @@
 
 ## 2025-11-11
 
+- feat: Add $or and $and logical operators to WHERE clauses
+  - Build complex queries with OR logic: `{ $or: [{ status: 'active' }, { role: 'admin' }] }`
+  - Combine with AND: `{ status: 'active', $or: [{ age: { $lt: 18 } }, { age: { $gt: 65 } }] }`
+  - Support nesting up to 2 levels deep for complex filtering patterns
+  - All 12 existing operators work inside $or/$and conditions
+  - Comprehensive test coverage with real-world scenarios
 - feat: Add type-safe WHERE clause filtering with advanced operators
   - Added 12 operators: $eq, $ne, $gt, $gte, $lt, $lte, $in, $nin, $like, $ilike, $is, $isNot
   - Full TypeScript type safety - only valid operators for each field type are allowed
@@ -14,6 +20,9 @@
 - feat: Export IncludeSpec types from SDK for advanced usage
   - Allows building complex include specifications outside SDK methods
   - Useful for dynamic query builders and custom abstractions
+- refactor: Add auto-generated file headers to all emitted files
+  - Clear warning that files are auto-generated and should not be edited manually
+  - Directs users to modify schema/config and regenerate instead
 - refactor: Reorganize project structure and clean up tests
   - Moved validation examples to examples/ directory for better discoverability
   - Removed obsolete test files that tested old patterns
@@ -23,7 +32,17 @@
   - Added quick start section with CLI commands
   - Better organized sections with clearer comments
   - More comprehensive examples for auth and pull configuration
+- docs: Expand WHERE clause examples in README
+  - Add OR logic examples with multiple conditions
+  - Show complex AND/OR combinations
+  - Include nested logic patterns
+- chore: Add MIT license file
+- chore: Add repository metadata to package.json
+  - Author, repository URL, homepage, and bug tracker links
+- chore: Ignore .claude/settings.local.json from version control
+  - Developer-specific Claude Code settings should not be committed
 - chore: Add Docker test setup automation
   - Auto-start PostgreSQL container if not running
   - Wait for DB readiness before running tests
   - Better test reliability across environments
+- chore: Remove obsolete planning document from repository
