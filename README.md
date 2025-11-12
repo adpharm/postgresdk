@@ -285,6 +285,41 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const apiRouter = createRouter({ pg: pool });
 ```
 
+### Request-Level Middleware (onRequest Hook)
+
+The `onRequest` hook executes before every endpoint operation, enabling:
+- Setting PostgreSQL session variables for audit logging
+- Configuring Row-Level Security (RLS) based on authenticated user
+- Request-level logging or monitoring
+
+```typescript
+import { createRouter } from "./api/server/router";
+
+const apiRouter = createRouter({
+  pg,
+  onRequest: async (c, pg) => {
+    // Access Hono context - fully type-safe
+    const auth = c.get('auth');
+
+    // Set PostgreSQL session variable for audit triggers
+    if (auth?.kind === 'jwt' && auth.claims?.sub) {
+      await pg.query(`SET LOCAL app.user_id = '${auth.claims.sub}'`);
+    }
+
+    // Or configure RLS policies
+    if (auth?.tenant_id) {
+      await pg.query(`SET LOCAL app.tenant_id = '${auth.tenant_id}'`);
+    }
+  }
+});
+```
+
+The hook receives:
+- `c` - Hono Context object with full type safety and IDE autocomplete
+- `pg` - PostgreSQL client for setting session variables
+
+**Note:** The router works with or without the `onRequest` hook - fully backward compatible.
+
 ## Server Integration
 
 postgresdk generates Hono-compatible routes:

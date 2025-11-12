@@ -38,6 +38,7 @@ export function emitHonoRouter(tables: Table[], hasAuth: boolean, useJsExtension
  * To make changes, modify your schema or configuration and regenerate.
  */
 import { Hono } from "hono";
+import type { Context } from "hono";
 import { SDK_MANIFEST } from "./sdk-bundle${ext}";
 import { getContract } from "./contract${ext}";
 ${imports}
@@ -45,32 +46,46 @@ ${hasAuth ? `export { authMiddleware } from "./auth${ext}";` : ""}
 
 /**
  * Creates a Hono router with all generated routes that can be mounted into your existing app.
- * 
+ *
  * @example
  * import { Hono } from "hono";
  * import { createRouter } from "./generated/server/router";
- * 
+ *
  * // Using pg driver (Node.js)
  * import { Client } from "pg";
  * const pg = new Client({ connectionString: process.env.DATABASE_URL });
  * await pg.connect();
- * 
+ *
  * // OR using Neon driver (Edge-compatible)
  * import { Pool } from "@neondatabase/serverless";
  * const pool = new Pool({ connectionString: process.env.DATABASE_URL! });
  * const pg = pool; // Pool already has the compatible query method
- * 
+ *
  * // Mount all generated routes
  * const app = new Hono();
  * const apiRouter = createRouter({ pg });
  * app.route("/api", apiRouter);
- * 
+ *
  * // Or mount directly at root
  * const router = createRouter({ pg });
  * app.route("/", router);
+ *
+ * // With onRequest hook for audit logging or session variables
+ * const router = createRouter({
+ *   pg,
+ *   onRequest: async (c, pg) => {
+ *     const auth = c.get('auth'); // Type-safe! IDE autocomplete works
+ *     if (auth?.kind === 'jwt' && auth.claims?.sub) {
+ *       await pg.query(\`SET LOCAL app.user_id = '\${auth.claims.sub}'\`);
+ *     }
+ *   }
+ * });
  */
 export function createRouter(
-  deps: { pg: { query: (text: string, params?: any[]) => Promise<{ rows: any[] }> } }
+  deps: {
+    pg: { query: (text: string, params?: any[]) => Promise<{ rows: any[] }> },
+    onRequest?: (c: Context, pg: { query: (text: string, params?: any[]) => Promise<{ rows: any[] }> }) => Promise<void>
+  }
 ): Hono {
   const router = new Hono();
   
@@ -129,22 +144,36 @@ ${registrations}
 
 /**
  * Register all generated routes directly on an existing Hono app.
- * 
+ *
  * @example
  * import { Hono } from "hono";
  * import { registerAllRoutes } from "./generated/server/router";
- * 
+ *
  * const app = new Hono();
- * 
+ *
  * // Setup database connection (see createRouter example for both pg and Neon options)
  * const pg = yourDatabaseClient;
- * 
+ *
  * // Register all routes at once
  * registerAllRoutes(app, { pg });
+ *
+ * // With onRequest hook
+ * registerAllRoutes(app, {
+ *   pg,
+ *   onRequest: async (c, pg) => {
+ *     const auth = c.get('auth'); // Type-safe!
+ *     if (auth?.kind === 'jwt' && auth.claims?.sub) {
+ *       await pg.query(\`SET LOCAL app.user_id = '\${auth.claims.sub}'\`);
+ *     }
+ *   }
+ * });
  */
 export function registerAllRoutes(
   app: Hono,
-  deps: { pg: { query: (text: string, params?: any[]) => Promise<{ rows: any[] }> } }
+  deps: {
+    pg: { query: (text: string, params?: any[]) => Promise<{ rows: any[] }> },
+    onRequest?: (c: Context, pg: { query: (text: string, params?: any[]) => Promise<{ rows: any[] }> }) => Promise<void>
+  }
 ) {
 ${registrations.replace(/router/g, 'app')}
 }

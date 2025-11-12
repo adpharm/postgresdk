@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- feat: Add onRequest hook for request-level middleware
+  - Enables setting PostgreSQL session variables for audit logging and RLS
+  - Hook receives Hono context and pg client for type-safe access
+  - Runs before each endpoint operation (create, read, update, delete, list)
+  - Fully backward compatible - router works with or without the hook
+  - Example use case: Setting `app.user_id` session variable from JWT claims
+
 ## [v0.10.4] - 2025-11-11
 
 - feat: Export table types from client SDK index

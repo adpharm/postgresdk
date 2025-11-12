@@ -43,6 +43,7 @@ export function emitHonoRoutes(
  * To make changes, modify your schema or configuration and regenerate.
  */
 import { Hono } from "hono";
+import type { Context } from "hono";
 import { z } from "zod";
 import { Insert${Type}Schema, Update${Type}Schema } from "../zod/${fileTableName}${ext}";
 import { loadIncludes } from "../include-loader${ext}";
@@ -57,7 +58,7 @@ const listSchema = z.object({
   orderBy: z.any().optional()
 });
 
-export function register${Type}Routes(app: Hono, deps: { pg: { query: (text: string, params?: any[]) => Promise<{ rows: any[] }> } }) {
+export function register${Type}Routes(app: Hono, deps: { pg: { query: (text: string, params?: any[]) => Promise<{ rows: any[] }> }, onRequest?: (c: Context, pg: { query: (text: string, params?: any[]) => Promise<{ rows: any[] }> }) => Promise<void> }) {
   const base = "/v1/${fileTableName}";
   
   // Create operation context
@@ -77,12 +78,16 @@ ${hasAuth ? `
   app.post(base, async (c) => {
     const body = await c.req.json().catch(() => ({}));
     const parsed = Insert${Type}Schema.safeParse(body);
-    
+
     if (!parsed.success) {
       const issues = parsed.error.flatten();
       return c.json({ error: "Invalid body", issues }, 400);
     }
-    
+
+    if (deps.onRequest) {
+      await deps.onRequest(c, deps.pg);
+    }
+
     const result = await coreOps.createRecord(ctx, parsed.data);
     
     if (result.error) {
@@ -95,6 +100,11 @@ ${hasAuth ? `
   // GET BY PK
   app.get(\`\${base}/${pkPath}\`, async (c) => {
     ${getPkParams}
+
+    if (deps.onRequest) {
+      await deps.onRequest(c, deps.pg);
+    }
+
     const result = await coreOps.getByPk(ctx, pkValues);
     
     if (result.error) {
@@ -107,12 +117,16 @@ ${hasAuth ? `
   // LIST
   app.post(\`\${base}/list\`, async (c) => {
     const body = listSchema.safeParse(await c.req.json().catch(() => ({})));
-    
+
     if (!body.success) {
       const issues = body.error.flatten();
       return c.json({ error: "Invalid body", issues }, 400);
     }
-    
+
+    if (deps.onRequest) {
+      await deps.onRequest(c, deps.pg);
+    }
+
     const result = await coreOps.listRecords(ctx, body.data);
     
     if (result.error) {
@@ -158,12 +172,16 @@ ${hasAuth ? `
     ${getPkParams}
     const body = await c.req.json().catch(() => ({}));
     const parsed = Update${Type}Schema.safeParse(body);
-    
+
     if (!parsed.success) {
       const issues = parsed.error.flatten();
       return c.json({ error: "Invalid body", issues }, 400);
     }
-    
+
+    if (deps.onRequest) {
+      await deps.onRequest(c, deps.pg);
+    }
+
     const result = await coreOps.updateRecord(ctx, pkValues, parsed.data);
     
     if (result.error) {
@@ -176,6 +194,11 @@ ${hasAuth ? `
   // DELETE
   app.delete(\`\${base}/${pkPath}\`, async (c) => {
     ${getPkParams}
+
+    if (deps.onRequest) {
+      await deps.onRequest(c, deps.pg);
+    }
+
     const result = await coreOps.deleteRecord(ctx, pkValues);
     
     if (result.error) {
