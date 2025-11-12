@@ -152,7 +152,8 @@ if [ "$VERSION_TYPE" != "none" ]; then
         git tag -a "v${NEW_VERSION}" -m "Release v${NEW_VERSION}"
         echo -e "${GREEN}✓ Committed and tagged as v${NEW_VERSION}${NC}"
         echo -e "${YELLOW}Don't forget to push: git push && git push --tags${NC}"
-        echo -e "${YELLOW}Don't forget to update the changelog with the newly-published version number (v${NEW_VERSION}), if there is an unreleased section.${NC}"
+        echo -e "${YELLOW}Don't forget to update the changelog with '[v${NEW_VERSION}] - ${TODAY}', if there is an unreleased section.${NC}"
+        echo -e "${YELLOW}Don't forget to add and commit with 'git add . && git commit -m \"updating changelog with v${NEW_VERSION} release\"'.${NC}"
     fi
 fi
 
