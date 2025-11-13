@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Columns validated via Zod enum at route level for type safety
   - Examples: `{ orderBy: ["status", "created_at"], order: ["asc", "desc"] }`
   - Works with WHERE clauses and include methods
+  - Generated SDK contract includes comprehensive sorting documentation and examples
 
 ## [v0.11.0] - 2025-11-12
 
