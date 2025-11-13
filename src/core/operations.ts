@@ -244,10 +244,11 @@ function buildWhereClause(
  */
 export async function listRecords(
   ctx: OperationContext,
-  params: { where?: any; limit?: number; offset?: number; include?: any }
+  params: { where?: any; limit?: number; offset?: number; include?: any; orderBy?: string | string[]; order?: "asc" | "desc" | ("asc" | "desc")[] }
 ): Promise<{ data?: any; error?: string; issues?: any; needsIncludes?: boolean; includeSpec?: any; status: number }> {
   try {
-    const { where: whereClause, limit = 50, offset = 0, include } = params;
+    const { where: whereClause, limit = 50, offset = 0, include, orderBy, order } = params;
+    log.debug(`LIST ${ctx.table} params:`, { where: whereClause, limit, offset, orderBy, order, include: !!include });
 
     // Build WHERE clause
     let paramIndex = 1;
@@ -271,12 +272,26 @@ export async function listRecords(
 
     const whereSQL = whereParts.length > 0 ? `WHERE ${whereParts.join(" AND ")}` : "";
 
+    // Build ORDER BY clause
+    let orderBySQL = "";
+    if (orderBy) {
+      const columns = Array.isArray(orderBy) ? orderBy : [orderBy];
+      const directions = Array.isArray(order) ? order : (order ? Array(columns.length).fill(order) : Array(columns.length).fill("asc"));
+
+      const orderParts = columns.map((col, i) => {
+        const dir = (directions[i] || "asc").toUpperCase();
+        return `"${col}" ${dir}`;
+      });
+
+      orderBySQL = `ORDER BY ${orderParts.join(", ")}`;
+    }
+
     // Add limit and offset params
     const limitParam = `$${paramIndex}`;
     const offsetParam = `$${paramIndex + 1}`;
     const allParams = [...whereParams, limit, offset];
 
-    const text = `SELECT * FROM "${ctx.table}" ${whereSQL} LIMIT ${limitParam} OFFSET ${offsetParam}`;
+    const text = `SELECT * FROM "${ctx.table}" ${whereSQL} ${orderBySQL} LIMIT ${limitParam} OFFSET ${offsetParam}`;
     log.debug(`LIST ${ctx.table} SQL:`, text, "params:", allParams);
 
     const { rows } = await ctx.pg.query(text, allParams);

@@ -34,6 +34,9 @@ export function emitHonoRoutes(
   const ext = opts.useJsExtensions ? ".js" : "";
   const authImport = hasAuth ? `import { authMiddleware } from "../auth${ext}";` : "";
 
+  // Generate column name enum for orderBy validation
+  const columnNames = table.columns.map(c => `"${c.name}"`).join(", ");
+
   return `/**
  * AUTO-GENERATED FILE - DO NOT EDIT
  *
@@ -50,12 +53,15 @@ import { loadIncludes } from "../include-loader${ext}";
 import * as coreOps from "../core/operations${ext}";
 ${authImport}
 
+const columnEnum = z.enum([${columnNames}]);
+
 const listSchema = z.object({
   where: z.any().optional(),
   include: z.any().optional(),
   limit: z.number().int().positive().max(100).optional(),
   offset: z.number().int().min(0).optional(),
-  orderBy: z.any().optional()
+  orderBy: z.union([columnEnum, z.array(columnEnum)]).optional(),
+  order: z.union([z.enum(["asc", "desc"]), z.array(z.enum(["asc", "desc"]))]).optional()
 });
 
 export function register${Type}Routes(app: Hono, deps: { pg: { query: (text: string, params?: any[]) => Promise<{ rows: any[] }> }, onRequest?: (c: Context, pg: { query: (text: string, params?: any[]) => Promise<{ rows: any[] }> }) => Promise<void> }) {

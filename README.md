@@ -160,13 +160,19 @@ const authors = await sdk.authors.list({
 ### Filtering & Pagination
 
 ```typescript
-// Simple equality filtering
+// Simple equality filtering with single-column sorting
 const users = await sdk.users.list({
   where: { status: "active" },
   orderBy: "created_at",
   order: "desc",
   limit: 20,
   offset: 40
+});
+
+// Multi-column sorting
+const sorted = await sdk.users.list({
+  orderBy: ["status", "created_at"],
+  order: ["asc", "desc"]  // or use single direction: order: "asc"
 });
 
 // Advanced WHERE operators

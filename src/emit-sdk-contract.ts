@@ -244,9 +244,9 @@ const items = await sdk.${tableName}.list();
 const filtered = await sdk.${tableName}.list({
   limit: 20,
   offset: 0,
-  ${table.columns[0]?.name || 'field'}_like: 'search',
-  order_by: '${table.columns[0]?.name || 'created_at'}',
-  order_dir: 'desc'
+  where: { ${table.columns[0]?.name || 'field'}: { $like: '%search%' } },
+  orderBy: '${table.columns[0]?.name || 'created_at'}',
+  order: 'desc'
 });`,
     correspondsTo: `GET ${basePath}`
   });
@@ -542,8 +542,8 @@ function generateQueryParams(table: Table): Record<string, string> {
   const params: Record<string, string> = {
     limit: "number - Max records to return (default: 50)",
     offset: "number - Records to skip",
-    order_by: "string - Field to sort by",
-    order_dir: "'asc' | 'desc' - Sort direction"
+    orderBy: "string | string[] - Field(s) to sort by",
+    order: "'asc' | 'desc' | ('asc' | 'desc')[] - Sort direction(s)"
   };
   
   // Add a few example filters

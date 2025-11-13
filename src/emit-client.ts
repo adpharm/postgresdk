@@ -60,7 +60,7 @@ export function emitClient(
   let includeMethodsCode = "";
   for (const method of includeMethods) {
     const isGetByPk = method.name.startsWith("getByPk");
-    const baseParams = isGetByPk ? "" : `params?: Omit<{ limit?: number; offset?: number; where?: Where<Select${Type}>; orderBy?: string; order?: "asc" | "desc"; }, "include">`;
+    const baseParams = isGetByPk ? "" : `params?: Omit<{ limit?: number; offset?: number; where?: Where<Select${Type}>; orderBy?: string | string[]; order?: "asc" | "desc" | ("asc" | "desc")[]; }, "include">`;
     
     if (isGetByPk) {
       // For getByPk with includes, we use the list endpoint with a where clause
@@ -123,8 +123,8 @@ export class ${Type}Client extends BaseClient {
     limit?: number;
     offset?: number;
     where?: Where<Select${Type}>;
-    orderBy?: string;
-    order?: "asc" | "desc";
+    orderBy?: string | string[];
+    order?: "asc" | "desc" | ("asc" | "desc")[];
   }): Promise<Select${Type}[]> {
     return this.post<Select${Type}[]>(\`\${this.resource}/list\`, params ?? {});
   }

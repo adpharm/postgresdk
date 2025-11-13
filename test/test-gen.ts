@@ -358,6 +358,41 @@ async function main() {
         .join(", ")}]`
     );
 
+    // ===== TEST SORTING =====
+    console.log("\n📊 Testing Sorting (orderBy/order):");
+
+    // Single column sort ASC
+    const booksSortedAsc = await sdk.books.list({ orderBy: "title", order: "asc" });
+    assert(booksSortedAsc.length >= 3, "Should have at least 3 books");
+    const firstTitleAsc = booksSortedAsc[0].title;
+    console.log(`  ✓ Single column ASC: "${firstTitleAsc}" comes first`);
+
+    // Single column sort DESC
+    const booksSortedDesc = await sdk.books.list({ orderBy: "title", order: "desc" });
+    const firstTitleDesc = booksSortedDesc[0].title;
+    const lastTitleDesc = booksSortedDesc[booksSortedDesc.length - 1].title;
+    assert(firstTitleDesc !== firstTitleAsc, `DESC should reverse order (got "${firstTitleDesc}" vs "${firstTitleAsc}")`);
+    assert(lastTitleDesc === firstTitleAsc, `Last in DESC should equal first in ASC`);
+    console.log(`  ✓ Single column DESC: "${firstTitleDesc}" comes first`);
+
+    // Multi-column sort
+    const booksMultiSort = await sdk.books.list({
+      orderBy: ["author_id", "title"],
+      order: "asc"
+    });
+    assert(booksMultiSort.length >= 3, "Multi-sort should return books");
+    console.log(`  ✓ Multi-column sort works (author_id, title)`);
+
+    // Sort with where clause
+    const filteredSorted = await sdk.books.list({
+      where: { author_id: author1.id },
+      orderBy: "title",
+      order: "asc"
+    });
+    assert(filteredSorted.length === 2, "Jane should have 2 books");
+    assert(filteredSorted.every((b: any) => b.author_id === author1.id), "All books should be Jane's");
+    console.log(`  ✓ Sorting with WHERE clause: ${filteredSorted.length} books filtered and sorted`);
+
     // ===== TEST DELETE =====
     console.log("\n🗑️  Testing Delete Operations:");
 
@@ -383,6 +418,7 @@ async function main() {
     console.log("  • 1:N relationships (Authors → Books)");
     console.log("  • M:N relationships (Books ↔ Tags)");
     console.log("  • Include patterns (simple & nested)");
+    console.log("  • Sorting (single/multi-column, ASC/DESC)");
     console.log("  • Error handling (404 on deleted resource)");
   } finally {
     server.close();

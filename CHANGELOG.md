@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- feat: Add multi-column sorting support to list operations
+  - `orderBy` now accepts single column or array of columns
+  - `order` now accepts single direction or array of directions (one per column)
+  - Columns validated via Zod enum at route level for type safety
+  - Examples: `{ orderBy: ["status", "created_at"], order: ["asc", "desc"] }`
+  - Works with WHERE clauses and include methods
+
 ## [v0.11.0] - 2025-11-12
 
 - feat: Add onRequest hook for request-level middleware
