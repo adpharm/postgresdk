@@ -1,19 +1,27 @@
 import type { Table } from "./introspect";
 import { pascal } from "./utils";
 
-export function emitZod(table: Table, opts: { numericMode: "string" | "number" }) {
+export function emitZod(table: Table, opts: { numericMode: "string" | "number" }, enums: Record<string, string[]>) {
   const Type = pascal(table.name);
 
   const zFor = (pg: string): string => {
-    if (pg === "uuid") return `z.string()`;
-    if (pg === "bool" || pg === "boolean") return `z.boolean()`;
-    if (pg === "int2" || pg === "int4" || pg === "int8")
+    const t = pg.toLowerCase();
+
+    // Check if this is an enum type
+    if (enums[t]) {
+      const values = enums[t].map(v => `"${v}"`).join(", ");
+      return `z.enum([${values}])`;
+    }
+
+    if (t === "uuid") return `z.string()`;
+    if (t === "bool" || t === "boolean") return `z.boolean()`;
+    if (t === "int2" || t === "int4" || t === "int8")
       return opts.numericMode === "number" ? `z.number()` : `z.string()`;
-    if (pg === "numeric" || pg === "float4" || pg === "float8")
+    if (t === "numeric" || t === "float4" || t === "float8")
       return opts.numericMode === "number" ? `z.number()` : `z.string()`;
-    if (pg === "jsonb" || pg === "json") return `z.unknown()`;
-    if (pg === "date" || pg.startsWith("timestamp")) return `z.string()`;
-    if (pg.startsWith("_")) return `z.array(${zFor(pg.slice(1))})`;
+    if (t === "jsonb" || t === "json") return `z.unknown()`;
+    if (t === "date" || t.startsWith("timestamp")) return `z.string()`;
+    if (t.startsWith("_")) return `z.array(${zFor(t.slice(1))})`;
     return `z.string()`; // text/varchar/unknown
   };
 

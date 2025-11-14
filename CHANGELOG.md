@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- feat: Add PostgreSQL enum type support
+  - Introspect enum types from database schema
+  - Generate TypeScript union types for enums (e.g., `"admin" | "user" | "guest"`)
+  - Generate Zod schemas using `z.enum()` instead of `z.string()` for proper validation
+  - Support nullable enum columns with proper type inference
+  - Support array of enum values with correct TypeScript and Zod typing
+  - Runtime validation ensures only valid enum values are accepted
 - chore: Enhance test coverage for compound sorting with mixed directions
   - Add validation tests for `[DESC, ASC]` direction combinations
   - Add validation tests for `[DESC, DESC]` direction combinations

@@ -22,11 +22,12 @@
   },
   "scripts": {
     "build": "bun build src/cli.ts src/index.ts --outdir dist --target node --format esm --external=pg --external=zod --external=hono --external=prompts --external=node:* && tsc -p tsconfig.build.json --emitDeclarationOnly",
-    "test": "bun test:init && bun test:gen && bun test test/test-where-clause.test.ts && bun test test/test-where-or-and.test.ts && bun test:gen-with-tests && bun test:pull && bun test:typecheck && bun test:drizzle-e2e",
+    "test": "bun test:init && bun test:gen && bun test test/test-where-clause.test.ts && bun test test/test-where-or-and.test.ts && bun test:gen-with-tests && bun test:pull && bun test:enums && bun test:typecheck && bun test:drizzle-e2e",
     "test:init": "bun test/test-init.ts",
     "test:gen": "bun test/test-gen.ts",
     "test:gen-with-tests": "bun test/test-gen-with-tests.ts",
     "test:pull": "bun test/test-pull.ts",
+    "test:enums": "bun test/test-enums.ts",
     "test:typecheck": "bun test/test-typecheck.ts",
     "test:drizzle-e2e": "bun test/test-drizzle-e2e.ts",
     "typecheck": "tsc --noEmit",

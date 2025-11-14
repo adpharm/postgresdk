@@ -1,9 +1,15 @@
 /* Emits TypeScript types (Insert/Update/Select) for each table. */
 import type { Table } from "./introspect";
 
-function tsTypeFor(pgType: string, opts: { numericMode: "string" | "number" }): string {
+function tsTypeFor(pgType: string, opts: { numericMode: "string" | "number" }, enums: Record<string, string[]>): string {
   const t = pgType.toLowerCase();
-  if (t.startsWith("_")) return `${tsTypeFor(t.slice(1), opts)}[]`;
+
+  // Check if this is an enum type
+  if (enums[t]) {
+    return enums[t].map(v => `"${v}"`).join(" | ");
+  }
+
+  if (t.startsWith("_")) return `(${tsTypeFor(t.slice(1), opts, enums)})[]`;
   if (t === "uuid") return "string";
   if (t === "bool" || t === "boolean") return "boolean";
   if (t === "int2" || t === "int4" || t === "int8" || t === "float4" || t === "float8" || t === "numeric") {
@@ -20,12 +26,12 @@ const pascal = (s: string) =>
     .map((w) => (w?.[0] ? w[0].toUpperCase() + w.slice(1) : ""))
     .join("");
 
-export function emitTypes(table: Table, opts: { numericMode: "string" | "number" }) {
+export function emitTypes(table: Table, opts: { numericMode: "string" | "number" }, enums: Record<string, string[]>) {
   const Type = pascal(table.name);
 
   const insertFields = table.columns
     .map((col) => {
-      const base = tsTypeFor(col.pgType, opts);
+      const base = tsTypeFor(col.pgType, opts, enums);
       const optional = col.hasDefault || col.nullable ? "?" : "";
       const valueType = col.nullable ? `${base} | null` : base;
       return `  ${col.name}${optional}: ${valueType};`;
@@ -34,7 +40,7 @@ export function emitTypes(table: Table, opts: { numericMode: "string" | "number"
 
   const selectFields = table.columns
     .map((col) => {
-      const base = tsTypeFor(col.pgType, opts);
+      const base = tsTypeFor(col.pgType, opts, enums);
       const valueType = col.nullable ? `${base} | null` : base;
       return `  ${col.name}: ${valueType};`;
     })

@@ -7,7 +7,7 @@ Generate a typed server/client SDK from your PostgreSQL database schema.
 ## Features
 
 - 🚀 **Instant SDK Generation** - Point at your PostgreSQL database and get a complete SDK
-- 🔒 **Type Safety** - Full TypeScript types derived from your database schema  
+- 🔒 **Type Safety** - Full TypeScript types derived from your database schema (including enum types)
 - ✅ **Runtime Validation** - Zod schemas for request/response validation
 - 🔗 **Smart Relationships** - Automatic handling of 1:N and M:N relationships with eager loading
 - 🔐 **Built-in Auth** - API key and JWT authentication
