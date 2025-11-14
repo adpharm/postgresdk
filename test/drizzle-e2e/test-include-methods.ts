@@ -86,8 +86,8 @@ async function testIncludeMethods() {
   
   console.log("1. Testing contacts.listWithContactInteractions()");
   const contactsWithInteractions = await sdk.contacts.listWithContactInteractions();
-  console.log(`   ✓ Found ${contactsWithInteractions.length} contacts`);
-  const johnWithInteractions = contactsWithInteractions.find(c => c.email === 'john@example.com');
+  console.log(`   ✓ Found ${contactsWithInteractions.data.length} contacts`);
+  const johnWithInteractions = contactsWithInteractions.data.find(c => c.email === 'john@example.com');
   if (johnWithInteractions) {
     console.log(`   ✓ John Doe has ${johnWithInteractions.contact_interactions.length} interactions`);
     // TypeScript knows contact_interactions exists and is an array
@@ -99,8 +99,8 @@ async function testIncludeMethods() {
   
   console.log("\n2. Testing contacts.listWithTags()");
   const contactsWithTags = await sdk.contacts.listWithTags();
-  console.log(`   ✓ Found ${contactsWithTags.length} contacts`);
-  for (const contact of contactsWithTags) {
+  console.log(`   ✓ Found ${contactsWithTags.data.length} contacts`);
+  for (const contact of contactsWithTags.data) {
     if (contact.tags && contact.tags.length > 0) {
       console.log(`   ✓ ${contact.first_name} ${contact.last_name} has tag: ${contact.tags[0]?.name}`);
     }
@@ -120,10 +120,10 @@ async function testIncludeMethods() {
 
   console.log("\n5. Testing contact_interactions.listWithContact()");
   const interactionsWithContact = await sdk.contact_interactions.listWithContact();
-  console.log(`   ✓ Found ${interactionsWithContact.length} interactions`);
-  if (interactionsWithContact[0]) {
+  console.log(`   ✓ Found ${interactionsWithContact.data.length} interactions`);
+  if (interactionsWithContact.data[0]) {
     // TypeScript knows contact exists and is of the correct type
-    console.log(`   ✓ First interaction belongs to: ${interactionsWithContact[0].contact.first_name} ${interactionsWithContact[0].contact.last_name}`);
+    console.log(`   ✓ First interaction belongs to: ${interactionsWithContact.data[0].contact.first_name} ${interactionsWithContact.data[0].contact.last_name}`);
   }
   
   console.log("\n✅ All include method tests passed!");

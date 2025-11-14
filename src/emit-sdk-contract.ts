@@ -236,7 +236,7 @@ function generateResourceWithSDK(table: Table, model: Model, graph?: Graph, conf
   // LIST method
   sdkMethods.push({
     name: "list",
-    signature: `list(params?: ListParams): Promise<{ data: ${Type}[]; total: number; limit: number; offset: number; hasMore: boolean; }>`,
+    signature: `list(params?: ListParams): Promise<PaginatedResponse<${Type}>>`,
     description: `List ${tableName} with filtering, sorting, and pagination. Returns paginated results with metadata.`,
     example: `// Get all ${tableName}
 const result = await sdk.${tableName}.list();
@@ -264,7 +264,7 @@ const currentPage = Math.floor(filtered.offset / filtered.limit) + 1;`,
     path: basePath,
     description: `List all ${tableName} records with pagination metadata`,
     queryParameters: generateQueryParams(table, enums),
-    responseBody: `{ data: ${Type}[]; total: number; limit: number; offset: number; hasMore: boolean; }`
+    responseBody: `PaginatedResponse<${Type}>`
   });
   
   // GET BY PK method (only if single PK)

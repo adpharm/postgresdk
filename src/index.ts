@@ -10,6 +10,7 @@ import { emitIncludeBuilder } from "./emit-include-builder";
 import { emitZod } from "./emit-zod";
 import { emitParamsZod } from "./emit-params-zod";
 import { emitSharedParamsZod } from "./emit-shared-params-zod";
+import { emitSharedTypes } from "./emit-shared-types";
 import { emitHonoRoutes } from "./emit-routes-hono";
 import { emitClient, emitClientIndex } from "./emit-client";
 import { emitBaseClient } from "./emit-base-client";
@@ -93,6 +94,9 @@ export async function generate(configPath: string) {
 
   // shared params zod (client only)
   files.push({ path: join(clientDir, "params", "shared.ts"), content: emitSharedParamsZod() });
+
+  // shared types (client only)
+  files.push({ path: join(clientDir, "types", "shared.ts"), content: emitSharedTypes() });
 
   // base-client (client only)
   files.push({ path: join(clientDir, "base-client.ts"), content: emitBaseClient() });

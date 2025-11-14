@@ -85,7 +85,7 @@ export function emitClient(
    * @returns The record with nested ${method.path.join(' and ')} if found, null otherwise
    */
   async ${method.name}(pk: ${pkType}): Promise<${method.returnType}> {
-    const results = await this.post<{ data: ${baseReturnType}[]; total: number; limit: number; offset: number; hasMore: boolean; }>(\`\${this.resource}/list\`, {
+    const results = await this.post<PaginatedResponse<${baseReturnType}>>(\`\${this.resource}/list\`, {
       where: ${pkWhere},
       include: ${JSON.stringify(method.includeSpec)},
       limit: 1
@@ -117,6 +117,7 @@ export function emitClient(
  */
 import { BaseClient } from "./base-client${ext}";
 import type { Where } from "./where-types${ext}";
+import type { PaginatedResponse } from "./types/shared${ext}";
 ${typeImports}
 ${otherTableImports.join("\n")}
 
@@ -163,20 +164,8 @@ export class ${Type}Client extends BaseClient {
     where?: Where<Select${Type}>;
     orderBy?: string | string[];
     order?: "asc" | "desc" | ("asc" | "desc")[];
-  }): Promise<{
-    data: Select${Type}[];
-    total: number;
-    limit: number;
-    offset: number;
-    hasMore: boolean;
-  }> {
-    return this.post<{
-      data: Select${Type}[];
-      total: number;
-      limit: number;
-      offset: number;
-      hasMore: boolean;
-    }>(\`\${this.resource}/list\`, params ?? {});
+  }): Promise<PaginatedResponse<Select${Type}>> {
+    return this.post<PaginatedResponse<Select${Type}>>(\`\${this.resource}/list\`, params ?? {});
   }
 
   /**
@@ -273,6 +262,10 @@ export function emitClientIndex(tables: Table[], useJsExtensions?: boolean) {
     const Type = pascal(t.name);
     out += `export type { Insert${Type}, Update${Type}, Select${Type} } from "./types/${t.name}${ext}";\n`;
   }
+
+  // Export shared types
+  out += `\n// Shared types\n`;
+  out += `export type { PaginatedResponse } from "./types/shared${ext}";\n`;
 
   return out;
 }

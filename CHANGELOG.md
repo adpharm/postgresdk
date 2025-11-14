@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- refactor: Add shared PaginatedResponse type for type safety
+  - Introduced `PaginatedResponse<T>` generic type exported from SDK
+  - Replaces inline pagination type definitions with reusable type
+  - Improves type consistency across all list methods
+  - Available as `import type { PaginatedResponse } from './client'`
+
 ## [v0.13.0] - 2025-11-14
 
 ### BREAKING CHANGES

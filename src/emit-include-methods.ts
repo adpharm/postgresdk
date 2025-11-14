@@ -167,7 +167,7 @@ export function generateIncludeMethods(
         path: newPath,
         isMany: newIsMany,
         targets: newTargets,
-        returnType: `{ data: (${buildReturnType(baseTableName, newPath, newIsMany, newTargets, graph)})[]; total: number; limit: number; offset: number; hasMore: boolean; }`,
+        returnType: `PaginatedResponse<${buildReturnType(baseTableName, newPath, newIsMany, newTargets, graph)}>`,
         includeSpec: buildIncludeSpec(newPath)
       });
       
@@ -227,7 +227,7 @@ export function generateIncludeMethods(
               path: combinedPath,
               isMany: [edge1.kind === "many", edge2.kind === "many"],
               targets: [edge1.target, edge2.target],
-              returnType: `{ data: (Select${pascal(baseTableName)} & { ${type1}; ${type2} })[]; total: number; limit: number; offset: number; hasMore: boolean; }`,
+              returnType: `PaginatedResponse<Select${pascal(baseTableName)} & { ${type1}; ${type2} }>`,
               includeSpec: { [key1]: true, [key2]: true }
             });
             
