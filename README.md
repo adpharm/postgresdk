@@ -4,6 +4,50 @@
 
 Generate a typed server/client SDK from your PostgreSQL database schema.
 
+## See It In Action
+
+**Your database:**
+```sql
+CREATE TABLE users (
+  id SERIAL PRIMARY KEY,
+  name TEXT NOT NULL,
+  email TEXT UNIQUE NOT NULL
+);
+
+CREATE TABLE posts (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id),
+  title TEXT NOT NULL,
+  published_at TIMESTAMPTZ
+);
+```
+
+**What you get:**
+```typescript
+// ✨ Fully typed client with autocomplete
+const user = await sdk.users.create({
+  name: "Alice",
+  email: "alice@example.com"
+});
+// ^ TypeScript knows: user.id is number, user.name is string
+
+// 🔗 Automatic relationship loading
+const users = await sdk.users.list({
+  include: { posts: true }
+});
+// ^ users[0].posts is fully typed Post[]
+
+// 🎯 Advanced filtering with type safety
+const filtered = await sdk.users.list({
+  where: {
+    email: { $ilike: '%@company.com' },
+    posts: { published_at: { $isNot: null } }
+  }
+});
+```
+
+**All generated automatically. Zero boilerplate.**
+
 ## Features
 
 - 🚀 **Instant SDK Generation** - Point at your PostgreSQL database and get a complete SDK
@@ -21,6 +65,8 @@ npm install -g postgresdk
 # or
 npx postgresdk generate
 ```
+
+> **Note:** Currently only generates **Hono** server code. See [Supported Frameworks](#supported-frameworks) for details.
 
 ## Quick Start
 
@@ -446,9 +492,31 @@ Examples:
 
 ## Requirements
 
-- Node.js 18+ 
+- Node.js 18+
 - PostgreSQL 12+
 - TypeScript project (for using generated code)
+
+## Supported Frameworks
+
+**Currently, postgresdk only generates server code for Hono.**
+
+While the configuration accepts `serverFramework: "hono" | "express" | "fastify"`, only Hono is implemented at this time. Attempting to generate code with `express` or `fastify` will result in an error.
+
+### Why Hono?
+
+Hono was chosen as the initial framework because:
+- **Edge-first design** - Works seamlessly in serverless and edge environments (Cloudflare Workers, Vercel Edge, Deno Deploy)
+- **Minimal dependencies** - Lightweight with excellent performance
+- **Modern patterns** - Web Standard APIs (Request/Response), TypeScript-first
+- **Framework compatibility** - Works across Node.js, Bun, Deno, and edge runtimes
+
+### Future Framework Support
+
+The codebase architecture is designed to support multiple frameworks. Adding Express or Fastify support would require:
+- Implementing framework-specific route emitters (`emit-routes-express.ts`, etc.)
+- Implementing framework-specific router creators (`emit-router-express.ts`, etc.)
+
+Contributions to add additional framework support are welcome.
 
 ## License
 
