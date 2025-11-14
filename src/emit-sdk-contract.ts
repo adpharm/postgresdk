@@ -236,10 +236,13 @@ function generateResourceWithSDK(table: Table, model: Model, graph?: Graph, conf
   // LIST method
   sdkMethods.push({
     name: "list",
-    signature: `list(params?: ListParams): Promise<${Type}[]>`,
-    description: `List ${tableName} with filtering, sorting, and pagination`,
+    signature: `list(params?: ListParams): Promise<{ data: ${Type}[]; total: number; limit: number; offset: number; hasMore: boolean; }>`,
+    description: `List ${tableName} with filtering, sorting, and pagination. Returns paginated results with metadata.`,
     example: `// Get all ${tableName}
-const items = await sdk.${tableName}.list();
+const result = await sdk.${tableName}.list();
+console.log(result.data);        // array of records
+console.log(result.total);       // total matching records
+console.log(result.hasMore);     // true if more pages available
 
 // With filters and pagination
 const filtered = await sdk.${tableName}.list({
@@ -248,16 +251,20 @@ const filtered = await sdk.${tableName}.list({
   where: { ${table.columns[0]?.name || 'field'}: { $like: '%search%' } },
   orderBy: '${table.columns[0]?.name || 'created_at'}',
   order: 'desc'
-});`,
+});
+
+// Calculate total pages
+const totalPages = Math.ceil(filtered.total / filtered.limit);
+const currentPage = Math.floor(filtered.offset / filtered.limit) + 1;`,
     correspondsTo: `GET ${basePath}`
   });
-  
+
   endpoints.push({
     method: "GET",
     path: basePath,
-    description: `List all ${tableName} records`,
+    description: `List all ${tableName} records with pagination metadata`,
     queryParameters: generateQueryParams(table, enums),
-    responseBody: `${Type}[]`
+    responseBody: `{ data: ${Type}[]; total: number; limit: number; offset: number; hasMore: boolean; }`
   });
   
   // GET BY PK method (only if single PK)
@@ -362,9 +369,12 @@ console.log('Deleted:', deleted);`,
     
     for (const method of includeMethods) {
       const isGetByPk = method.name.startsWith("getByPk");
-      const exampleCall = isGetByPk 
+      const exampleCall = isGetByPk
         ? `const result = await sdk.${tableName}.${method.name}('123e4567-e89b-12d3-a456-426614174000');`
-        : `const results = await sdk.${tableName}.${method.name}();
+        : `const result = await sdk.${tableName}.${method.name}();
+console.log(result.data);    // array of records with includes
+console.log(result.total);   // total count
+console.log(result.hasMore); // more pages available
 
 // With filters and pagination
 const filtered = await sdk.${tableName}.${method.name}({

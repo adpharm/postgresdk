@@ -121,7 +121,8 @@ const user = await sdk.users.create({ name: "Bob", email: "bob@example.com" });
 
 // Read
 const user = await sdk.users.getByPk(123);
-const users = await sdk.users.list();
+const result = await sdk.users.list();
+const users = result.data;  // Array of users
 
 // Update  
 const updated = await sdk.users.update(123, { name: "Robert" });
@@ -136,17 +137,19 @@ Automatically handles relationships with the `include` parameter:
 
 ```typescript
 // 1:N relationship - Get authors with their books
-const authors = await sdk.authors.list({
+const authorsResult = await sdk.authors.list({
   include: { books: true }
 });
+const authors = authorsResult.data;
 
 // M:N relationship - Get books with their tags
-const books = await sdk.books.list({
+const booksResult = await sdk.books.list({
   include: { tags: true }
 });
+const books = booksResult.data;
 
 // Nested includes - Get authors with books and their tags
-const authors = await sdk.authors.list({
+const nestedResult = await sdk.authors.list({
   include: {
     books: {
       include: {
@@ -155,19 +158,32 @@ const authors = await sdk.authors.list({
     }
   }
 });
+const authorsWithBooksAndTags = nestedResult.data;
 ```
 
 ### Filtering & Pagination
 
+All `list()` methods return pagination metadata:
+
 ```typescript
-// Simple equality filtering with single-column sorting
-const users = await sdk.users.list({
+const result = await sdk.users.list({
   where: { status: "active" },
   orderBy: "created_at",
   order: "desc",
   limit: 20,
   offset: 40
 });
+
+// Access results
+result.data;       // User[] - array of records
+result.total;      // number - total matching records
+result.limit;      // number - page size used
+result.offset;     // number - offset used
+result.hasMore;    // boolean - more pages available
+
+// Calculate pagination info
+const totalPages = Math.ceil(result.total / result.limit);
+const currentPage = Math.floor(result.offset / result.limit) + 1;
 
 // Multi-column sorting
 const sorted = await sdk.users.list({
@@ -184,6 +200,7 @@ const filtered = await sdk.users.list({
     deleted_at: { $is: null }              // NULL checks
   }
 });
+// filtered.total respects WHERE clause for accurate counts
 
 // OR logic - match any condition
 const results = await sdk.users.list({
@@ -221,6 +238,17 @@ const nested = await sdk.users.list({
     ]
   }
 });
+
+// Pagination with filtered results
+let allResults = [];
+let offset = 0;
+const limit = 50;
+do {
+  const page = await sdk.users.list({ where: { status: 'active' }, limit, offset });
+  allResults = allResults.concat(page.data);
+  offset += limit;
+  if (!page.hasMore) break;
+} while (true);
 ```
 
 See the generated SDK documentation for all available operators: `$eq`, `$ne`, `$gt`, `$gte`, `$lt`, `$lte`, `$in`, `$nin`, `$like`, `$ilike`, `$is`, `$isNot`, `$or`, `$and`.

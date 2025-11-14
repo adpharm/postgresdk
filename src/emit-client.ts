@@ -73,12 +73,12 @@ export function emitClient(
       
       includeMethodsCode += `
   async ${method.name}(pk: ${pkType}): Promise<${method.returnType}> {
-    const results = await this.post<${baseReturnType}[]>(\`\${this.resource}/list\`, { 
+    const results = await this.post<{ data: ${baseReturnType}[]; total: number; limit: number; offset: number; hasMore: boolean; }>(\`\${this.resource}/list\`, {
       where: ${pkWhere},
       include: ${JSON.stringify(method.includeSpec)},
-      limit: 1 
+      limit: 1
     });
-    return (results[0] as ${baseReturnType}) ?? null;
+    return (results.data[0] as ${baseReturnType}) ?? null;
   }
 `;
     } else {
@@ -125,8 +125,20 @@ export class ${Type}Client extends BaseClient {
     where?: Where<Select${Type}>;
     orderBy?: string | string[];
     order?: "asc" | "desc" | ("asc" | "desc")[];
-  }): Promise<Select${Type}[]> {
-    return this.post<Select${Type}[]>(\`\${this.resource}/list\`, params ?? {});
+  }): Promise<{
+    data: Select${Type}[];
+    total: number;
+    limit: number;
+    offset: number;
+    hasMore: boolean;
+  }> {
+    return this.post<{
+      data: Select${Type}[];
+      total: number;
+      limit: number;
+      offset: number;
+      hasMore: boolean;
+    }>(\`\${this.resource}/list\`, params ?? {});
   }
 
   async update(pk: ${pkType}, patch: Update${Type}): Promise<Select${Type} | null> {

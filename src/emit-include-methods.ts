@@ -167,7 +167,7 @@ export function generateIncludeMethods(
         path: newPath,
         isMany: newIsMany,
         targets: newTargets,
-        returnType: `(${buildReturnType(baseTableName, newPath, newIsMany, newTargets, graph)})[]`,
+        returnType: `{ data: (${buildReturnType(baseTableName, newPath, newIsMany, newTargets, graph)})[]; total: number; limit: number; offset: number; hasMore: boolean; }`,
         includeSpec: buildIncludeSpec(newPath)
       });
       
@@ -227,7 +227,7 @@ export function generateIncludeMethods(
               path: combinedPath,
               isMany: [edge1.kind === "many", edge2.kind === "many"],
               targets: [edge1.target, edge2.target],
-              returnType: `(Select${pascal(baseTableName)} & { ${type1}; ${type2} })[]`,
+              returnType: `{ data: (Select${pascal(baseTableName)} & { ${type1}; ${type2} })[]; total: number; limit: number; offset: number; hasMore: boolean; }`,
               includeSpec: { [key1]: true, [key2]: true }
             });
             

@@ -152,13 +152,22 @@ ${hasAuth ? `
       const { include, limit = 50, offset = 0 } = body.data;
 
       const where = ${softDel ? `\`WHERE "${softDel}" IS NULL\`` : `""`};
+
+      // Get total count for pagination
+      const countText = \`SELECT COUNT(*) FROM "${fileTableName}" \${where}\`;
+      log.debug("LIST ${fileTableName} COUNT SQL:", countText);
+      const countResult = await deps.pg.query(countText);
+      const total = parseInt(countResult.rows[0].count, 10);
+
       const text = \`SELECT * FROM "${fileTableName}" \${where} LIMIT $1 OFFSET $2\`;
       log.debug("LIST ${fileTableName} SQL:", text, "params:", [limit, offset]);
       const { rows } = await deps.pg.query(text, [limit, offset]);
 
+      const hasMore = offset + limit < total;
+
       if (!include) {
-        log.debug("LIST ${fileTableName} rows:", rows.length);
-        return c.json(rows);
+        log.debug("LIST ${fileTableName} rows:", rows.length, "total:", total);
+        return c.json({ data: rows, total, limit, offset, hasMore });
       }
 
       // Attempt include stitching with explicit error handling
@@ -166,7 +175,7 @@ ${hasAuth ? `
       try {
         const stitched = await loadIncludes("${fileTableName}", rows, include, deps.pg, ${opts.includeMethodsDepth});
         log.debug("LIST ${fileTableName} stitched count:", Array.isArray(stitched) ? stitched.length : "n/a");
-        return c.json(stitched);
+        return c.json({ data: stitched, total, limit, offset, hasMore });
       } catch (e: any) {
         const strict = process.env.SDK_STRICT_INCLUDE === "1" || process.env.SDK_STRICT_INCLUDE === "true";
         const msg = e?.message ?? String(e);
@@ -177,7 +186,7 @@ ${hasAuth ? `
           return c.json({ error: "include-stitch-failed", message: msg, ...(DEBUG ? { stack: e?.stack } : {}) }, 500);
         }
         // Non-strict fallback: return base rows plus error metadata
-        return c.json({ data: rows, includeError: { message: msg, ...(DEBUG ? { stack: e?.stack } : {}) } }, 200);
+        return c.json({ data: rows, total, limit, offset, hasMore, includeError: { message: msg, ...(DEBUG ? { stack: e?.stack } : {}) } }, 200);
       }
     } catch (e: any) {
       log.error("LIST ${fileTableName} error:", e?.stack ?? e);

@@ -245,7 +245,7 @@ function buildWhereClause(
 export async function listRecords(
   ctx: OperationContext,
   params: { where?: any; limit?: number; offset?: number; include?: any; orderBy?: string | string[]; order?: "asc" | "desc" | ("asc" | "desc")[] }
-): Promise<{ data?: any; error?: string; issues?: any; needsIncludes?: boolean; includeSpec?: any; status: number }> {
+): Promise<{ data?: any; total?: number; limit?: number; offset?: number; hasMore?: boolean; error?: string; issues?: any; needsIncludes?: boolean; includeSpec?: any; status: number }> {
   try {
     const { where: whereClause, limit = 50, offset = 0, include, orderBy, order } = params;
     log.debug(`LIST ${ctx.table} params:`, { where: whereClause, limit, offset, orderBy, order, include: !!include });
@@ -291,20 +291,35 @@ export async function listRecords(
     const offsetParam = `$${paramIndex + 1}`;
     const allParams = [...whereParams, limit, offset];
 
+    // Get total count for pagination
+    const countText = `SELECT COUNT(*) FROM "${ctx.table}" ${whereSQL}`;
+    log.debug(`LIST ${ctx.table} COUNT SQL:`, countText, "params:", whereParams);
+    const countResult = await ctx.pg.query(countText, whereParams);
+    const total = parseInt(countResult.rows[0].count, 10);
+
+    // Get paginated data
     const text = `SELECT * FROM "${ctx.table}" ${whereSQL} ${orderBySQL} LIMIT ${limitParam} OFFSET ${offsetParam}`;
     log.debug(`LIST ${ctx.table} SQL:`, text, "params:", allParams);
 
     const { rows } = await ctx.pg.query(text, allParams);
 
-    if (!include) {
-      log.debug(`LIST ${ctx.table} rows:`, rows.length);
-      return { data: rows, status: 200 };
-    }
+    // Calculate hasMore
+    const hasMore = offset + limit < total;
 
-    // Include logic will be handled by the include-loader
-    // For now, just return the rows with a note that includes need to be applied
-    log.debug(`LIST ${ctx.table} include spec:`, include);
-    return { data: rows, needsIncludes: true, includeSpec: include, status: 200 };
+    const metadata = {
+      data: rows,
+      total,
+      limit,
+      offset,
+      hasMore,
+      needsIncludes: !!include,
+      includeSpec: include,
+      status: 200
+    };
+
+    log.debug(`LIST ${ctx.table} result: ${rows.length} rows, ${total} total, hasMore=${hasMore}`);
+    console.log("[operations.ts] Returning metadata:", JSON.stringify(metadata, null, 2).substring(0, 500));
+    return metadata;
   } catch (e: any) {
     log.error(`LIST ${ctx.table} error:`, e?.stack ?? e);
     return {

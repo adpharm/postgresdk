@@ -253,9 +253,9 @@ async function main() {
     assert(updatedAuthor.name === "Jane Austen (Updated)", "Updated name mismatch");
 
     // List
-    const authors = await sdk.authors.list();
-    console.log("  ✓ Listed authors, count:", authors.length);
-    assert(authors.length >= 2, "Should have at least 2 authors");
+    const authorsResult = await sdk.authors.list();
+    console.log("  ✓ Listed authors, count:", authorsResult.data.length);
+    assert(authorsResult.data.length >= 2, "Should have at least 2 authors");
 
     // ===== TEST BOOKS CRUD =====
     console.log("\n📚 Testing Books CRUD:");
@@ -303,16 +303,16 @@ async function main() {
     // ===== TEST INCLUDES (1:N) =====
     console.log("\n🔗 Testing 1:N Includes (Authors → Books):");
 
-    const authorsWithBooks = await sdk.authors.list({ include: { books: true } });
+    const authorsWithBooksResult = await sdk.authors.list({ include: { books: true } });
     console.log("  ✓ Fetched authors with books");
 
-    const janeWithBooks = authorsWithBooks.find((a: any) => a.id === author1.id);
+    const janeWithBooks = authorsWithBooksResult.data.find((a: any) => a.id === author1.id);
     assert(janeWithBooks, "Author not found in list");
     assert(Array.isArray(janeWithBooks.books), "Books should be an array");
     assert(janeWithBooks.books.length === 2, "Jane should have 2 books");
     console.log(`  ✓ Author "${janeWithBooks.name}" has ${janeWithBooks.books.length} books`);
 
-    const markWithBooks = authorsWithBooks.find((a: any) => a.id === author2.id);
+    const markWithBooks = authorsWithBooksResult.data.find((a: any) => a.id === author2.id);
     assert(markWithBooks, "Author not found in list");
     assert(markWithBooks.books.length === 1, "Mark should have 1 book");
     console.log(`  ✓ Author "${markWithBooks.name}" has ${markWithBooks.books.length} book`);
@@ -320,10 +320,10 @@ async function main() {
     // ===== TEST INCLUDES (M:N) =====
     console.log("\n🔗 Testing M:N Includes (Books ↔ Tags):");
 
-    const booksWithTags = await sdk.books.list({ include: { tags: true } });
+    const booksWithTagsResult = await sdk.books.list({ include: { tags: true } });
     console.log("  ✓ Fetched books with tags");
 
-    const prideBook = booksWithTags.find((b: any) => b.id === book1.id);
+    const prideBook = booksWithTagsResult.data.find((b: any) => b.id === book1.id);
     assert(prideBook, "Book not found");
     assert(Array.isArray(prideBook.tags), "Tags should be an array");
     assert(prideBook.tags.length === 2, "Pride & Prejudice should have 2 tags");
@@ -335,7 +335,7 @@ async function main() {
     // ===== TEST NESTED INCLUDES =====
     console.log("\n🔗 Testing Nested Includes (Authors → Books → Tags):");
 
-    const authorsWithBooksAndTags = await sdk.authors.list({
+    const authorsWithBooksAndTagsResult = await sdk.authors.list({
       include: {
         books: {
           include: {
@@ -346,7 +346,7 @@ async function main() {
     });
     console.log("  ✓ Fetched authors with books and tags (nested)");
 
-    const janeNested = authorsWithBooksAndTags.find((a: any) => a.id === author1.id);
+    const janeNested = authorsWithBooksAndTagsResult.data.find((a: any) => a.id === author1.id);
     assert(janeNested, "Author not found");
     assert(janeNested.books.length === 2, "Should have 2 books");
     const prideNested = janeNested.books.find((b: any) => b.id === book1.id);
@@ -362,35 +362,35 @@ async function main() {
     console.log("\n📊 Testing Sorting (orderBy/order):");
 
     // Single column sort ASC
-    const booksSortedAsc = await sdk.books.list({ orderBy: "title", order: "asc" });
-    assert(booksSortedAsc.length >= 3, "Should have at least 3 books");
-    const firstTitleAsc = booksSortedAsc[0].title;
+    const booksSortedAscResult = await sdk.books.list({ orderBy: "title", order: "asc" });
+    assert(booksSortedAscResult.data.length >= 3, "Should have at least 3 books");
+    const firstTitleAsc = booksSortedAscResult.data[0].title;
     console.log(`  ✓ Single column ASC: "${firstTitleAsc}" comes first`);
 
     // Single column sort DESC
-    const booksSortedDesc = await sdk.books.list({ orderBy: "title", order: "desc" });
-    const firstTitleDesc = booksSortedDesc[0].title;
-    const lastTitleDesc = booksSortedDesc[booksSortedDesc.length - 1].title;
+    const booksSortedDescResult = await sdk.books.list({ orderBy: "title", order: "desc" });
+    const firstTitleDesc = booksSortedDescResult.data[0].title;
+    const lastTitleDesc = booksSortedDescResult.data[booksSortedDescResult.data.length - 1].title;
     assert(firstTitleDesc !== firstTitleAsc, `DESC should reverse order (got "${firstTitleDesc}" vs "${firstTitleAsc}")`);
     assert(lastTitleDesc === firstTitleAsc, `Last in DESC should equal first in ASC`);
     console.log(`  ✓ Single column DESC: "${firstTitleDesc}" comes first`);
 
     // Multi-column sort with same direction
-    const booksMultiSort = await sdk.books.list({
+    const booksMultiSortResult = await sdk.books.list({
       orderBy: ["author_id", "title"],
       order: "asc"
     });
-    assert(booksMultiSort.length >= 3, "Multi-sort should return books");
+    assert(booksMultiSortResult.data.length >= 3, "Multi-sort should return books");
     console.log(`  ✓ Multi-column sort (same direction) works`);
 
     // Multi-column sort with mixed directions [DESC, ASC]
-    const booksMixedSort = await sdk.books.list({
+    const booksMixedSortResult = await sdk.books.list({
       orderBy: ["author_id", "title"],
       order: ["desc", "asc"]
     });
-    for (let i = 1; i < booksMixedSort.length; i++) {
-      const prev = booksMixedSort[i-1];
-      const curr = booksMixedSort[i];
+    for (let i = 1; i < booksMixedSortResult.data.length; i++) {
+      const prev = booksMixedSortResult.data[i-1];
+      const curr = booksMixedSortResult.data[i];
       if (prev.author_id < curr.author_id) {
         throw new Error(`author_id not DESC at index ${i}`);
       }
@@ -401,13 +401,13 @@ async function main() {
     console.log(`  ✓ Multi-column sort [DESC, ASC] works`);
 
     // Multi-column sort with both DESC [DESC, DESC]
-    const booksDescDesc = await sdk.books.list({
+    const booksDescDescResult = await sdk.books.list({
       orderBy: ["author_id", "title"],
       order: ["desc", "desc"]
     });
-    for (let i = 1; i < booksDescDesc.length; i++) {
-      const prev = booksDescDesc[i-1];
-      const curr = booksDescDesc[i];
+    for (let i = 1; i < booksDescDescResult.data.length; i++) {
+      const prev = booksDescDescResult.data[i-1];
+      const curr = booksDescDescResult.data[i];
       if (prev.author_id < curr.author_id) {
         throw new Error(`author_id not DESC at index ${i}`);
       }
@@ -418,14 +418,131 @@ async function main() {
     console.log(`  ✓ Multi-column sort [DESC, DESC] works`);
 
     // Sort with where clause
-    const filteredSorted = await sdk.books.list({
+    const filteredSortedResult = await sdk.books.list({
       where: { author_id: author1.id },
       orderBy: "title",
       order: "asc"
     });
-    assert(filteredSorted.length === 2, "Jane should have 2 books");
-    assert(filteredSorted.every((b: any) => b.author_id === author1.id), "All books should be Jane's");
-    console.log(`  ✓ Sorting with WHERE clause: ${filteredSorted.length} books filtered and sorted`);
+    assert(filteredSortedResult.data.length === 2, "Jane should have 2 books");
+    assert(filteredSortedResult.data.every((b: any) => b.author_id === author1.id), "All books should be Jane's");
+    console.log(`  ✓ Sorting with WHERE clause: ${filteredSortedResult.data.length} books filtered and sorted`);
+
+    // ===== TEST PAGINATION METADATA =====
+    console.log("\n📄 Testing Pagination Metadata:");
+
+    // Create additional authors and books for pagination testing
+    const paginationAuthors = [];
+    for (let i = 1; i <= 5; i++) {
+      const author = await sdk.authors.create({ name: `Pagination Author ${i}` });
+      paginationAuthors.push(author);
+    }
+
+    const paginationBooks = [];
+    for (let i = 1; i <= 25; i++) {
+      const book = await sdk.books.create({
+        author_id: paginationAuthors[i % 5].id,
+        title: `Pagination Book ${i.toString().padStart(2, '0')}`,
+      });
+      paginationBooks.push(book);
+    }
+    console.log("  ✓ Created 25 books for pagination testing");
+
+    // Test 1: Basic pagination metadata structure
+    const page1 = await sdk.books.list({ limit: 10, offset: 0, orderBy: "title", order: "asc" });
+    assert(typeof page1 === 'object' && !Array.isArray(page1), "Response should be an object, not array");
+    assert(Array.isArray(page1.data), "Response should have data array");
+    assert(typeof page1.total === 'number', "Response should have total count");
+    assert(typeof page1.limit === 'number', "Response should have limit");
+    assert(typeof page1.offset === 'number', "Response should have offset");
+    assert(typeof page1.hasMore === 'boolean', "Response should have hasMore flag");
+    console.log(`  ✓ Pagination metadata structure correct`);
+
+    // Test 2: Verify metadata values for first page
+    assert(page1.data.length === 10, "First page should have 10 records");
+    assert(page1.limit === 10, "Limit should match request");
+    assert(page1.offset === 0, "Offset should match request");
+    assert(page1.total >= 28, `Total should be at least 28 (got ${page1.total})`); // 3 original + 25 new
+    assert(page1.hasMore === true, "First page should have more pages");
+    console.log(`  ✓ First page metadata: ${page1.data.length} records, ${page1.total} total, hasMore=${page1.hasMore}`);
+
+    // Test 3: Second page with offset
+    const page2 = await sdk.books.list({ limit: 10, offset: 10, orderBy: "title", order: "asc" });
+    assert(page2.data.length === 10, "Second page should have 10 records");
+    assert(page2.limit === 10, "Limit should match request");
+    assert(page2.offset === 10, "Offset should match request");
+    assert(page2.total === page1.total, "Total should be same across pages");
+    assert(page2.hasMore === true, "Second page should have more pages");
+    console.log(`  ✓ Second page metadata: offset=${page2.offset}, hasMore=${page2.hasMore}`);
+
+    // Test 4: Last page (hasMore should be false)
+    const lastPageOffset = Math.floor(page1.total / 10) * 10;
+    const lastPage = await sdk.books.list({ limit: 10, offset: lastPageOffset, orderBy: "title", order: "asc" });
+    assert(lastPage.hasMore === false, `Last page should have hasMore=false (offset=${lastPageOffset}, total=${lastPage.total})`);
+    console.log(`  ✓ Last page correctly reports hasMore=false`);
+
+    // Test 5: Pagination with WHERE clause
+    const authorId = paginationAuthors[0].id;
+    const filteredPage = await sdk.books.list({
+      where: { author_id: authorId },
+      limit: 2,
+      offset: 0,
+      orderBy: "title",
+      order: "asc"
+    });
+    assert(filteredPage.data.length <= 2, "Filtered page should respect limit");
+    assert(filteredPage.data.every((b: any) => b.author_id === authorId), "All books should match WHERE clause");
+    assert(filteredPage.total <= page1.total, "Filtered total should be less than or equal to unfiltered");
+    assert(filteredPage.limit === 2, "Filtered limit should match request");
+    console.log(`  ✓ Pagination with WHERE: ${filteredPage.total} total matching, ${filteredPage.data.length} returned`);
+
+    // Test 6: Empty results pagination
+    const emptyPage = await sdk.books.list({
+      where: { title: "This Book Does Not Exist XYZ123" },
+      limit: 10,
+      offset: 0
+    });
+    assert(emptyPage.data.length === 0, "Empty results should have no data");
+    assert(emptyPage.total === 0, "Empty results should have total=0");
+    assert(emptyPage.hasMore === false, "Empty results should have hasMore=false");
+    console.log(`  ✓ Empty results: total=0, hasMore=false`);
+
+    // Test 7: Single page of results (no pagination needed)
+    const singlePage = await sdk.books.list({
+      where: { author_id: authorId },
+      limit: 100,
+      offset: 0
+    });
+    assert(singlePage.total <= 100, "Should fit in single page");
+    assert(singlePage.hasMore === false, "Single page should have hasMore=false");
+    assert(singlePage.data.length === singlePage.total, "Single page should return all records");
+    console.log(`  ✓ Single page: ${singlePage.total} records, hasMore=false`);
+
+    // Test 8: Calculate pages correctly
+    const pageSize = 7;
+    const allBooksPage = await sdk.books.list({ limit: pageSize, offset: 0 });
+    const totalPages = Math.ceil(allBooksPage.total / pageSize);
+    const currentPage = Math.floor(allBooksPage.offset / pageSize) + 1;
+    assert(totalPages >= 4, `Should have at least 4 pages with pageSize=${pageSize} (got ${totalPages})`);
+    assert(currentPage === 1, "First request should be page 1");
+    console.log(`  ✓ Page calculation: page ${currentPage} of ${totalPages}`);
+
+    // Test 9: hasMore calculation edge case (exact multiple)
+    const exactPage = await sdk.books.list({
+      limit: allBooksPage.total,
+      offset: 0
+    });
+    assert(exactPage.hasMore === false, "Exact page should have hasMore=false");
+    console.log(`  ✓ Exact page (limit=total): hasMore=false`);
+
+    // Test 10: Offset beyond total
+    const beyondPage = await sdk.books.list({
+      limit: 10,
+      offset: allBooksPage.total + 100
+    });
+    assert(beyondPage.data.length === 0, "Offset beyond total should return empty data");
+    assert(beyondPage.total === allBooksPage.total, "Total should still be accurate");
+    assert(beyondPage.hasMore === false, "Beyond total should have hasMore=false");
+    console.log(`  ✓ Offset beyond total: returns empty data, correct metadata`);
 
     // ===== TEST DELETE =====
     console.log("\n🗑️  Testing Delete Operations:");
@@ -453,6 +570,7 @@ async function main() {
     console.log("  • M:N relationships (Books ↔ Tags)");
     console.log("  • Include patterns (simple & nested)");
     console.log("  • Sorting (single-col, multi-col, mixed directions)");
+    console.log("  • Pagination metadata (total, hasMore, limit, offset)");
     console.log("  • Error handling (404 on deleted resource)");
   } finally {
     server.close();
@@ -531,7 +649,7 @@ async function main() {
     
     const authAuthors = await sdkWithAuth.authors.list();
     console.log("  ✓ Requests accepted with valid API key");
-    assert(Array.isArray(authAuthors), "Should get authors with valid key");
+    assert(Array.isArray(authAuthors.data), "Should get authors with valid key");
     
     // Test with invalid auth header
     const sdkBadAuth = new SDK({ 
@@ -647,17 +765,17 @@ async function main() {
     
     const jwtAuthors = await sdkWithJWT.authors.list();
     console.log("  ✓ Requests accepted with valid JWT");
-    assert(Array.isArray(jwtAuthors), "Should get authors with valid JWT");
-    
+    assert(Array.isArray(jwtAuthors.data), "Should get authors with valid JWT");
+
     // Test with JWT provider function
-    const sdkWithJWTProvider = new SDKJWT({ 
+    const sdkWithJWTProvider = new SDKJWT({
       baseUrl: "http://localhost:3458",
       auth: { jwt: async () => validJWT }
     });
-    
+
     const jwtAuthors2 = await sdkWithJWTProvider.authors.list();
     console.log("  ✓ Requests accepted with JWT provider function");
-    assert(Array.isArray(jwtAuthors2), "Should get authors with JWT provider");
+    assert(Array.isArray(jwtAuthors2.data), "Should get authors with JWT provider");
     
     // Test with invalid JWT
     const sdkBadJWT = new SDKJWT({ 

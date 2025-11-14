@@ -69,9 +69,9 @@ async function main() {
 
   // Test listWithAuthor
   console.log("1. Testing books.listWithAuthor():");
-  const booksWithAuthor = await sdk.books.listWithAuthor();
-  console.log(`   ✓ Found ${booksWithAuthor.length} books`);
-  for (const book of booksWithAuthor) {
+  const booksWithAuthorResult = await sdk.books.listWithAuthor();
+  console.log(`   ✓ Found ${booksWithAuthorResult.data.length} books`);
+  for (const book of booksWithAuthorResult.data) {
     console.log(`   ✓ "${book.title}" by ${book.author.name}`);
     // TypeScript knows book.author exists and is of type SelectAuthors
     const authorName: string = book.author.name;
@@ -79,20 +79,20 @@ async function main() {
 
   // Test listWithTags
   console.log("\n2. Testing books.listWithTags():");
-  const booksWithTags = await sdk.books.listWithTags();
-  console.log(`   ✓ Found ${booksWithTags.length} books`);
-  for (const book of booksWithTags) {
-    console.log(`   ✓ "${book.title}" has ${book.tags.length} tag(s): ${book.tags.map(t => t.name).join(", ")}`);
+  const booksWithTagsResult = await sdk.books.listWithTags();
+  console.log(`   ✓ Found ${booksWithTagsResult.data.length} books`);
+  for (const book of booksWithTagsResult.data) {
+    console.log(`   ✓ "${book.title}" has ${book.tags.length} tag(s): ${book.tags.map((t: any) => t.name).join(", ")}`);
     // TypeScript knows book.tags exists and is SelectTags[]
     const firstTagName: string = book.tags[0]?.name ?? "";
   }
 
   // Test listWithAuthorAndTags
   console.log("\n3. Testing books.listWithAuthorAndTags():");
-  const booksWithBoth = await sdk.books.listWithAuthorAndTags();
-  console.log(`   ✓ Found ${booksWithBoth.length} books`);
-  for (const book of booksWithBoth) {
-    console.log(`   ✓ "${book.title}" by ${book.author.name} [${book.tags.map(t => t.name).join(", ")}]`);
+  const booksWithBothResult = await sdk.books.listWithAuthorAndTags();
+  console.log(`   ✓ Found ${booksWithBothResult.data.length} books`);
+  for (const book of booksWithBothResult.data) {
+    console.log(`   ✓ "${book.title}" by ${book.author.name} [${book.tags.map((t: any) => t.name).join(", ")}]`);
   }
 
   // Test getByPkWithAuthor
@@ -111,9 +111,9 @@ async function main() {
 
   // Test authors methods
   console.log("\n6. Testing authors.listWithBooks():");
-  const authorsWithBooks = await sdk.authors.listWithBooks();
-  console.log(`   ✓ Found ${authorsWithBooks.length} authors`);
-  for (const author of authorsWithBooks) {
+  const authorsWithBooksResult = await sdk.authors.listWithBooks();
+  console.log(`   ✓ Found ${authorsWithBooksResult.data.length} authors`);
+  for (const author of authorsWithBooksResult.data) {
     console.log(`   ✓ ${author.name} has ${author.books.length} book(s)`);
   }
 

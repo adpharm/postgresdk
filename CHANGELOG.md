@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### BREAKING CHANGES
+- feat: Add pagination metadata to list operations
+  - `list()` methods now return `{ data: T[], total: number, limit: number, offset: number, hasMore: boolean }` instead of `T[]`
+  - Enables calculating total pages: `Math.ceil(result.total / result.limit)`
+  - Enables calculating current page: `Math.floor(result.offset / result.limit) + 1`
+  - `hasMore` flag indicates if more pages are available
+  - Applies to all list methods including include methods (e.g., `listWithAuthor()`, `listWithBooks()`)
+  - Migration: Update code from `const items = await sdk.table.list()` to `const items = (await sdk.table.list()).data`
+  - COUNT query automatically respects WHERE clauses for accurate totals
+
 ## [v0.12.1] - 2025-11-14
 
 - feat: Add PostgreSQL enum type support

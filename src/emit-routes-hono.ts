@@ -143,34 +143,50 @@ ${hasAuth ? `
     if (result.needsIncludes && result.includeSpec) {
       try {
         const stitched = await loadIncludes(
-          "${fileTableName}", 
-          result.data, 
-          result.includeSpec, 
-          deps.pg, 
+          "${fileTableName}",
+          result.data,
+          result.includeSpec,
+          deps.pg,
           ${opts.includeMethodsDepth}
         );
-        return c.json(stitched);
+        return c.json({
+          data: stitched,
+          total: result.total,
+          limit: result.limit,
+          offset: result.offset,
+          hasMore: result.hasMore
+        });
       } catch (e: any) {
         const strict = process.env.SDK_STRICT_INCLUDE === "1";
         if (strict) {
-          return c.json({ 
-            error: "include-stitch-failed", 
+          return c.json({
+            error: "include-stitch-failed",
             message: e?.message,
             ...(process.env.SDK_DEBUG === "1" ? { stack: e?.stack } : {})
           }, 500);
         }
         // Non-strict: return base rows with error metadata
-        return c.json({ 
-          data: result.data, 
-          includeError: { 
+        return c.json({
+          data: result.data,
+          total: result.total,
+          limit: result.limit,
+          offset: result.offset,
+          hasMore: result.hasMore,
+          includeError: {
             message: e?.message,
             ...(process.env.SDK_DEBUG === "1" ? { stack: e?.stack } : {})
           }
         }, 200);
       }
     }
-    
-    return c.json(result.data, result.status as any);
+
+    return c.json({
+      data: result.data,
+      total: result.total,
+      limit: result.limit,
+      offset: result.offset,
+      hasMore: result.hasMore
+    }, result.status as any);
   });
 
   // UPDATE

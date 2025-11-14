@@ -90,8 +90,8 @@ test("$or - basic OR with simple equality", async () => {
       }
     });
 
-    expect(result).toHaveLength(2);
-    const names = result.map(a => a.name).sort();
+    expect(result.data).toHaveLength(2);
+    const names = result.data.map((a: any) => a.name).sort();
     expect(names).toEqual(["Alice", "Bob"]);
 
     // Cleanup
@@ -132,9 +132,9 @@ test("$or - with operators inside OR conditions", async () => {
 
     // Should match: Alice Anderson (has 'a'), Bob Brown (has 'b')
     // Charlie Chen and David Delta also have 'a' and 'i' respectively
-    expect(result.length).toBeGreaterThanOrEqual(2);
-    const hasAlice = result.some(a => a.name === "Alice Anderson");
-    const hasBob = result.some(a => a.name === "Bob Brown");
+    expect(result.data.length).toBeGreaterThanOrEqual(2);
+    const hasAlice = result.data.some((a: any) => a.name === "Alice Anderson");
+    const hasBob = result.data.some((a: any) => a.name === "Bob Brown");
     expect(hasAlice).toBe(true);
     expect(hasBob).toBe(true);
 
@@ -228,8 +228,8 @@ test("$or - mixed with AND (implicit root level)", async () => {
 
     // Should match: Active Alice, Active Bob
     // Should NOT match: Inactive Charlie, Active Charlie
-    expect(result).toHaveLength(2);
-    const names = result.map(a => a.name).sort();
+    expect(result.data).toHaveLength(2);
+    const names = result.data.map((a: any) => a.name).sort();
     expect(names).toEqual(["Active Alice", "Active Bob"]);
 
     server.close();
@@ -270,8 +270,8 @@ test("$and - explicit AND operator", async () => {
     });
 
     // Should match only: Alice Anderson
-    expect(result).toHaveLength(1);
-    expect(result[0]!.name).toBe("Alice Anderson");
+    expect(result.data).toHaveLength(1);
+    expect(result.data[0]!.name).toBe("Alice Anderson");
 
     server.close();
   } finally {
@@ -320,8 +320,8 @@ test("$or and $and - nested 2 levels", async () => {
 
     // Should match: Alice Smith, Bob Smith
     // Should NOT match: Alice Jones, Bob Jones, Charlie Smith
-    expect(result).toHaveLength(2);
-    const names = result.map(a => a.name).sort();
+    expect(result.data).toHaveLength(2);
+    const names = result.data.map((a: any) => a.name).sort();
     expect(names).toEqual(["Alice Smith", "Bob Smith"]);
 
     server.close();
@@ -354,7 +354,7 @@ test("$or - edge case: empty array", async () => {
     });
 
     // Empty OR is logically false, so should return nothing
-    expect(result).toHaveLength(0);
+    expect(result.data).toHaveLength(0);
 
     server.close();
   } finally {
@@ -387,8 +387,8 @@ test("$or - edge case: single condition", async () => {
       }
     });
 
-    expect(result).toHaveLength(1);
-    expect(result[0]!.name).toBe("Alice");
+    expect(result.data).toHaveLength(1);
+    expect(result.data[0]!.name).toBe("Alice");
 
     server.close();
   } finally {

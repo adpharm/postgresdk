@@ -182,12 +182,12 @@ test("list with where clause filters correctly", async () => {
     const sdk = new SDK({ baseUrl: "http://localhost:3462" });
 
     // Test WHERE clause filtering
-    const bobAuthors = await sdk.authors.list({ where: { name: "Bob" } });
-    expect(bobAuthors).toHaveLength(1);
-    expect(bobAuthors[0]!.name).toBe("Bob");
-    
-    const allAuthors = await sdk.authors.list();
-    expect(allAuthors.length).toBeGreaterThanOrEqual(3);
+    const bobAuthorsResult = await sdk.authors.list({ where: { name: "Bob" } });
+    expect(bobAuthorsResult.data).toHaveLength(1);
+    expect(bobAuthorsResult.data[0]!.name).toBe("Bob");
+
+    const allAuthorsResult = await sdk.authors.list();
+    expect(allAuthorsResult.data.length).toBeGreaterThanOrEqual(3);
 
     // Cleanup
     server.close();
