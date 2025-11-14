@@ -16,6 +16,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Applies to all list methods including include methods (e.g., `listWithAuthor()`, `listWithBooks()`)
   - Migration: Update code from `const items = await sdk.table.list()` to `const items = (await sdk.table.list()).data`
   - COUNT query automatically respects WHERE clauses for accurate totals
+- docs: Add JSDoc documentation to generated SDK client methods
+  - All CRUD methods now include parameter descriptions and return types
+  - Include methods document relationship paths and nested data structure
+  - Type definitions explain Insert, Update, and Select types
+  - Improves IDE autocomplete and developer experience
 
 ## [v0.12.1] - 2025-11-14
 

@@ -64,6 +64,13 @@ const listSchema = z.object({
   order: z.union([z.enum(["asc", "desc"]), z.array(z.enum(["asc", "desc"]))]).optional()
 });
 
+/**
+ * Register all CRUD routes for the ${fileTableName} table
+ * @param app - Hono application instance
+ * @param deps - Dependencies including database client and optional request hook
+ * @param deps.pg - PostgreSQL client with query method
+ * @param deps.onRequest - Optional hook that runs before each request (for audit logging, RLS, etc.)
+ */
 export function register${Type}Routes(app: Hono, deps: { pg: { query: (text: string, params?: any[]) => Promise<{ rows: any[] }> }, onRequest?: (c: Context, pg: { query: (text: string, params?: any[]) => Promise<{ rows: any[] }> }) => Promise<void> }) {
   const base = "/v1/${fileTableName}";
   

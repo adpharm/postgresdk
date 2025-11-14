@@ -61,17 +61,29 @@ export function emitClient(
   for (const method of includeMethods) {
     const isGetByPk = method.name.startsWith("getByPk");
     const baseParams = isGetByPk ? "" : `params?: Omit<{ limit?: number; offset?: number; where?: Where<Select${Type}>; orderBy?: string | string[]; order?: "asc" | "desc" | ("asc" | "desc")[]; }, "include">`;
-    
+
+    // Generate JSDoc description
+    const relationshipDesc = method.path.map((p, i) => {
+      const isLast = i === method.path.length - 1;
+      const relation = method.isMany[i] ? "many" : "one";
+      return isLast ? p : `${p} -> `;
+    }).join('');
+
     if (isGetByPk) {
       // For getByPk with includes, we use the list endpoint with a where clause
-      const pkWhere = hasCompositePk 
+      const pkWhere = hasCompositePk
         ? `{ ${safePk.map(col => `${col}: pk.${col}`).join(", ")} }`
         : `{ ${safePk[0] || 'id'}: pk }`;
-      
+
       // Extract the base return type (without the "| null" part)
       const baseReturnType = method.returnType.replace(" | null", "");
-      
+
       includeMethodsCode += `
+  /**
+   * Get a ${table.name} record by primary key with included related ${relationshipDesc}
+   * @param pk - The primary key value${hasCompositePk ? 's' : ''}
+   * @returns The record with nested ${method.path.join(' and ')} if found, null otherwise
+   */
   async ${method.name}(pk: ${pkType}): Promise<${method.returnType}> {
     const results = await this.post<{ data: ${baseReturnType}[]; total: number; limit: number; offset: number; hasMore: boolean; }>(\`\${this.resource}/list\`, {
       where: ${pkWhere},
@@ -83,6 +95,11 @@ export function emitClient(
 `;
     } else {
       includeMethodsCode += `
+  /**
+   * List ${table.name} records with included related ${relationshipDesc}
+   * @param params - Query parameters (where, orderBy, order, limit, offset)
+   * @returns Paginated results with nested ${method.path.join(' and ')} included
+   */
   async ${method.name}(${baseParams}): Promise<${method.returnType}> {
     return this.post<${method.returnType}>(\`\${this.resource}/list\`, { ...params, include: ${JSON.stringify(method.includeSpec)} });
   }
@@ -109,15 +126,36 @@ ${otherTableImports.join("\n")}
 export class ${Type}Client extends BaseClient {
   private readonly resource = "/v1/${table.name}";
 
+  /**
+   * Create a new ${table.name} record
+   * @param data - The data to insert
+   * @returns The created record
+   */
   async create(data: Insert${Type}): Promise<Select${Type}> {
     return this.post<Select${Type}>(this.resource, data);
   }
 
+  /**
+   * Get a ${table.name} record by primary key
+   * @param pk - The primary key value${hasCompositePk ? 's' : ''}
+   * @returns The record if found, null otherwise
+   */
   async getByPk(pk: ${pkType}): Promise<Select${Type} | null> {
     const path = ${pkPathExpr};
     return this.get<Select${Type} | null>(\`\${this.resource}/\${path}\`);
   }
 
+  /**
+   * List ${table.name} records with pagination and filtering
+   * @param params - Query parameters
+   * @param params.where - Filter conditions using operators like $eq, $gt, $in, $like, etc.
+   * @param params.orderBy - Column(s) to sort by
+   * @param params.order - Sort direction(s): "asc" or "desc"
+   * @param params.limit - Maximum number of records to return (default: 50, max: 100)
+   * @param params.offset - Number of records to skip for pagination
+   * @param params.include - Related records to include (see listWith* methods for typed includes)
+   * @returns Paginated results with data, total count, and hasMore flag
+   */
   async list(params?: {
     include?: any;
     limit?: number;
@@ -141,11 +179,22 @@ export class ${Type}Client extends BaseClient {
     }>(\`\${this.resource}/list\`, params ?? {});
   }
 
+  /**
+   * Update a ${table.name} record by primary key
+   * @param pk - The primary key value${hasCompositePk ? 's' : ''}
+   * @param patch - Partial data to update
+   * @returns The updated record if found, null otherwise
+   */
   async update(pk: ${pkType}, patch: Update${Type}): Promise<Select${Type} | null> {
     const path = ${pkPathExpr};
     return this.patch<Select${Type} | null>(\`\${this.resource}/\${path}\`, patch);
   }
 
+  /**
+   * Delete a ${table.name} record by primary key
+   * @param pk - The primary key value${hasCompositePk ? 's' : ''}
+   * @returns The deleted record if found, null otherwise
+   */
   async delete(pk: ${pkType}): Promise<Select${Type} | null> {
     const path = ${pkPathExpr};
     return this.del<Select${Type} | null>(\`\${this.resource}/\${path}\`);

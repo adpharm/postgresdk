@@ -54,12 +54,25 @@ export function emitTypes(table: Table, opts: { numericMode: "string" | "number"
  *
  * To make changes, modify your schema or configuration and regenerate.
  */
+
+/**
+ * Type for inserting a new ${table.name} record.
+ * Fields with defaults or nullable columns are optional.
+ */
 export type Insert${Type} = {
 ${insertFields}
 };
 
+/**
+ * Type for updating an existing ${table.name} record.
+ * All fields are optional, allowing partial updates.
+ */
 export type Update${Type} = Partial<Insert${Type}>;
 
+/**
+ * Type representing a ${table.name} record from the database.
+ * All fields are included as returned by SELECT queries.
+ */
 export type Select${Type} = {
 ${selectFields}
 };
