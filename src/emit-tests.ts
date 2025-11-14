@@ -59,8 +59,11 @@ describe('${Type} SDK Operations', () => {
   });
   
   it('should list ${tableName} relationships', async () => {
-    const list = await sdk.${tableName}.list({ limit: 10 });
-    expect(Array.isArray(list)).toBe(true);
+    const result = await sdk.${tableName}.list({ limit: 10 });
+    expect(result).toBeDefined();
+    expect(Array.isArray(result.data)).toBe(true);
+    expect(typeof result.total).toBe('number');
+    expect(typeof result.hasMore).toBe('boolean');
   });
 });
 `;
@@ -851,8 +854,11 @@ function generateTestCases(table: Table, sampleData: string, updateData: string,
   });
   
   it('should list ${table.name}', async () => {
-    const list = await sdk.${table.name}.list({ limit: 10 });
-    expect(Array.isArray(list)).toBe(true);
+    const result = await sdk.${table.name}.list({ limit: 10 });
+    expect(result).toBeDefined();
+    expect(Array.isArray(result.data)).toBe(true);
+    expect(typeof result.total).toBe('number');
+    expect(typeof result.hasMore).toBe('boolean');
   });
   
   ${hasData && hasSinglePK ? `it('should get ${table.name} by id', async () => {

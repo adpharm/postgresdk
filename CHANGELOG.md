@@ -25,6 +25,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Core operations now generated via `emitCoreOperations()` for consistency
   - Removed `src/core/operations.ts` template file (operations still generated to output directory)
   - No user-facing changes - purely internal restructuring
+- chore: Update generated tests for pagination metadata
+  - Generated test files now validate pagination structure (data, total, hasMore)
+  - Tests verify list operations return correct metadata format
 
 ## [v0.12.1] - 2025-11-14
 
