@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Support nullable enum columns with proper type inference
   - Support array of enum values with correct TypeScript and Zod typing
   - Runtime validation ensures only valid enum values are accepted
+  - SDK contract documentation includes enum types in field descriptions and query parameters
 - chore: Enhance test coverage for compound sorting with mixed directions
   - Add validation tests for `[DESC, ASC]` direction combinations
   - Add validation tests for `[DESC, DESC]` direction combinations

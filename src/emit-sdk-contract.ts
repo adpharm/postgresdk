@@ -228,6 +228,7 @@ function generateResourceWithSDK(table: Table, model: Model, graph?: Graph, conf
   const basePath = `/v1/${tableName}`;
   const hasSinglePK = table.pk.length === 1;
   const pkField = hasSinglePK ? table.pk[0] : 'id';
+  const enums = model.enums || {};
   
   const sdkMethods: SDKMethod[] = [];
   const endpoints: EndpointContract[] = [];
@@ -255,7 +256,7 @@ const filtered = await sdk.${tableName}.list({
     method: "GET",
     path: basePath,
     description: `List all ${tableName} records`,
-    queryParameters: generateQueryParams(table),
+    queryParameters: generateQueryParams(table, enums),
     responseBody: `${Type}[]`
   });
   
@@ -383,8 +384,8 @@ const filtered = await sdk.${tableName}.${method.name}({
   }
   
   // Process fields
-  const fields = table.columns.map(col => generateFieldContract(col, table));
-  
+  const fields = table.columns.map(col => generateFieldContract(col, table, enums));
+
   return {
     name: Type,
     tableName: tableName,
@@ -400,11 +401,11 @@ const filtered = await sdk.${tableName}.${method.name}({
   };
 }
 
-function generateFieldContract(column: any, table: Table): FieldContract {
+function generateFieldContract(column: any, table: Table, enums: Record<string, string[]>): FieldContract {
   const field: FieldContract = {
     name: column.name,
-    type: postgresTypeToJsonType(column.pgType),
-    tsType: postgresTypeToTsType(column),
+    type: postgresTypeToJsonType(column.pgType, enums),
+    tsType: postgresTypeToTsType(column, enums),
     required: !column.nullable && !column.hasDefault,
     description: generateFieldDescription(column, table)
   };
@@ -424,16 +425,46 @@ function generateFieldContract(column: any, table: Table): FieldContract {
   return field;
 }
 
-function postgresTypeToTsType(column: any): string {
+function postgresTypeToTsType(column: any, enums: Record<string, string[]>): string {
+  const pgType = column.pgType.toLowerCase();
+
+  // Check if this is an enum type
+  if (enums[pgType]) {
+    const enumType = enums[pgType].map(v => `"${v}"`).join(" | ");
+    if (column.nullable) {
+      return `${enumType} | null`;
+    }
+    return enumType;
+  }
+
+  // Check if this is an array of enums
+  if (pgType.startsWith("_")) {
+    const enumName = pgType.slice(1);
+    const enumValues = enums[enumName];
+    if (enumValues) {
+      const enumType = enumValues.map(v => `"${v}"`).join(" | ");
+      const arrayType = `(${enumType})[]`;
+      if (column.nullable) {
+        return `${arrayType} | null`;
+      }
+      return arrayType;
+    }
+  }
+
   const baseType = (() => {
-    switch (column.pgType) {
+    switch (pgType) {
       case 'int':
+      case 'int2':
+      case 'int4':
+      case 'int8':
       case 'integer':
       case 'smallint':
       case 'bigint':
       case 'decimal':
       case 'numeric':
       case 'real':
+      case 'float4':
+      case 'float8':
       case 'double precision':
       case 'float':
         return 'number';
@@ -451,15 +482,22 @@ function postgresTypeToTsType(column: any): string {
         return 'string';
       case 'text[]':
       case 'varchar[]':
+      case '_text':
+      case '_varchar':
         return 'string[]';
       case 'int[]':
       case 'integer[]':
+      case '_int':
+      case '_int2':
+      case '_int4':
+      case '_int8':
+      case '_integer':
         return 'number[]';
       default:
         return 'string';
     }
   })();
-  
+
   if (column.nullable) {
     return `${baseType} | null`;
   }
@@ -538,46 +576,63 @@ function generateExampleValue(column: any): string {
   }
 }
 
-function generateQueryParams(table: Table): Record<string, string> {
+function generateQueryParams(table: Table, enums: Record<string, string[]>): Record<string, string> {
   const params: Record<string, string> = {
     limit: "number - Max records to return (default: 50)",
     offset: "number - Records to skip",
     orderBy: "string | string[] - Field(s) to sort by",
     order: "'asc' | 'desc' | ('asc' | 'desc')[] - Sort direction(s)"
   };
-  
+
   // Add a few example filters
   let filterCount = 0;
   for (const col of table.columns) {
     if (filterCount >= 3) break; // Limit examples for readability
-    
-    const type = postgresTypeToJsonType(col.pgType);
+
+    const type = postgresTypeToJsonType(col.pgType, enums);
     params[col.name] = `${type} - Filter by ${col.name}`;
-    
+
     if (type === 'string') {
       params[`${col.name}_like`] = `string - Search in ${col.name}`;
     } else if (type === 'number' || type === 'date/datetime') {
       params[`${col.name}_gt`] = `${type} - Greater than`;
       params[`${col.name}_lt`] = `${type} - Less than`;
     }
-    
+
     filterCount++;
   }
-  
+
   params['...'] = "Additional filters for all fields";
-  
+
   return params;
 }
 
-function postgresTypeToJsonType(pgType: string): string {
-  switch (pgType) {
+function postgresTypeToJsonType(pgType: string, enums: Record<string, string[]>): string {
+  const t = pgType.toLowerCase();
+
+  // Check if this is an enum type
+  if (enums[t]) {
+    return t; // Return the enum name
+  }
+
+  // Check if this is an array of enums
+  if (t.startsWith("_") && enums[t.slice(1)]) {
+    return `${t.slice(1)}[]`;
+  }
+
+  switch (t) {
     case 'int':
+    case 'int2':
+    case 'int4':
+    case 'int8':
     case 'integer':
     case 'smallint':
     case 'bigint':
     case 'decimal':
     case 'numeric':
     case 'real':
+    case 'float4':
+    case 'float8':
     case 'double precision':
     case 'float':
       return 'number';
@@ -595,9 +650,16 @@ function postgresTypeToJsonType(pgType: string): string {
       return 'uuid';
     case 'text[]':
     case 'varchar[]':
+    case '_text':
+    case '_varchar':
       return 'string[]';
     case 'int[]':
     case 'integer[]':
+    case '_int':
+    case '_int2':
+    case '_int4':
+    case '_int8':
+    case '_integer':
       return 'number[]';
     default:
       return 'string';
