@@ -21,6 +21,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Include methods document relationship paths and nested data structure
   - Type definitions explain Insert, Update, and Select types
   - Improves IDE autocomplete and developer experience
+- refactor: Convert core operations from static template to generated code
+  - Core operations now generated via `emitCoreOperations()` for consistency
+  - Removed `src/core/operations.ts` template file (operations still generated to output directory)
+  - No user-facing changes - purely internal restructuring
 
 ## [v0.12.1] - 2025-11-14
 
