@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- chore: Enhance test coverage for compound sorting with mixed directions
+  - Add validation tests for `[DESC, ASC]` direction combinations
+  - Add validation tests for `[DESC, DESC]` direction combinations
+  - Verify correct SQL generation and result ordering for all direction permutations
+
 ## [v0.12.0] - 2025-11-13
 
 - feat: Add multi-column sorting support to list operations

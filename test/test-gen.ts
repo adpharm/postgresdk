@@ -375,13 +375,47 @@ async function main() {
     assert(lastTitleDesc === firstTitleAsc, `Last in DESC should equal first in ASC`);
     console.log(`  ✓ Single column DESC: "${firstTitleDesc}" comes first`);
 
-    // Multi-column sort
+    // Multi-column sort with same direction
     const booksMultiSort = await sdk.books.list({
       orderBy: ["author_id", "title"],
       order: "asc"
     });
     assert(booksMultiSort.length >= 3, "Multi-sort should return books");
-    console.log(`  ✓ Multi-column sort works (author_id, title)`);
+    console.log(`  ✓ Multi-column sort (same direction) works`);
+
+    // Multi-column sort with mixed directions [DESC, ASC]
+    const booksMixedSort = await sdk.books.list({
+      orderBy: ["author_id", "title"],
+      order: ["desc", "asc"]
+    });
+    for (let i = 1; i < booksMixedSort.length; i++) {
+      const prev = booksMixedSort[i-1];
+      const curr = booksMixedSort[i];
+      if (prev.author_id < curr.author_id) {
+        throw new Error(`author_id not DESC at index ${i}`);
+      }
+      if (prev.author_id === curr.author_id && prev.title > curr.title) {
+        throw new Error(`title not ASC within same author at index ${i}`);
+      }
+    }
+    console.log(`  ✓ Multi-column sort [DESC, ASC] works`);
+
+    // Multi-column sort with both DESC [DESC, DESC]
+    const booksDescDesc = await sdk.books.list({
+      orderBy: ["author_id", "title"],
+      order: ["desc", "desc"]
+    });
+    for (let i = 1; i < booksDescDesc.length; i++) {
+      const prev = booksDescDesc[i-1];
+      const curr = booksDescDesc[i];
+      if (prev.author_id < curr.author_id) {
+        throw new Error(`author_id not DESC at index ${i}`);
+      }
+      if (prev.author_id === curr.author_id && prev.title < curr.title) {
+        throw new Error(`title not DESC within same author at index ${i}`);
+      }
+    }
+    console.log(`  ✓ Multi-column sort [DESC, DESC] works`);
 
     // Sort with where clause
     const filteredSorted = await sdk.books.list({
@@ -418,7 +452,7 @@ async function main() {
     console.log("  • 1:N relationships (Authors → Books)");
     console.log("  • M:N relationships (Books ↔ Tags)");
     console.log("  • Include patterns (simple & nested)");
-    console.log("  • Sorting (single/multi-column, ASC/DESC)");
+    console.log("  • Sorting (single-col, multi-col, mixed directions)");
     console.log("  • Error handling (404 on deleted resource)");
   } finally {
     server.close();
