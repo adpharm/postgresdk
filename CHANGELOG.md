@@ -7,11 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- docs: Enhance README with usage examples and framework clarification
-  - Added "See It In Action" section showing database schema to SDK transformation
-  - Added "Supported Frameworks" section clarifying Hono-only support
-  - Explains why Hono was chosen and how to contribute other frameworks
-  - Improves onboarding experience for new users
+### BREAKING CHANGES
+
+- refactor: Simplify output directory configuration with unified `outDir`
+  - Replace separate `outServer` and `outClient` config fields with single `outDir` option
+  - Supports simple usage: `outDir: "./api"` (uses same directory for both)
+  - Supports separate paths: `outDir: { client: "./sdk", server: "./api" }`
+  - Migration: Update config from `{ outServer: "./api/server", outClient: "./api/client" }` to `{ outDir: { server: "./api/server", client: "./api/client" } }`
+  - All test configs and example configs updated to new format
+- refactor: Move special endpoints to `/_psdk` prefix for better organization
+  - SDK distribution endpoints moved from `/sdk/*` to `/_psdk/sdk/*`
+  - Contract endpoints moved from `/api/contract*` to `/_psdk/contract*`
+  - Prevents collision with user data routes
+  - Endpoints: `/_psdk/sdk/manifest`, `/_psdk/sdk/download`, `/_psdk/contract`, `/_psdk/contract.json`, `/_psdk/contract.md`
+  - Migration: Update pull config or SDK fetching code to use new `/_psdk/*` paths
+
+### Features
+
+- feat: Add configurable API path prefix via `apiPathPrefix` option
+  - Control URL prefix for all data table routes (default: `/v1`)
+  - Examples: `"/v1"` → `/v1/users`, `""` → `/users`, `"/api/v2"` → `/api/v2/users`
+  - Special `/_psdk/*` endpoints unaffected by this setting
+- feat: Enhance `postgresdk init` with project type selection
+  - Added `--api` flag for API-side config (database introspection and generation)
+  - Added `--sdk` flag for SDK-side config (consuming remote SDK via pull)
+  - Interactive prompt if no flag provided
+  - Generates appropriate config template based on project type
+  - Tailored next steps and documentation for each use case
+
+### Documentation
+
+- docs: Add Bun runtime examples throughout README
+  - Added installation examples: `bun install -g postgresdk`, `bunx postgresdk`
+  - Added CLI command examples with Bun alternatives
+  - Documented Bun test framework option: `bun test`
+- docs: Enhance CLI documentation in README
+  - Document new `--api` and `--sdk` flags for init command
+  - Show interactive vs flag-based initialization workflows
+  - Improve clarity of init command usage
+- docs: Improve generated code usage examples
+  - Show clear separation between server setup and client SDK usage
+  - Add file path examples relative to project root
 
 ## [v0.13.1] - 2025-11-14
 

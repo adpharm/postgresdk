@@ -121,8 +121,10 @@ async function generatePostgreSDK() {
   // Create config for PostgreSDK with include methods generation
   const config = `export default {
   connectionString: "${TEST_URL}",
-  outServer: "${OUTPUT_DIR}/server",
-  outClient: "${OUTPUT_DIR}/client",
+  outDir: {
+    server: "${OUTPUT_DIR}/server",
+    client: "${OUTPUT_DIR}/client"
+  },
   includeMethodsDepth: 2,  // Enable include methods generation
   skipJunctionTables: true,
   tests: {

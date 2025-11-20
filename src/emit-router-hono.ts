@@ -91,21 +91,21 @@ export function createRouter(
   
   // Register table routes
 ${registrations}
-  
+
   // SDK distribution endpoints
-  router.get("/sdk/manifest", (c) => {
+  router.get("/_psdk/sdk/manifest", (c) => {
     return c.json({
       version: SDK_MANIFEST.version,
       generated: SDK_MANIFEST.generated,
       files: Object.keys(SDK_MANIFEST.files)
     });
   });
-  
-  router.get("/sdk/download", (c) => {
+
+  router.get("/_psdk/sdk/download", (c) => {
     return c.json(SDK_MANIFEST);
   });
-  
-  router.get("/sdk/files/:path{.*}", (c) => {
+
+  router.get("/_psdk/sdk/files/:path{.*}", (c) => {
     const path = c.req.param("path");
     const content = SDK_MANIFEST.files[path as keyof typeof SDK_MANIFEST.files];
     if (!content) {
@@ -115,25 +115,25 @@ ${registrations}
       "Content-Type": "text/plain; charset=utf-8"
     });
   });
-  
+
   // API Contract endpoints - describes the entire API
-  router.get("/api/contract", (c) => {
+  router.get("/_psdk/contract", (c) => {
     const format = c.req.query("format") || "json";
-    
+
     if (format === "markdown") {
       return c.text(getContract("markdown") as string, 200, {
         "Content-Type": "text/markdown; charset=utf-8"
       });
     }
-    
+
     return c.json(getContract("json"));
   });
-  
-  router.get("/api/contract.json", (c) => {
+
+  router.get("/_psdk/contract.json", (c) => {
     return c.json(getContract("json"));
   });
-  
-  router.get("/api/contract.md", (c) => {
+
+  router.get("/_psdk/contract.md", (c) => {
     return c.text(getContract("markdown") as string, 200, {
       "Content-Type": "text/markdown; charset=utf-8"
     });

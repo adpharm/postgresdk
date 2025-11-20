@@ -35,7 +35,7 @@ async function testBasicInit() {
   await new Promise((resolve) => setTimeout(resolve, 1000));
 
   // Run init in the test directory
-  execSync(`cd ${projectDir} && bun ${process.cwd()}/src/cli.ts init`, { stdio: "inherit" });
+  execSync(`cd ${projectDir} && bun ${process.cwd()}/src/cli.ts init --api`, { stdio: "inherit" });
 
   // Check that postgresdk.config.ts was created
   const configPath = join(projectDir, "postgresdk.config.ts");
@@ -52,10 +52,11 @@ async function testBasicInit() {
 
   // Check that default values are present
   assert(configContent.includes("process.env.DATABASE_URL"), "Config should reference DATABASE_URL env var");
-  assert(configContent.includes("// outServer:"), "Config should have commented outServer option");
-  assert(configContent.includes("// outClient:"), "Config should have commented outClient option");
+  assert(configContent.includes("// outDir:"), "Config should have commented outDir option");
   assert(configContent.includes("// auth:"), "Config should have commented auth option");
-  assert(configContent.includes("// pull:"), "Config should have commented pull option");
+
+  // API-side template should NOT have pull config
+  assert(!configContent.includes("pull:"), "API-side config should not have pull option");
 
   console.log("  ✓ Basic init created config file with all sections");
 }
@@ -89,13 +90,13 @@ async function testInitConfigStructure() {
   const projectDir = join(TEST_DIR, "structure");
   mkdirSync(projectDir, { recursive: true });
 
-  execSync(`cd ${projectDir} && bun ${process.cwd()}/src/cli.ts init`, { stdio: "pipe" });
+  execSync(`cd ${projectDir} && bun ${process.cwd()}/src/cli.ts init --api`, { stdio: "pipe" });
 
   const configPath = join(projectDir, "postgresdk.config.ts");
   const configContent = await readFile(configPath, "utf-8");
 
-  // Verify all major sections are present
-  const sections = ["DATABASE CONNECTION", "BASIC OPTIONS", "ADVANCED OPTIONS", "AUTHENTICATION", "SDK DISTRIBUTION"];
+  // Verify all major sections are present (API-side doesn't have SDK DISTRIBUTION)
+  const sections = ["DATABASE CONNECTION", "BASIC OPTIONS", "ADVANCED OPTIONS", "AUTHENTICATION"];
 
   for (const section of sections) {
     assert(configContent.includes(section), `Config should have ${section} section`);
@@ -105,15 +106,13 @@ async function testInitConfigStructure() {
   const options = [
     "connectionString",
     "schema",
-    "outServer",
-    "outClient",
+    "outDir",
     "softDeleteColumn",
     "includeMethodsDepth",
     "apiKeyHeader",
     "apiKeys",
     "jwt",
     "sharedSecret",
-    "pull",
   ];
 
   for (const option of options) {
@@ -130,7 +129,7 @@ async function testInitOutputMessages() {
   mkdirSync(projectDir, { recursive: true });
 
   // Capture output to verify helpful messages
-  const output = execSync(`cd ${projectDir} && bun ${process.cwd()}/src/cli.ts init`, { encoding: "utf-8" });
+  const output = execSync(`cd ${projectDir} && bun ${process.cwd()}/src/cli.ts init --api`, { encoding: "utf-8" });
 
   // Check for expected output messages
   assert(output.includes("Initializing postgresdk"), "Should show initialization message");
@@ -153,7 +152,7 @@ API_KEY=test-key-123`;
   await Bun.write(join(projectDir, ".env"), envContent);
 
   // Run init
-  const output = execSync(`cd ${projectDir} && bun ${process.cwd()}/src/cli.ts init`, { encoding: "utf-8" });
+  const output = execSync(`cd ${projectDir} && bun ${process.cwd()}/src/cli.ts init --api`, { encoding: "utf-8" });
 
   // When .env exists, it shouldn't suggest creating one
   assert(existsSync(join(projectDir, "postgresdk.config.ts")), "Config should be created");
@@ -174,7 +173,7 @@ async function testMultipleInits() {
   mkdirSync(projectDir, { recursive: true });
 
   // First init should succeed
-  execSync(`cd ${projectDir} && bun ${process.cwd()}/src/cli.ts init`, { stdio: "pipe" });
+  execSync(`cd ${projectDir} && bun ${process.cwd()}/src/cli.ts init --api`, { stdio: "pipe" });
   assert(existsSync(join(projectDir, "postgresdk.config.ts")), "First init should create config");
 
   // Second init should fail with --force-error flag

@@ -27,11 +27,10 @@ export type AuthConfigInput = AuthConfig | {
 export interface Config {
   // Required
   connectionString: string;
-  
+
   // Optional
   schema?: string;
-  outServer?: string;
-  outClient?: string;
+  outDir?: string | { client: string; server: string };
   softDeleteColumn?: string | null;
   dateType?: "date" | "string";
   
@@ -41,7 +40,10 @@ export interface Config {
   
   // Server framework for generated routes
   serverFramework?: "hono" | "express" | "fastify";
-  
+
+  // API path prefix for table routes (default: "/v1")
+  apiPathPrefix?: string;
+
   // Auth
   auth?: AuthConfigInput;
   

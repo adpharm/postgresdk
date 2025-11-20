@@ -9,7 +9,7 @@ import { pascal } from "./utils";
 export function emitHonoRoutes(
   table: Table,
   _graph: Graph,
-  opts: { softDeleteColumn: string | null; includeMethodsDepth: number; authStrategy?: string; useJsExtensions?: boolean }
+  opts: { softDeleteColumn: string | null; includeMethodsDepth: number; authStrategy?: string; useJsExtensions?: boolean; apiPathPrefix: string }
 ) {
   const fileTableName = table.name;
   const Type = pascal(table.name);
@@ -72,7 +72,7 @@ const listSchema = z.object({
  * @param deps.onRequest - Optional hook that runs before each request (for audit logging, RLS, etc.)
  */
 export function register${Type}Routes(app: Hono, deps: { pg: { query: (text: string, params?: any[]) => Promise<{ rows: any[] }> }, onRequest?: (c: Context, pg: { query: (text: string, params?: any[]) => Promise<{ rows: any[] }> }) => Promise<void> }) {
-  const base = "/v1/${fileTableName}";
+  const base = "${opts.apiPathPrefix}/${fileTableName}";
   
   // Create operation context
   const ctx: coreOps.OperationContext = {

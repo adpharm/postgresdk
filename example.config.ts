@@ -30,29 +30,20 @@ export default {
   schema: "public",
 
   /**
-   * Output directory for server-side code (routes, validators, types, etc.)
-   * Generated files include:
-   * - Hono routes for each table
-   * - Zod validators for input validation
-   * - TypeScript types
-   * - Authentication middleware (if configured)
-   * - Include/relationship handlers
-   * @default "./api/server"
-   */
-  outServer: "./api/server",
-
-  /**
-   * Output directory for client SDK
-   * Generated files include:
-   * - Type-safe client for each table
-   * - TypeScript types matching server types
-   * - Base client with auth configuration
+   * Output directory for generated code
    *
-   * Note: If outServer and outClient are the same directory,
+   * Simple usage (same directory for both):
+   *   outDir: "./api"
+   *
+   * Separate directories for client and server:
+   *   outDir: { client: "./sdk", server: "./api" }
+   *
+   * Note: If client and server paths are the same,
    * the client SDK will be placed in an 'sdk' subdirectory.
-   * @default "./api/client"
+   *
+   * @default { client: "./api/client", server: "./api/server" }
    */
-  outClient: "./api/client",
+  outDir: { client: "./api/client", server: "./api/server" },
 
   // ========== ADVANCED OPTIONS ==========
 
@@ -115,6 +106,21 @@ export default {
    * @default "hono"
    */
   serverFramework: "hono",
+
+  /**
+   * API path prefix for all table routes
+   *
+   * Controls the URL prefix for data endpoints. For example:
+   * - "/v1" → /v1/users, /v1/posts (default)
+   * - "" → /users, /posts (no prefix)
+   * - "/api/v2" → /api/v2/users, /api/v2/posts (custom prefix)
+   *
+   * Note: Special endpoints (SDK distribution, contract) are always at /_psdk/*
+   * regardless of this setting.
+   *
+   * @default "/v1"
+   */
+  apiPathPrefix: "/v1",
 
   /**
    * Use .js extensions in server-side imports for compatibility with runtimes
@@ -311,8 +317,7 @@ export default {
  * export default {
  *   connectionString: process.env.DATABASE_URL,
  *   schema: "app",
- *   outServer: "./src/generated/server",
- *   outClient: "./src/generated/client",
+ *   outDir: { client: "./src/generated/client", server: "./src/generated/server" },
  *   softDeleteColumn: "deleted_at",
  *   includeMethodsDepth: 2,
  *   dateType: "string",

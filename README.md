@@ -64,6 +64,11 @@ const filtered = await sdk.users.list({
 npm install -g postgresdk
 # or
 npx postgresdk generate
+
+# With Bun
+bun install -g postgresdk
+# or
+bunx postgresdk generate
 ```
 
 > **Note:** Currently only generates **Hono** server code. See [Supported Frameworks](#supported-frameworks) for details.
@@ -74,6 +79,8 @@ npx postgresdk generate
 
 ```bash
 npx postgresdk init
+# or with Bun
+bunx postgresdk init
 ```
 
 This creates a `postgresdk.config.ts` file with all available options documented.
@@ -91,12 +98,13 @@ export default {
 
 ```bash
 postgresdk generate
+# or with Bun
+bunx postgresdk generate
 ```
 
-4. Use the generated SDK:
+4. Set up your server:
 
 ```typescript
-// Server (Hono)
 import { Hono } from "hono";
 import { Client } from "pg";
 import { createRouter } from "./api/server/router";
@@ -107,8 +115,11 @@ await pg.connect();
 
 const api = createRouter({ pg });
 app.route("/", api);
+```
 
-// Client
+5. Use the client SDK:
+
+```typescript
 import { SDK } from "./api/client";
 
 const sdk = new SDK({ baseUrl: "http://localhost:3000" });
@@ -128,13 +139,12 @@ Create a `postgresdk.config.ts` file in your project root:
 export default {
   // Required
   connectionString: process.env.DATABASE_URL || "postgres://user:pass@localhost:5432/dbname",
-  
+
   // Optional (with defaults)
   schema: "public",                    // Database schema to introspect
-  outServer: "./api/server",           // Server code output directory  
-  outClient: "./api/client",           // Client SDK output directory
+  outDir: "./api",                     // Output directory (or { client: "./sdk", server: "./api" })
   softDeleteColumn: null,              // Column name for soft deletes (e.g., "deleted_at")
-  includeMethodsDepth: 2,               // Max depth for nested includes
+  includeMethodsDepth: 2,              // Max depth for nested includes
   dateType: "date",                    // "date" | "string" - How to handle timestamps
   serverFramework: "hono",             // Currently only hono is supported
   useJsExtensions: false,              // Add .js to imports (for Vercel Edge, Deno)
@@ -466,6 +476,9 @@ Run tests with the included Docker setup:
 ```bash
 chmod +x api/tests/run-tests.sh
 ./api/tests/run-tests.sh
+
+# Or with Bun's built-in test runner (if framework: "bun")
+bun test
 ```
 
 ## CLI Commands
@@ -483,8 +496,14 @@ Commands:
 Options:
   -c, --config <path>  Path to config file (default: postgresdk.config.ts)
 
+Init flags:
+  --api                Generate API-side config (for database introspection)
+  --sdk                Generate SDK-side config (for consuming remote SDK)
+
 Examples:
-  postgresdk init
+  postgresdk init                              # Interactive prompt
+  postgresdk init --api                        # API-side config
+  postgresdk init --sdk                        # SDK-side config
   postgresdk generate
   postgresdk generate -c custom.config.ts
   postgresdk pull --from=https://api.com --output=./src/sdk

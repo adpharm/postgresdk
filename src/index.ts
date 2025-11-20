@@ -44,9 +44,24 @@ export async function generate(configPath: string) {
   console.log("🔗 Building relationship graph...");
   const graph = buildGraph(model);
 
-  const serverDir = cfg.outServer || "./api/server";
-  const originalClientDir = cfg.outClient || "./api/client";
-  
+  // Handle outDir configuration
+  let serverDir: string;
+  let originalClientDir: string;
+
+  if (typeof cfg.outDir === "string") {
+    // Single string: use for both
+    serverDir = cfg.outDir;
+    originalClientDir = cfg.outDir;
+  } else if (cfg.outDir && typeof cfg.outDir === "object") {
+    // Object with client/server paths
+    serverDir = cfg.outDir.server;
+    originalClientDir = cfg.outDir.client;
+  } else {
+    // Defaults
+    serverDir = "./api/server";
+    originalClientDir = "./api/client";
+  }
+
   // If server and client dirs are the same, put client SDK in an 'sdk' subdirectory
   const sameDirectory = serverDir === originalClientDir;
   let clientDir = originalClientDir;
@@ -157,6 +172,7 @@ export async function generate(configPath: string) {
         includeMethodsDepth: cfg.includeMethodsDepth || 2,
         authStrategy: normalizedAuth?.strategy,
         useJsExtensions: cfg.useJsExtensions,
+        apiPathPrefix: cfg.apiPathPrefix || "/v1",
       });
     } else {
       // For future framework support (express, fastify, etc.)
@@ -291,4 +307,15 @@ export async function generate(configPath: string) {
     console.log(`     2. Edit the script to configure your API server startup`);
     console.log(`     3. Run tests: ${testDir}/run-tests.sh`);
   }
+
+  // Usage instructions
+  console.log(`\n📚 Usage:`);
+  console.log(`  Server (${serverFramework}):`);
+  console.log(`    import { createRouter } from "./${relative(process.cwd(), serverDir)}/router";`);
+  console.log(`    const api = createRouter({ pg });`);
+  console.log(`    app.route("/", api);`);
+  console.log(`\n  Client:`);
+  console.log(`    import { SDK } from "./${relative(process.cwd(), clientDir)}";`);
+  console.log(`    const sdk = new SDK({ baseUrl: "http://localhost:3000" });`);
+  console.log(`    const users = await sdk.users.list();`);
 }

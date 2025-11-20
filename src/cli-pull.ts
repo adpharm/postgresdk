@@ -76,7 +76,7 @@ export async function pullCommand(args: string[]) {
       ? { Authorization: `Bearer ${config.token}` } 
       : {};
     
-    const manifestRes = await fetch(`${config.from}/sdk/manifest`, { headers });
+    const manifestRes = await fetch(`${config.from}/_psdk/sdk/manifest`, { headers });
     
     if (!manifestRes.ok) {
       throw new Error(`Failed to fetch SDK manifest: ${manifestRes.status} ${manifestRes.statusText}`);
@@ -88,7 +88,7 @@ export async function pullCommand(args: string[]) {
     console.log(`📄 Files: ${manifest.files.length}`);
     
     // Fetch full SDK
-    const sdkRes = await fetch(`${config.from}/sdk/download`, { headers });
+    const sdkRes = await fetch(`${config.from}/_psdk/sdk/download`, { headers });
     
     if (!sdkRes.ok) {
       throw new Error(`Failed to download SDK: ${sdkRes.status} ${sdkRes.statusText}`);

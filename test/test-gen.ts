@@ -111,8 +111,7 @@ function writeTestConfig(withAuth = false) {
   const cfg = `export default {
   connectionString: "${PG_URL}",
   schema: "public",
-  outServer: "${SERVER_DIR}",
-  outClient: "${CLIENT_DIR}",
+  outDir: { server: "${SERVER_DIR}", client: "${CLIENT_DIR}" },
   softDeleteColumn: null,
   includeMethodsDepth: 3${authConfig},
   tests: {
@@ -591,8 +590,7 @@ async function main() {
   const authConfig = `export default {
   connectionString: "${PG_URL}",
   schema: "public",
-  outServer: "${AUTH_SERVER_DIR}",
-  outClient: "${AUTH_CLIENT_DIR}",
+  outDir: { server: "${AUTH_SERVER_DIR}", client: "${AUTH_CLIENT_DIR}" },
   softDeleteColumn: null,
   includeMethodsDepth: 3,
   auth: {
@@ -688,8 +686,7 @@ async function main() {
   const jwtConfig = `export default {
   connectionString: "${PG_URL}",
   schema: "public",
-  outServer: "${JWT_SERVER_DIR}",
-  outClient: "${JWT_CLIENT_DIR}",
+  outDir: { server: "${JWT_SERVER_DIR}", client: "${JWT_CLIENT_DIR}" },
   softDeleteColumn: null,
   includeMethodsDepth: 3,
   auth: {
@@ -809,8 +806,7 @@ async function main() {
   const sameDirConfig = `export default {
   connectionString: "${PG_URL}",
   schema: "public",
-  outServer: "${SAME_DIR}",
-  outClient: "${SAME_DIR}",
+  outDir: "${SAME_DIR}",
   softDeleteColumn: null,
   includeMethodsDepth: 3
 };`;

@@ -29,8 +29,10 @@ const testCases: TestCase[] = [
     clientDir: `${TEST_DIR}/basic/client`,
     config: `export default {
       connectionString: "${PG_URL}",
-      outServer: "${TEST_DIR}/basic/server",
-      outClient: "${TEST_DIR}/basic/client",
+      outDir: {
+        server: "${TEST_DIR}/basic/server",
+        client: "${TEST_DIR}/basic/client"
+      }
     };`,
   },
   {
@@ -39,8 +41,10 @@ const testCases: TestCase[] = [
     clientDir: `${TEST_DIR}/same-dir`,
     config: `export default {
       connectionString: "${PG_URL}",
-      outServer: "${TEST_DIR}/same-dir",
-      outClient: "${TEST_DIR}/same-dir",
+      outDir: {
+        server: "${TEST_DIR}/same-dir",
+        client: "${TEST_DIR}/same-dir"
+      }
     };`,
   },
   {
@@ -49,8 +53,10 @@ const testCases: TestCase[] = [
     clientDir: `${TEST_DIR}/auth-apikey/client`,
     config: `export default {
       connectionString: "${PG_URL}",
-      outServer: "${TEST_DIR}/auth-apikey/server",
-      outClient: "${TEST_DIR}/auth-apikey/client",
+      outDir: {
+        server: "${TEST_DIR}/auth-apikey/server",
+        client: "${TEST_DIR}/auth-apikey/client"
+      },
       auth: {
         strategy: "api-key",
         apiKeyHeader: "x-api-key",
@@ -64,8 +70,10 @@ const testCases: TestCase[] = [
     clientDir: `${TEST_DIR}/auth-jwt/client`,
     config: `export default {
       connectionString: "${PG_URL}",
-      outServer: "${TEST_DIR}/auth-jwt/server",
-      outClient: "${TEST_DIR}/auth-jwt/client",
+      outDir: {
+        server: "${TEST_DIR}/auth-jwt/server",
+        client: "${TEST_DIR}/auth-jwt/client"
+      },
       auth: {
         strategy: "jwt-hs256",
         jwt: {

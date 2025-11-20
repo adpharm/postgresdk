@@ -27,8 +27,10 @@ function writeTestConfig() {
   const cfg = `export default {
   connectionString: "${PG_URL}",
   schema: "public",
-  outServer: "${SERVER_DIR}",
-  outClient: "${CLIENT_DIR}",
+  outDir: {
+    server: "${SERVER_DIR}",
+    client: "${CLIENT_DIR}"
+  },
   softDeleteColumn: null,
   includeMethodsDepth: 2
 };`;

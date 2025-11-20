@@ -5,8 +5,8 @@ import prompts from "prompts";
 import { extractConfigFields, generateMergedConfig } from "./cli-config-utils";
 import type { ConfigField } from "./cli-config-utils";
 
-const CONFIG_TEMPLATE = `/**
- * PostgreSDK Configuration
+const CONFIG_TEMPLATE_API = `/**
+ * PostgreSDK Configuration (API-Side)
  *
  * This file configures how postgresdk generates your type-safe API and SDK
  * from your PostgreSQL database schema.
@@ -17,9 +17,7 @@ const CONFIG_TEMPLATE = `/**
  *   3. Start using your generated SDK!
  *
  * CLI COMMANDS:
- *   postgresdk init              Initialize this config file
  *   postgresdk generate          Generate API and SDK from your database
- *   postgresdk pull              Pull SDK from a remote API
  *   postgresdk help              Show help and examples
  *
  * Environment variables are automatically loaded from .env files.
@@ -45,16 +43,17 @@ export default {
   // schema: "public",
 
   /**
-   * Output directory for server-side code (routes, validators, etc.)
-   * Default: "./api/server"
+   * Output directory for generated code
+   *
+   * Simple usage (same directory for both):
+   *   outDir: "./api"
+   *
+   * Separate directories for client and server:
+   *   outDir: { client: "./sdk", server: "./api" }
+   *
+   * Default: { client: "./api/client", server: "./api/server" }
    */
-  // outServer: "./api/server",
-
-  /**
-   * Output directory for client SDK
-   * Default: "./api/client"
-   */
-  // outClient: "./api/client",
+  // outDir: "./api",
 
   // ========== ADVANCED OPTIONS ==========
 
@@ -139,27 +138,48 @@ export default {
   //     audience: "my-users",                  // Optional: validate 'aud' claim
   //   }
   // },
+};
+`;
 
-  // ========== SDK DISTRIBUTION (Pull Configuration) ==========
+const CONFIG_TEMPLATE_SDK = `/**
+ * PostgreSDK Configuration (SDK-Side)
+ *
+ * This file configures how postgresdk pulls a generated SDK from a remote API.
+ *
+ * QUICK START:
+ *   1. Update the 'pull.from' URL below
+ *   2. Run: postgresdk pull
+ *   3. Import and use the SDK!
+ *
+ * CLI COMMANDS:
+ *   postgresdk pull              Pull SDK from a remote API
+ *   postgresdk help              Show help and examples
+ *
+ * Environment variables are automatically loaded from .env files.
+ */
+
+export default {
+  // ========== SDK PULL CONFIGURATION ==========
 
   /**
    * Configuration for pulling SDK from a remote API
-   * Used when running: postgresdk pull
    */
-  // pull: {
-  //   from: "https://api.myapp.com",     // API URL to pull SDK from
-  //   output: "./src/sdk",                // Local directory for pulled SDK
-  //   token: process.env.API_TOKEN,       // Optional authentication token
-  // },
+  pull: {
+    from: "https://api.myapp.com",     // API URL to pull SDK from
+    output: "./src/sdk",                // Local directory for pulled SDK
+    // token: process.env.API_TOKEN,    // Optional authentication token
+  },
 };
 `;
 
 export async function initCommand(args: string[]): Promise<void> {
   console.log("🚀 Initializing postgresdk configuration...\n");
-  
-  // Check for --force-error flag (for testing)
+
+  // Check for flags
   const forceError = args.includes("--force-error");
-  
+  const isApiSide = args.includes("--api");
+  const isSdkSide = args.includes("--sdk");
+
   // Check for existing config file
   const configPath = resolve(process.cwd(), "postgresdk.config.ts");
   
@@ -304,30 +324,84 @@ export async function initCommand(args: string[]): Promise<void> {
     return;
   }
   
+  // Determine project type from flags or prompt
+  let projectType: string;
+
+  if (isApiSide && isSdkSide) {
+    console.error("❌ Error: Cannot use both --api and --sdk flags");
+    process.exit(1);
+  } else if (isApiSide) {
+    projectType = "api";
+  } else if (isSdkSide) {
+    projectType = "sdk";
+  } else {
+    // Ask interactively
+    const response = await prompts({
+      type: "select",
+      name: "projectType",
+      message: "What type of project is this?",
+      choices: [
+        {
+          title: "API-side (generating SDK from database)",
+          value: "api",
+          description: "You have a PostgreSQL database and want to generate an SDK"
+        },
+        {
+          title: "SDK-side (consuming a remote SDK)",
+          value: "sdk",
+          description: "You want to pull and use an SDK from a remote API"
+        }
+      ],
+      initial: 0
+    });
+
+    projectType = response.projectType;
+
+    if (!projectType) {
+      console.log("\n✅ Cancelled. No changes made.");
+      process.exit(0);
+    }
+  }
+
+  const template = projectType === "api" ? CONFIG_TEMPLATE_API : CONFIG_TEMPLATE_SDK;
+
   // Check for .env file
   const envPath = resolve(process.cwd(), ".env");
   const hasEnv = existsSync(envPath);
-  
+
   // Write the config file
   try {
-    writeFileSync(configPath, CONFIG_TEMPLATE, "utf-8");
+    writeFileSync(configPath, template, "utf-8");
     console.log("✅ Created postgresdk.config.ts");
-    
+
     // Provide helpful next steps
     console.log("\n📝 Next steps:");
-    console.log("   1. Edit postgresdk.config.ts with your database connection");
-    
-    if (!hasEnv) {
-      console.log("   2. Consider creating a .env file for sensitive values:");
-      console.log("      DATABASE_URL=postgres://user:pass@localhost:5432/mydb");
-      console.log("      API_KEY=your-secret-key");
-      console.log("      JWT_SECRET=your-jwt-secret");
+
+    if (projectType === "api") {
+      console.log("   1. Edit postgresdk.config.ts with your database connection");
+
+      if (!hasEnv) {
+        console.log("   2. Consider creating a .env file for sensitive values:");
+        console.log("      DATABASE_URL=postgres://user:pass@localhost:5432/mydb");
+        console.log("      API_KEY=your-secret-key");
+        console.log("      JWT_SECRET=your-jwt-secret");
+      }
+
+      console.log("   3. Run 'postgresdk generate' to create your SDK");
+    } else {
+      console.log("   1. Edit postgresdk.config.ts with your API URL in pull.from");
+
+      if (!hasEnv) {
+        console.log("   2. Consider creating a .env file if you need authentication:");
+        console.log("      API_TOKEN=your-api-token");
+      }
+
+      console.log("   3. Run 'postgresdk pull' to fetch your SDK");
     }
-    
-    console.log("   3. Run 'postgresdk generate' to create your SDK");
+
     console.log("\n💡 Tip: The config file has detailed comments for all options.");
     console.log("   Uncomment the options you want to customize.");
-    
+
   } catch (error) {
     console.error("❌ Error creating config file:", error);
     process.exit(1);
