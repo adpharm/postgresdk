@@ -78,7 +78,7 @@ const testCases: TestCase[] = [
         strategy: "jwt-hs256",
         jwt: {
           services: [
-            { issuer: "test", secret: "test-secret" }
+            { issuer: "test", secret: "env:TEST_JWT_SECRET" }
           ],
           audience: "test"
         }
@@ -149,12 +149,15 @@ async function typeCheckDirectory(dir: string, name: string): Promise<boolean> {
 async function main() {
   console.log("🧪 Testing TypeScript compilation of generated code");
   console.log("=" + "=".repeat(49));
-  
+
   try {
     // Cleanup before tests
     await cleanup();
     mkdirSync(TEST_DIR, { recursive: true });
-    
+
+    // Set environment variable for JWT test
+    process.env.TEST_JWT_SECRET = "test-secret-for-typecheck";
+
     let allPassed = true;
     const results: { name: string; passed: boolean }[] = [];
     
