@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- docs: Reorganize README for better flow and discoverability
+  - Restructured into clear sections: Getting Started, API Server Setup, Client SDK, Reference
+  - Moved Installation before Quick Start (logical progression)
+  - Grouped server concerns together (Configuration, Database Drivers, Server Integration, Authentication, Deployment)
+  - Moved SDK Distribution and Usage to dedicated Client SDK section
+  - Relocated CLI Commands, Tests, Requirements to Reference section at end
+  - Added section dividers to improve visual navigation
+  - Preserves all existing content and examples
 - docs: Add service-to-service authorization guide
   - Documents JWT claims-based authorization pattern using `onRequest` hook
   - Explains why token claims are preferred over config-based scopes (follows OAuth2/OIDC standards, dynamic permissions, flexible authorization)

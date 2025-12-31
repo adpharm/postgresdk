@@ -4,7 +4,7 @@
 
 Generate a typed server/client SDK from your PostgreSQL database schema.
 
-## See It In Action
+## What It Does
 
 **Your database:**
 ```sql
@@ -58,7 +58,11 @@ const filtered = await sdk.users.list({
 - 🎯 **Zero Config** - Works out of the box with sensible defaults
 - 📦 **Lightweight** - Minimal dependencies, optimized bundle size
 
-## Installation
+---
+
+## Getting Started
+
+### Installation
 
 ```bash
 npm install -g postgresdk
@@ -73,7 +77,7 @@ bunx postgresdk generate
 
 > **Note:** Currently only generates **Hono** server code. See [Supported Frameworks](#supported-frameworks) for details.
 
-## Quick Start
+### Quick Start
 
 1. Initialize your project:
 
@@ -131,7 +135,11 @@ await sdk.users.update(user.id, { name: "Alice Smith" });
 await sdk.users.delete(user.id);
 ```
 
-## Configuration
+---
+
+## API Server Setup
+
+### Configuration
 
 Create a `postgresdk.config.ts` file in your project root:
 
@@ -148,7 +156,7 @@ export default {
   dateType: "date",                    // "date" | "string" - How to handle timestamps
   serverFramework: "hono",             // Currently only hono is supported
   useJsExtensions: false,              // Add .js to imports (for Vercel Edge, Deno)
-  
+
   // Authentication (optional)
   auth: {
     apiKey: process.env.API_KEY,        // Simple API key auth
@@ -159,7 +167,7 @@ export default {
       ]
     }
   },
-  
+
   // Test generation (optional)
   tests: {
     generate: true,                      // Generate test files
@@ -169,155 +177,96 @@ export default {
 };
 ```
 
-## Generated SDK Usage
+### Database Drivers
 
-### CRUD Operations
+The generated code works with any PostgreSQL client that implements a simple `query` interface:
 
-Every table gets a complete set of CRUD operations:
+#### Node.js `pg` Driver
 
 ```typescript
-// Create
-const user = await sdk.users.create({ name: "Bob", email: "bob@example.com" });
+import { Client } from "pg";
+import { createRouter } from "./api/server/router";
 
-// Read
-const user = await sdk.users.getByPk(123);
-const result = await sdk.users.list();
-const users = result.data;  // Array of users
+const pg = new Client({ connectionString: process.env.DATABASE_URL });
+await pg.connect();
 
-// Update  
-const updated = await sdk.users.update(123, { name: "Robert" });
-
-// Delete
-const deleted = await sdk.users.delete(123);
+const apiRouter = createRouter({ pg });
 ```
 
-### Relationships & Eager Loading
-
-Automatically handles relationships with the `include` parameter:
+#### Neon Serverless Driver (Edge-Compatible)
 
 ```typescript
-// 1:N relationship - Get authors with their books
-const authorsResult = await sdk.authors.list({
-  include: { books: true }
-});
-const authors = authorsResult.data;
+import { Pool } from "@neondatabase/serverless";
+import { createRouter } from "./api/server/router";
 
-// M:N relationship - Get books with their tags
-const booksResult = await sdk.books.list({
-  include: { tags: true }
-});
-const books = booksResult.data;
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const apiRouter = createRouter({ pg: pool });
+```
 
-// Nested includes - Get authors with books and their tags
-const nestedResult = await sdk.authors.list({
-  include: {
-    books: {
-      include: {
-        tags: true
-      }
+### Server Integration
+
+postgresdk generates Hono-compatible routes:
+
+```typescript
+import { Hono } from "hono";
+import { serve } from "@hono/node-server";
+import { Client } from "pg";
+import { createRouter } from "./api/server/router";
+
+const app = new Hono();
+
+// Database connection
+const pg = new Client({ connectionString: process.env.DATABASE_URL });
+await pg.connect();
+
+// Mount all generated routes
+const apiRouter = createRouter({ pg });
+app.route("/", apiRouter);
+
+// Start server
+serve({ fetch: app.fetch, port: 3000 });
+```
+
+#### Request-Level Middleware (onRequest Hook)
+
+The `onRequest` hook executes before every endpoint operation, enabling:
+- Setting PostgreSQL session variables for audit logging
+- Configuring Row-Level Security (RLS) based on authenticated user
+- Request-level logging or monitoring
+
+```typescript
+import { createRouter } from "./api/server/router";
+
+const apiRouter = createRouter({
+  pg,
+  onRequest: async (c, pg) => {
+    // Access Hono context - fully type-safe
+    const auth = c.get('auth');
+
+    // Set PostgreSQL session variable for audit triggers
+    if (auth?.kind === 'jwt' && auth.claims?.sub) {
+      await pg.query(`SET LOCAL app.user_id = '${auth.claims.sub}'`);
+    }
+
+    // Or configure RLS policies
+    if (auth?.tenant_id) {
+      await pg.query(`SET LOCAL app.tenant_id = '${auth.tenant_id}'`);
     }
   }
 });
-const authorsWithBooksAndTags = nestedResult.data;
 ```
 
-### Filtering & Pagination
+The hook receives:
+- `c` - Hono Context object with full type safety and IDE autocomplete
+- `pg` - PostgreSQL client for setting session variables
 
-All `list()` methods return pagination metadata:
+**Note:** The router works with or without the `onRequest` hook - fully backward compatible.
 
-```typescript
-const result = await sdk.users.list({
-  where: { status: "active" },
-  orderBy: "created_at",
-  order: "desc",
-  limit: 20,
-  offset: 40
-});
-
-// Access results
-result.data;       // User[] - array of records
-result.total;      // number - total matching records
-result.limit;      // number - page size used
-result.offset;     // number - offset used
-result.hasMore;    // boolean - more pages available
-
-// Calculate pagination info
-const totalPages = Math.ceil(result.total / result.limit);
-const currentPage = Math.floor(result.offset / result.limit) + 1;
-
-// Multi-column sorting
-const sorted = await sdk.users.list({
-  orderBy: ["status", "created_at"],
-  order: ["asc", "desc"]  // or use single direction: order: "asc"
-});
-
-// Advanced WHERE operators
-const filtered = await sdk.users.list({
-  where: {
-    age: { $gte: 18, $lt: 65 },           // Range queries
-    email: { $ilike: '%@company.com' },   // Pattern matching
-    status: { $in: ['active', 'pending'] }, // Array matching
-    deleted_at: { $is: null }              // NULL checks
-  }
-});
-// filtered.total respects WHERE clause for accurate counts
-
-// OR logic - match any condition
-const results = await sdk.users.list({
-  where: {
-    $or: [
-      { email: { $ilike: '%@gmail.com' } },
-      { email: { $ilike: '%@yahoo.com' } },
-      { status: 'premium' }
-    ]
-  }
-});
-
-// Complex queries with AND/OR
-const complex = await sdk.users.list({
-  where: {
-    status: 'active',  // Implicit AND at root level
-    $or: [
-      { age: { $lt: 18 } },
-      { age: { $gt: 65 } }
-    ]
-  }
-});
-
-// Nested logic (2 levels)
-const nested = await sdk.users.list({
-  where: {
-    $and: [
-      {
-        $or: [
-          { firstName: { $ilike: '%john%' } },
-          { lastName: { $ilike: '%john%' } }
-        ]
-      },
-      { status: 'active' }
-    ]
-  }
-});
-
-// Pagination with filtered results
-let allResults = [];
-let offset = 0;
-const limit = 50;
-do {
-  const page = await sdk.users.list({ where: { status: 'active' }, limit, offset });
-  allResults = allResults.concat(page.data);
-  offset += limit;
-  if (!page.hasMore) break;
-} while (true);
-```
-
-See the generated SDK documentation for all available operators: `$eq`, `$ne`, `$gt`, `$gte`, `$lt`, `$lte`, `$in`, `$nin`, `$like`, `$ilike`, `$is`, `$isNot`, `$or`, `$and`.
-
-## Authentication
+### Authentication
 
 postgresdk supports API key and JWT authentication:
 
-### API Key Authentication
+#### API Key Authentication
 
 ```typescript
 // postgresdk.config.ts
@@ -335,7 +284,7 @@ const sdk = new SDK({
 });
 ```
 
-### JWT Authentication (HS256)
+#### JWT Authentication (HS256)
 
 ```typescript
 // postgresdk.config.ts
@@ -374,7 +323,7 @@ const sdk = new SDK({
 });
 ```
 
-### Service-to-Service Authorization
+#### Service-to-Service Authorization
 
 For service-to-service authorization (controlling which services can access which tables/actions), use JWT claims with the `onRequest` hook instead of built-in config scopes:
 
@@ -492,94 +441,9 @@ onRequest: async (c, pg) => {
 }
 ```
 
-## Database Drivers
+### Deployment
 
-The generated code works with any PostgreSQL client that implements a simple `query` interface:
-
-### Node.js `pg` Driver
-
-```typescript
-import { Client } from "pg";
-import { createRouter } from "./api/server/router";
-
-const pg = new Client({ connectionString: process.env.DATABASE_URL });
-await pg.connect();
-
-const apiRouter = createRouter({ pg });
-```
-
-### Neon Serverless Driver (Edge-Compatible)
-
-```typescript
-import { Pool } from "@neondatabase/serverless";
-import { createRouter } from "./api/server/router";
-
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-const apiRouter = createRouter({ pg: pool });
-```
-
-### Request-Level Middleware (onRequest Hook)
-
-The `onRequest` hook executes before every endpoint operation, enabling:
-- Setting PostgreSQL session variables for audit logging
-- Configuring Row-Level Security (RLS) based on authenticated user
-- Request-level logging or monitoring
-
-```typescript
-import { createRouter } from "./api/server/router";
-
-const apiRouter = createRouter({
-  pg,
-  onRequest: async (c, pg) => {
-    // Access Hono context - fully type-safe
-    const auth = c.get('auth');
-
-    // Set PostgreSQL session variable for audit triggers
-    if (auth?.kind === 'jwt' && auth.claims?.sub) {
-      await pg.query(`SET LOCAL app.user_id = '${auth.claims.sub}'`);
-    }
-
-    // Or configure RLS policies
-    if (auth?.tenant_id) {
-      await pg.query(`SET LOCAL app.tenant_id = '${auth.tenant_id}'`);
-    }
-  }
-});
-```
-
-The hook receives:
-- `c` - Hono Context object with full type safety and IDE autocomplete
-- `pg` - PostgreSQL client for setting session variables
-
-**Note:** The router works with or without the `onRequest` hook - fully backward compatible.
-
-## Server Integration
-
-postgresdk generates Hono-compatible routes:
-
-```typescript
-import { Hono } from "hono";
-import { serve } from "@hono/node-server";
-import { Client } from "pg";
-import { createRouter } from "./api/server/router";
-
-const app = new Hono();
-
-// Database connection
-const pg = new Client({ connectionString: process.env.DATABASE_URL });
-await pg.connect();
-
-// Mount all generated routes
-const apiRouter = createRouter({ pg });
-app.route("/", apiRouter);
-
-// Start server
-serve({ fetch: app.fetch, port: 3000 });
-```
-
-## Deployment
-
-### Serverless (Vercel, Netlify, Cloudflare Workers)
+#### Serverless (Vercel, Netlify, Cloudflare Workers)
 
 Use `max: 1` - each serverless instance should hold one connection:
 
@@ -596,7 +460,7 @@ const apiRouter = createRouter({ pg: pool });
 
 **Why `max: 1`?** Serverless functions are ephemeral and isolated. Each instance handles one request at a time, so connection pooling provides no benefit and wastes database connections.
 
-### Traditional Servers (Railway, Render, VPS)
+#### Traditional Servers (Railway, Render, VPS)
 
 Use connection pooling to reuse connections across requests:
 
@@ -613,11 +477,15 @@ const apiRouter = createRouter({ pg: pool });
 
 **Why `max: 10`?** Long-running servers handle many concurrent requests. Pooling prevents opening/closing connections for every request, significantly improving performance.
 
-## SDK Distribution
+---
+
+## Client SDK
+
+### SDK Distribution
 
 When you run `postgresdk generate`, the client SDK is automatically bundled into your server code and exposed via HTTP endpoints. This allows client applications to pull the SDK directly from your running API.
 
-### How It Works
+#### How It Works
 
 **On the API server:**
 - SDK files are bundled into `api/server/sdk-bundle.ts` as embedded strings
@@ -675,32 +543,155 @@ bunx postgresdk pull
 
 The SDK files are written directly to your client project, giving you full TypeScript autocomplete and type safety.
 
-## Generated Tests
+### Using the SDK
 
-Enable test generation in your config:
+#### CRUD Operations
+
+Every table gets a complete set of CRUD operations:
 
 ```typescript
-export default {
-  connectionString: process.env.DATABASE_URL,
-  tests: {
-    generate: true,
-    output: "./api/tests",
-    framework: "vitest"
+// Create
+const user = await sdk.users.create({ name: "Bob", email: "bob@example.com" });
+
+// Read
+const user = await sdk.users.getByPk(123);
+const result = await sdk.users.list();
+const users = result.data;  // Array of users
+
+// Update
+const updated = await sdk.users.update(123, { name: "Robert" });
+
+// Delete
+const deleted = await sdk.users.delete(123);
+```
+
+#### Relationships & Eager Loading
+
+Automatically handles relationships with the `include` parameter:
+
+```typescript
+// 1:N relationship - Get authors with their books
+const authorsResult = await sdk.authors.list({
+  include: { books: true }
+});
+const authors = authorsResult.data;
+
+// M:N relationship - Get books with their tags
+const booksResult = await sdk.books.list({
+  include: { tags: true }
+});
+const books = booksResult.data;
+
+// Nested includes - Get authors with books and their tags
+const nestedResult = await sdk.authors.list({
+  include: {
+    books: {
+      include: {
+        tags: true
+      }
+    }
   }
-};
+});
+const authorsWithBooksAndTags = nestedResult.data;
 ```
 
-Run tests with the included Docker setup:
+#### Filtering & Pagination
 
-```bash
-chmod +x api/tests/run-tests.sh
-./api/tests/run-tests.sh
+All `list()` methods return pagination metadata:
 
-# Or with Bun's built-in test runner (if framework: "bun")
-bun test
+```typescript
+const result = await sdk.users.list({
+  where: { status: "active" },
+  orderBy: "created_at",
+  order: "desc",
+  limit: 20,
+  offset: 40
+});
+
+// Access results
+result.data;       // User[] - array of records
+result.total;      // number - total matching records
+result.limit;      // number - page size used
+result.offset;     // number - offset used
+result.hasMore;    // boolean - more pages available
+
+// Calculate pagination info
+const totalPages = Math.ceil(result.total / result.limit);
+const currentPage = Math.floor(result.offset / result.limit) + 1;
+
+// Multi-column sorting
+const sorted = await sdk.users.list({
+  orderBy: ["status", "created_at"],
+  order: ["asc", "desc"]  // or use single direction: order: "asc"
+});
+
+// Advanced WHERE operators
+const filtered = await sdk.users.list({
+  where: {
+    age: { $gte: 18, $lt: 65 },           // Range queries
+    email: { $ilike: '%@company.com' },   // Pattern matching
+    status: { $in: ['active', 'pending'] }, // Array matching
+    deleted_at: { $is: null }              // NULL checks
+  }
+});
+// filtered.total respects WHERE clause for accurate counts
+
+// OR logic - match any condition
+const results = await sdk.users.list({
+  where: {
+    $or: [
+      { email: { $ilike: '%@gmail.com' } },
+      { email: { $ilike: '%@yahoo.com' } },
+      { status: 'premium' }
+    ]
+  }
+});
+
+// Complex queries with AND/OR
+const complex = await sdk.users.list({
+  where: {
+    status: 'active',  // Implicit AND at root level
+    $or: [
+      { age: { $lt: 18 } },
+      { age: { $gt: 65 } }
+    ]
+  }
+});
+
+// Nested logic (2 levels)
+const nested = await sdk.users.list({
+  where: {
+    $and: [
+      {
+        $or: [
+          { firstName: { $ilike: '%john%' } },
+          { lastName: { $ilike: '%john%' } }
+        ]
+      },
+      { status: 'active' }
+    ]
+  }
+});
+
+// Pagination with filtered results
+let allResults = [];
+let offset = 0;
+const limit = 50;
+do {
+  const page = await sdk.users.list({ where: { status: 'active' }, limit, offset });
+  allResults = allResults.concat(page.data);
+  offset += limit;
+  if (!page.hasMore) break;
+} while (true);
 ```
 
-## CLI Commands
+See the generated SDK documentation for all available operators: `$eq`, `$ne`, `$gt`, `$gte`, `$lt`, `$lte`, `$in`, `$nin`, `$like`, `$ilike`, `$is`, `$isNot`, `$or`, `$and`.
+
+---
+
+## Reference
+
+### CLI Commands
 
 ```bash
 postgresdk <command> [options]
@@ -728,19 +719,44 @@ Examples:
   postgresdk pull --from=https://api.com --output=./src/sdk
 ```
 
-## Requirements
+### Generated Tests
+
+Enable test generation in your config:
+
+```typescript
+export default {
+  connectionString: process.env.DATABASE_URL,
+  tests: {
+    generate: true,
+    output: "./api/tests",
+    framework: "vitest"
+  }
+};
+```
+
+Run tests with the included Docker setup:
+
+```bash
+chmod +x api/tests/run-tests.sh
+./api/tests/run-tests.sh
+
+# Or with Bun's built-in test runner (if framework: "bun")
+bun test
+```
+
+### Requirements
 
 - Node.js 18+
 - PostgreSQL 12+
 - TypeScript project (for using generated code)
 
-## Supported Frameworks
+### Supported Frameworks
 
 **Currently, postgresdk only generates server code for Hono.**
 
 While the configuration accepts `serverFramework: "hono" | "express" | "fastify"`, only Hono is implemented at this time. Attempting to generate code with `express` or `fastify` will result in an error.
 
-### Why Hono?
+#### Why Hono?
 
 Hono was chosen as the initial framework because:
 - **Edge-first design** - Works seamlessly in serverless and edge environments (Cloudflare Workers, Vercel Edge, Deno Deploy)
@@ -748,7 +764,7 @@ Hono was chosen as the initial framework because:
 - **Modern patterns** - Web Standard APIs (Request/Response), TypeScript-first
 - **Framework compatibility** - Works across Node.js, Bun, Deno, and edge runtimes
 
-### Future Framework Support
+#### Future Framework Support
 
 The codebase architecture is designed to support multiple frameworks. Adding Express or Fastify support would require:
 - Implementing framework-specific route emitters (`emit-routes-express.ts`, etc.)
