@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- fix: Prevent duplicate include method generation in client SDK
+  - Deduplicates methods by name when nested paths and combinations produce identical method signatures
+  - Resolves TypeScript "Duplicate function implementation" errors in generated client code
+  - Keeps first occurrence when multiple generation paths create the same method name
+- fix: Allow optional JWT secret in generated auth code
+  - JWT service type now accepts optional `secret` field to support environment variable references
+  - Resolves TypeScript type mismatch errors when JWT config uses `env:VAR_NAME` syntax
+  - Generated auth.ts properly handles secrets resolved at runtime from environment
 - docs: Fix hardcoded paths in README to reflect configurable outDir
   - Removed hardcoded `api/server/sdk-bundle.ts` reference (outDir is configurable)
   - Added note that code examples use default paths and should be adjusted for custom outDir

@@ -247,6 +247,16 @@ export function generateIncludeMethods(
   
   // Start exploration
   explore(baseTableName, [], [], [], new Set([baseTableName]), 1);
-  
-  return methods;
+
+  // Deduplicate methods by name (keep first occurrence)
+  const seen = new Set<string>();
+  const dedupedMethods: IncludeMethod[] = [];
+  for (const method of methods) {
+    if (!seen.has(method.name)) {
+      seen.add(method.name);
+      dedupedMethods.push(method);
+    }
+  }
+
+  return dedupedMethods;
 }

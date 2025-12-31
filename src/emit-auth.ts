@@ -32,7 +32,7 @@ const STRATEGY = ${STRATEGY} as "none" | "api-key" | "jwt-hs256";
 const API_KEY_HEADER = ${API_KEY_HEADER} as string;
 const RAW_API_KEYS = ${RAW_API_KEYS} as readonly string[];
 
-const JWT_SERVICES = ${JWT_SERVICES} as ReadonlyArray<{ issuer: string; secret: string }>;
+const JWT_SERVICES = ${JWT_SERVICES} as ReadonlyArray<{ issuer: string; secret?: string }>;
 const JWT_AUDIENCE = ${JWT_AUDIENCE} as string | undefined;
 // -------------------------------------
 
