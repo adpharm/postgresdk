@@ -19,6 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- chore: Fix publish script to build before testing
+  - Moved build step before test step to ensure dist files are up-to-date
+  - Tests now run against fresh build that matches generated code
+  - Prevents test failures from stale dist files during publish workflow
+  - Removed duplicate rebuild step
 - chore: Migrate test suite from manual scripts to Vitest framework
   - Converted 16 manual test scripts to 11 automated test files with proper assertions
   - Added Vitest configuration for sequential test execution to avoid resource conflicts

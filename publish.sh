@@ -85,15 +85,7 @@ esac
 
 echo -e "\n${GREEN}New version: ${NEW_VERSION}${NC}\n"
 
-# Run tests
-echo -e "${BLUE}🧪 Running tests...${NC}"
-npm test || {
-    echo -e "${RED}❌ Tests failed. Fix issues before publishing.${NC}"
-    exit 1
-}
-echo -e "${GREEN}✓ Tests passed${NC}\n"
-
-# Build the package
+# Build the package first (tests need up-to-date dist files)
 echo -e "${BLUE}🔨 Building package...${NC}"
 npm run build || {
     echo -e "${RED}❌ Build failed.${NC}"
@@ -101,13 +93,13 @@ npm run build || {
 }
 echo -e "${GREEN}✓ Build complete${NC}\n"
 
-# Rebuild to include new version
-echo -e "${BLUE}🔨 Rebuilding with updated version...${NC}"
-npm run build || {
-    echo -e "${RED}❌ Rebuild failed.${NC}"
+# Run tests
+echo -e "${BLUE}🧪 Running tests...${NC}"
+npm test || {
+    echo -e "${RED}❌ Tests failed. Fix issues before publishing.${NC}"
     exit 1
 }
-echo -e "${GREEN}✓ Rebuild complete${NC}\n"
+echo -e "${GREEN}✓ Tests passed${NC}\n"
 
 # Dry run first
 echo -e "${BLUE}🔍 Running npm publish dry-run...${NC}"
