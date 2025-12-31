@@ -44,12 +44,11 @@ echo "How would you like to bump the version?"
 echo "  1) Patch (0.1.0 → 0.1.1)"
 echo "  2) Minor (0.1.0 → 0.2.0)"
 echo "  3) Major (0.1.0 → 1.0.0)"
-echo "  4) Prerelease (0.1.0 → 0.1.1-alpha.0)"
-echo "  5) Custom version"
-echo "  6) Don't bump (use current version)"
+echo "  4) Custom version"
+echo "  5) Don't bump (use current version)"
 echo
 
-read -p "Select option (1-6): " VERSION_CHOICE
+read -p "Select option (1-5): " VERSION_CHOICE
 
 case $VERSION_CHOICE in
     1)
@@ -65,15 +64,11 @@ case $VERSION_CHOICE in
         NEW_VERSION=$(npm version major --no-git-tag-version | sed 's/v//')
         ;;
     4)
-        VERSION_TYPE="prerelease"
-        NEW_VERSION=$(npm version prerelease --preid=alpha --no-git-tag-version | sed 's/v//')
-        ;;
-    5)
         read -p "Enter custom version: " NEW_VERSION
         npm version $NEW_VERSION --no-git-tag-version >/dev/null
         VERSION_TYPE="custom"
         ;;
-    6)
+    5)
         NEW_VERSION=$CURRENT_VERSION
         VERSION_TYPE="none"
         ;;
