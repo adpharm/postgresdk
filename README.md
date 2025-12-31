@@ -111,7 +111,7 @@ bunx postgresdk generate
 ```typescript
 import { Hono } from "hono";
 import { Client } from "pg";
-import { createRouter } from "./api/server/router";
+import { createRouter } from "./api/server/router"; // Path depends on your outDir config
 
 const app = new Hono();
 const pg = new Client({ connectionString: "..." });
@@ -124,7 +124,7 @@ app.route("/", api);
 5. Use the client SDK:
 
 ```typescript
-import { SDK } from "./api/client";
+import { SDK } from "./api/client"; // Path depends on your outDir config
 
 const sdk = new SDK({ baseUrl: "http://localhost:3000" });
 
@@ -138,6 +138,8 @@ await sdk.users.delete(user.id);
 ---
 
 ## API Server Setup
+
+> **Note:** Code examples in this section use default output paths (`./api/server/`, `./api/client/`). If you configure a custom `outDir`, adjust import paths accordingly.
 
 ### Configuration
 
@@ -488,7 +490,7 @@ When you run `postgresdk generate`, the client SDK is automatically bundled into
 #### How It Works
 
 **On the API server:**
-- SDK files are bundled into `api/server/sdk-bundle.ts` as embedded strings
+- SDK files are bundled into your server output directory as `sdk-bundle.ts` (embedded as strings)
 - Auto-generated endpoints serve the SDK:
   - `GET /_psdk/sdk/manifest` - Lists available files and metadata
   - `GET /_psdk/sdk/download` - Returns complete SDK bundle

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- docs: Fix hardcoded paths in README to reflect configurable outDir
+  - Removed hardcoded `api/server/sdk-bundle.ts` reference (outDir is configurable)
+  - Added note that code examples use default paths and should be adjusted for custom outDir
+  - Added inline comments in Quick Start to clarify import paths depend on configuration
 - docs: Reorganize README for better flow and discoverability
   - Restructured into clear sections: Getting Started, API Server Setup, Client SDK, Reference
   - Moved Installation before Quick Start (logical progression)
