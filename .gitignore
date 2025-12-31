@@ -216,6 +216,7 @@ test-results/
 
 # Test output directories
 test/.test-output/
+test/test/
 test/.results/
 test/.results-*/
 test/.*
