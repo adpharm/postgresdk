@@ -3,6 +3,7 @@ import "dotenv/config";
 
 import { join, relative } from "node:path";
 import { pathToFileURL } from "node:url";
+import { existsSync } from "node:fs";
 import { introspect } from "./introspect";
 import { buildGraph } from "./rel-classify";
 import { emitIncludeSpec } from "./emit-include-spec";
@@ -29,6 +30,15 @@ import type { Config } from "./types";
 import { normalizeAuthConfig } from "./types";
 
 export async function generate(configPath: string) {
+  // Check if config file exists
+  if (!existsSync(configPath)) {
+    throw new Error(
+      `Config file not found: ${configPath}\n\n` +
+      `Run 'postgresdk init' to create a config file, or specify a custom path with:\n` +
+      `  postgresdk generate --config <path>`
+    );
+  }
+
   // Load config
   const configUrl = pathToFileURL(configPath).href;
   const module = await import(configUrl);

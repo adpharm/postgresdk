@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- fix: Show helpful error when config file is missing
+  - `postgresdk generate` now checks if config file exists before attempting to load it
+  - Displays clear error message suggesting to run `postgresdk init` first
+  - Replaces cryptic `ERR_MODULE_NOT_FOUND` error with actionable guidance
+
 ## [v0.14.2] - 2025-12-31
 
 ### BREAKING CHANGES
