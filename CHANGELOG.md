@@ -24,12 +24,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Tests now run against fresh build that matches generated code
   - Prevents test failures from stale dist files during publish workflow
   - Removed duplicate rebuild step
-- chore: Migrate test suite from manual scripts to Vitest framework
-  - Converted 16 manual test scripts to 11 automated test files with proper assertions
-  - Added Vitest configuration for sequential test execution to avoid resource conflicts
-  - Unified test output directory to `test/.test-output/`
-  - Simplified test execution from 7+ individual scripts to single `bun test` command
-  - All tests now run automatically with proper pass/fail reporting (47 tests)
 
 ### BREAKING CHANGES
 

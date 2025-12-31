@@ -1,18 +1,68 @@
-import { describe, test, expect, beforeAll } from "vitest";
+#!/usr/bin/env bun
+
+import { test, expect, beforeAll, afterAll } from "bun:test";
 import { Hono } from "hono";
 import { serve } from "@hono/node-server";
 import { Client } from "pg";
-import { TEST_PATHS, TEST_PORTS, PG_URL, ensurePostgresRunning } from "./test-utils";
+import { SDK } from "./.results/client";
+import { exec } from "node:child_process";
+import { promisify } from "node:util";
+
+const execAsync = promisify(exec);
+const CONTAINER_NAME = "postgresdk-test-db";
+
+async function ensurePostgresRunning(): Promise<void> {
+  try {
+    const { stdout } = await execAsync(`docker ps --filter "name=${CONTAINER_NAME}" --format "{{.Names}}"`);
+    if (stdout.trim() === CONTAINER_NAME) {
+      return; // Already running
+    }
+  } catch {}
+
+  // Container not running, start it
+  console.log("🐳 Starting PostgreSQL container for WHERE clause tests...");
+  try {
+    const { stdout } = await execAsync(`docker ps -a --filter "name=${CONTAINER_NAME}" --format "{{.Names}}"`);
+    if (stdout.trim() === CONTAINER_NAME) {
+      await execAsync(`docker start ${CONTAINER_NAME}`);
+    } else {
+      await execAsync(`docker run -d --name ${CONTAINER_NAME} -e POSTGRES_USER=user -e POSTGRES_PASSWORD=pass -e POSTGRES_DB=testdb -p 5432:5432 postgres:17-alpine`);
+    }
+  } catch (error) {
+    console.error("Failed to start container:", error);
+    throw error;
+  }
+
+  // Wait for PostgreSQL to be ready
+  console.log("  → Waiting for PostgreSQL to be ready...");
+  let attempts = 0;
+  const maxAttempts = 30;
+
+  while (attempts < maxAttempts) {
+    try {
+      const pg = new Client({ connectionString: "postgres://user:pass@localhost:5432/testdb" });
+      await pg.connect();
+      await pg.query("SELECT 1");
+      await pg.end();
+      console.log("  ✓ PostgreSQL is ready!");
+      return;
+    } catch {
+      attempts++;
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+  }
+
+  throw new Error("PostgreSQL failed to start in time");
+}
 
 beforeAll(async () => {
   await ensurePostgresRunning();
 });
 
-describe("WHERE clause tests", () => {
-  test("getByPkWith* methods return the correct record", async () => {
-    // Setup database
-    const pg = new Client({ connectionString: PG_URL });
-    await pg.connect();
+test("getByPkWith* methods return the correct record", async () => {
+  // Setup database
+  const pg = new Client({ connectionString: "postgres://user:pass@localhost:5432/testdb" });
+  await pg.connect();
 
   try {
     // Clean up
@@ -49,24 +99,23 @@ describe("WHERE clause tests", () => {
     await pg.query("INSERT INTO book_tags (book_id, tag_id) VALUES ($1, $2)", [book3.rows[0].id, tag1.rows[0].id]);
 
     // Start server
-    const { registerAuthorsRoutes } = await import(`../${TEST_PATHS.gen}/server/routes/authors`);
-    const { registerBooksRoutes } = await import(`../${TEST_PATHS.gen}/server/routes/books`);
-    const { registerTagsRoutes } = await import(`../${TEST_PATHS.gen}/server/routes/tags`);
-    const { registerBookTagsRoutes } = await import(`../${TEST_PATHS.gen}/server/routes/book_tags`);
+    const { registerAuthorsRoutes } = await import("./.results/server/routes/authors");
+    const { registerBooksRoutes } = await import("./.results/server/routes/books");
+    const { registerTagsRoutes } = await import("./.results/server/routes/tags");
+    const { registerBookTagsRoutes } = await import("./.results/server/routes/book_tags");
 
     const app = new Hono();
     const deps = { pg };
-
+    
     registerAuthorsRoutes(app, deps);
     registerBooksRoutes(app, deps);
     registerTagsRoutes(app, deps);
     registerBookTagsRoutes(app, deps);
 
-    const server = serve({ fetch: app.fetch, port: TEST_PORTS.whereClause });
+    const server = serve({ fetch: app.fetch, port: 3461 });
 
     // Test SDK
-    const { SDK } = await import(`../${TEST_PATHS.gen}/client/index.ts`);
-    const sdk = new SDK({ baseUrl: `http://localhost:${TEST_PORTS.whereClause}` });
+    const sdk = new SDK({ baseUrl: "http://localhost:3461" });
 
     // CRITICAL TESTS: Verify we get the CORRECT record, not just any record
     
@@ -108,43 +157,41 @@ describe("WHERE clause tests", () => {
   } finally {
     await pg.end();
   }
-  });
+});
 
-  test("list with where clause filters correctly", async () => {
-    // Setup database
-    const pg = new Client({ connectionString: PG_URL });
-    await pg.connect();
+test("list with where clause filters correctly", async () => {
+  // Setup database
+  const pg = new Client({ connectionString: "postgres://user:pass@localhost:5432/testdb" });
+  await pg.connect();
 
-    try {
-      // Clean up
-      await pg.query("DELETE FROM authors");
+  try {
+    // Clean up
+    await pg.query("DELETE FROM authors");
 
-      // Insert test data
-      await pg.query("INSERT INTO authors (name) VALUES ('Alice'), ('Bob'), ('Charlie')");
+    // Insert test data
+    await pg.query("INSERT INTO authors (name) VALUES ('Alice'), ('Bob'), ('Charlie')");
+    
+    // Start server
+    const { registerAuthorsRoutes } = await import("./.results/server/routes/authors");
+    const app = new Hono();
+    const deps = { pg };
+    registerAuthorsRoutes(app, deps);
+    const server = serve({ fetch: app.fetch, port: 3462 });
 
-      // Start server
-      const { registerAuthorsRoutes } = await import(`../${TEST_PATHS.gen}/server/routes/authors`);
-      const app = new Hono();
-      const deps = { pg };
-      registerAuthorsRoutes(app, deps);
-      const server = serve({ fetch: app.fetch, port: TEST_PORTS.whereClause + 1 });
+    // Test SDK
+    const sdk = new SDK({ baseUrl: "http://localhost:3462" });
 
-      // Test SDK
-      const { SDK } = await import(`../${TEST_PATHS.gen}/client/index.ts`);
-      const sdk = new SDK({ baseUrl: `http://localhost:${TEST_PORTS.whereClause + 1}` });
+    // Test WHERE clause filtering
+    const bobAuthorsResult = await sdk.authors.list({ where: { name: "Bob" } });
+    expect(bobAuthorsResult.data).toHaveLength(1);
+    expect(bobAuthorsResult.data[0]!.name).toBe("Bob");
 
-      // Test WHERE clause filtering
-      const bobAuthorsResult = await sdk.authors.list({ where: { name: "Bob" } });
-      expect(bobAuthorsResult.data).toHaveLength(1);
-      expect(bobAuthorsResult.data[0]!.name).toBe("Bob");
+    const allAuthorsResult = await sdk.authors.list();
+    expect(allAuthorsResult.data.length).toBeGreaterThanOrEqual(3);
 
-      const allAuthorsResult = await sdk.authors.list();
-      expect(allAuthorsResult.data.length).toBeGreaterThanOrEqual(3);
-
-      // Cleanup
-      server.close();
-    } finally {
-      await pg.end();
-    }
-  });
+    // Cleanup
+    server.close();
+  } finally {
+    await pg.end();
+  }
 });
