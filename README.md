@@ -374,6 +374,124 @@ const sdk = new SDK({
 });
 ```
 
+### Service-to-Service Authorization
+
+For service-to-service authorization (controlling which services can access which tables/actions), use JWT claims with the `onRequest` hook instead of built-in config scopes:
+
+**Why this approach?**
+- **Standard**: Follows OAuth2/OIDC conventions (authorization in token claims, not API config)
+- **Dynamic**: Different tokens can have different permissions (service accounts vs user sessions)
+- **Flexible**: Supports table-level, row-level, and field-level authorization in one place
+
+```typescript
+// 1. Your auth service issues JWTs with scopes in claims
+import { sign } from "jsonwebtoken";
+
+const token = sign({
+  iss: "analytics-service",
+  sub: "service-123",
+  aud: "my-api",
+  scopes: ["users:read", "posts:read", "analytics:*"]  // ← Authorization here
+}, process.env.ANALYTICS_SECRET);
+
+// 2. API config remains simple (authentication only)
+export default {
+  connectionString: process.env.DATABASE_URL,
+  auth: {
+    strategy: "jwt-hs256",
+    jwt: {
+      services: [
+        { issuer: "web-app", secret: process.env.WEB_SECRET },
+        { issuer: "analytics-service", secret: process.env.ANALYTICS_SECRET }
+      ],
+      audience: "my-api"
+    }
+  }
+};
+
+// 3. Enforce scopes in onRequest hook
+import { createRouter } from "./api/server/router";
+
+function hasPermission(scopes: string[], table: string, method: string): boolean {
+  const action = { POST: "create", GET: "read", PUT: "update", DELETE: "delete" }[method];
+
+  return scopes.some(scope => {
+    const [scopeTable, scopeAction] = scope.split(":");
+    return (scopeTable === "*" || scopeTable === table) &&
+           (scopeAction === "*" || scopeAction === action);
+  });
+}
+
+function getTableFromPath(path: string): string {
+  // Extract table from path like "/v1/users" or "/v1/posts/123"
+  return path.split("/")[2];
+}
+
+const apiRouter = createRouter({
+  pg,
+  onRequest: async (c, pg) => {
+    const auth = c.get("auth");
+
+    // Extract scopes from JWT claims
+    const scopes = auth?.claims?.scopes || [];
+    const table = getTableFromPath(c.req.path);
+    const method = c.req.method;
+
+    // Enforce permission
+    if (!hasPermission(scopes, table, method)) {
+      throw new Error(`Forbidden: ${auth?.claims?.iss} lacks ${table}:${method}`);
+    }
+
+    // Optional: Set session variables for audit logging
+    if (auth?.claims?.sub) {
+      await pg.query(`SET LOCAL app.service_id = $1`, [auth.claims.sub]);
+    }
+  }
+});
+```
+
+**Advanced patterns:**
+
+```typescript
+// Row-level security (RLS)
+onRequest: async (c, pg) => {
+  const auth = c.get("auth");
+  const userId = auth?.claims?.sub;
+
+  // Enable RLS for this session
+  await pg.query(`SET LOCAL app.user_id = $1`, [userId]);
+  // Now your RLS policies automatically filter rows
+}
+
+// Field-level restrictions
+onRequest: async (c, pg) => {
+  const auth = c.get("auth");
+  const scopes = auth?.claims?.scopes || [];
+
+  // Store scopes in session for use in SELECT queries
+  await pg.query(`SET LOCAL app.scopes = $1`, [JSON.stringify(scopes)]);
+
+  // Your stored procedures/views can read app.scopes to hide sensitive fields
+}
+
+// Complex business logic
+onRequest: async (c, pg) => {
+  const auth = c.get("auth");
+  const table = getTableFromPath(c.req.path);
+
+  // Custom rules per service
+  if (auth?.claims?.iss === "analytics-service" && c.req.method !== "GET") {
+    throw new Error("Analytics service is read-only");
+  }
+
+  // Time-based restrictions
+  const hour = new Date().getHours();
+  if (auth?.claims?.iss === "batch-processor" && hour >= 8 && hour <= 17) {
+    throw new Error("Batch jobs only run outside business hours");
+  }
+}
+```
+
 ## Database Drivers
 
 The generated code works with any PostgreSQL client that implements a simple `query` interface:
@@ -497,14 +615,45 @@ const apiRouter = createRouter({ pg: pool });
 
 ## SDK Distribution
 
-Your generated SDK can be pulled by client applications:
+When you run `postgresdk generate`, the client SDK is automatically bundled into your server code and exposed via HTTP endpoints. This allows client applications to pull the SDK directly from your running API.
+
+### How It Works
+
+**On the API server:**
+- SDK files are bundled into `api/server/sdk-bundle.ts` as embedded strings
+- Auto-generated endpoints serve the SDK:
+  - `GET /_psdk/sdk/manifest` - Lists available files and metadata
+  - `GET /_psdk/sdk/download` - Returns complete SDK bundle
+  - `GET /_psdk/sdk/files/:path` - Individual file access
+
+**On client applications:**
+
+1. Install postgresdk in your client project:
 
 ```bash
-# In your client app
-postgresdk pull --from=https://api.myapp.com --output=./src/sdk
+npm install -D postgresdk
+# or
+bun install -D postgresdk
 ```
 
-Or with configuration:
+2. Pull the SDK from your API:
+
+```bash
+npx postgresdk pull --from=https://api.myapp.com --output=./src/sdk
+# or with Bun
+bunx postgresdk pull --from=https://api.myapp.com --output=./src/sdk
+```
+
+3. Use the generated SDK with full TypeScript types:
+
+```typescript
+import { SDK } from "./src/sdk";
+
+const sdk = new SDK({ baseUrl: "https://api.myapp.com" });
+const users = await sdk.users.list();
+```
+
+**Using a config file (recommended):**
 
 ```typescript
 // postgresdk.config.ts in client app
@@ -512,10 +661,19 @@ export default {
   pull: {
     from: "https://api.myapp.com",
     output: "./src/sdk",
-    token: process.env.API_TOKEN  // Optional auth
+    token: process.env.API_TOKEN  // Optional auth for protected APIs
   }
 };
 ```
+
+Then run:
+```bash
+npx postgresdk pull
+# or
+bunx postgresdk pull
+```
+
+The SDK files are written directly to your client project, giving you full TypeScript autocomplete and type safety.
 
 ## Generated Tests
 

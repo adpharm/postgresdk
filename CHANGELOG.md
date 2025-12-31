@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- docs: Add service-to-service authorization guide
+  - Documents JWT claims-based authorization pattern using `onRequest` hook
+  - Explains why token claims are preferred over config-based scopes (follows OAuth2/OIDC standards, dynamic permissions, flexible authorization)
+  - Includes examples for table-level, row-level (RLS), and field-level authorization
+  - Shows advanced patterns like read-only services and time-based restrictions
+- docs: Expand SDK distribution documentation
+  - Clarifies how SDK bundling works (files embedded in server, served via HTTP endpoints)
+  - Documents SDK endpoints: `/_psdk/sdk/manifest`, `/_psdk/sdk/download`, `/_psdk/sdk/files/:path`
+  - Adds step-by-step client integration workflow (install postgresdk, pull SDK, use types)
+  - Shows both Bun and npm usage examples for pull command
+  - Emphasizes config file approach as recommended practice
+
 ## [v0.14.3] - 2025-12-31
 
 - fix: Show helpful error when config file is missing
