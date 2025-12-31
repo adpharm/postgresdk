@@ -235,29 +235,39 @@ export default {
     // ===== For JWT (HS256) authentication =====
 
     /**
-     * JWT configuration for token validation
-     * All JWT options can use "env:" prefix to read from environment
+     * JWT configuration for multi-service token validation
+     *
+     * Each service is identified by its issuer claim and has its own secret.
+     * This allows multiple services to authenticate with different credentials.
+     *
+     * Secrets can use "env:" prefix to read from environment variables.
      */
     jwt: {
       /**
-       * Shared secret for signing/verifying JWT tokens
-       * Can use "env:" prefix: sharedSecret: "env:JWT_SECRET"
+       * Array of services that can authenticate with this API
+       * Each service must include an 'iss' claim in its JWT matching the issuer
        */
-      sharedSecret: process.env.JWT_SECRET!,
-
-      /**
-       * Expected issuer claim ('iss') in the JWT
-       * If set, tokens with different issuer will be rejected
-       * @optional
-       */
-      issuer: "my-app",
+      services: [
+        {
+          issuer: "web-app",
+          secret: process.env.WEB_APP_JWT_SECRET!,  // or "env:WEB_APP_JWT_SECRET"
+        },
+        {
+          issuer: "lambda-service",
+          secret: process.env.LAMBDA_JWT_SECRET!,
+        },
+        {
+          issuer: "mobile-app",
+          secret: process.env.MOBILE_JWT_SECRET!,
+        },
+      ],
 
       /**
        * Expected audience claim ('aud') in the JWT
-       * If set, tokens with different audience will be rejected
+       * Applied to all services. Tokens with different audience will be rejected.
        * @optional
        */
-      audience: "my-users",
+      audience: "my-api",
     },
   },
 
@@ -312,7 +322,7 @@ export default {
  * };
  *
  *
- * 3. Full-featured configuration:
+ * 3. Full-featured configuration with JWT:
  *
  * export default {
  *   connectionString: process.env.DATABASE_URL,
@@ -324,8 +334,9 @@ export default {
  *   auth: {
  *     strategy: "jwt-hs256",
  *     jwt: {
- *       sharedSecret: process.env.JWT_SECRET!,
- *       issuer: "my-saas-app",
+ *       services: [
+ *         { issuer: "my-saas-app", secret: process.env.JWT_SECRET! }
+ *       ],
  *       audience: "customers"
  *     }
  *   }

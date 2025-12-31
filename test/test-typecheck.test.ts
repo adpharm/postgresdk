@@ -66,8 +66,9 @@ const testCases: TestCase[] = [
       auth: {
         strategy: "jwt-hs256",
         jwt: {
-          sharedSecret: "test-secret",
-          issuer: "test",
+          services: [
+            { issuer: "test", secret: "test-secret" }
+          ],
           audience: "test"
         }
       }

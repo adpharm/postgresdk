@@ -133,9 +133,11 @@ export default {
   //
   //   // For JWT (HS256) authentication
   //   jwt: {
-  //     sharedSecret: process.env.JWT_SECRET,  // Secret for signing/verifying
-  //     issuer: "my-app",                      // Optional: validate 'iss' claim
-  //     audience: "my-users",                  // Optional: validate 'aud' claim
+  //     services: [                            // Array of services that can authenticate
+  //       { issuer: "web-app", secret: process.env.WEB_APP_SECRET },
+  //       { issuer: "mobile-app", secret: process.env.MOBILE_SECRET },
+  //     ],
+  //     audience: "my-api",                    // Optional: validate 'aud' claim
   //   }
   // },
 };

@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### BREAKING CHANGES
+
+- feat: Replace single-secret JWT auth with multi-service authentication
+  - JWT config now requires `services` array with per-service issuer and secret
+  - Each service identified by its `iss` claim and verified with its own secret
+  - Enables true service isolation - compromising one service doesn't affect others
+  - API automatically selects correct secret based on JWT issuer claim
+  - Migration: Replace `jwt: { sharedSecret: "...", issuer: "..." }` with `jwt: { services: [{ issuer: "service-name", secret: "..." }] }`
+  - Issuer claim now required in all JWTs (tokens missing `iss` are rejected)
+
 ### Chores
 
 - chore: Migrate test suite from manual scripts to Vitest framework

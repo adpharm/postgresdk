@@ -6,16 +6,14 @@ export function emitAuth(cfgAuth: AuthConfig | undefined) {
   const apiKeyHeader = cfgAuth?.apiKeyHeader ?? "x-api-key";
   const apiKeys = cfgAuth?.apiKeys ?? [];
 
-  const jwtShared = cfgAuth?.jwt?.sharedSecret ?? "";
-  const jwtIssuer = cfgAuth?.jwt?.issuer ?? undefined;
+  const jwtServices = cfgAuth?.jwt?.services ?? [];
   const jwtAudience = cfgAuth?.jwt?.audience ?? undefined;
 
   // Inline as literals; use JSON.stringify for safe embedding.
   const STRATEGY = JSON.stringify(strategy);
   const API_KEY_HEADER = JSON.stringify(apiKeyHeader);
   const RAW_API_KEYS = JSON.stringify(apiKeys);
-  const JWT_SHARED_SECRET = JSON.stringify(jwtShared);
-  const JWT_ISSUER = jwtIssuer === undefined ? "undefined" : JSON.stringify(jwtIssuer);
+  const JWT_SERVICES = JSON.stringify(jwtServices);
   const JWT_AUDIENCE = jwtAudience === undefined ? "undefined" : JSON.stringify(jwtAudience);
 
   return `/**
@@ -34,8 +32,7 @@ const STRATEGY = ${STRATEGY} as "none" | "api-key" | "jwt-hs256";
 const API_KEY_HEADER = ${API_KEY_HEADER} as string;
 const RAW_API_KEYS = ${RAW_API_KEYS} as readonly string[];
 
-const JWT_SHARED_SECRET = ${JWT_SHARED_SECRET} as string;
-const JWT_ISSUER = ${JWT_ISSUER} as string | undefined;
+const JWT_SERVICES = ${JWT_SERVICES} as ReadonlyArray<{ issuer: string; secret: string }>;
 const JWT_AUDIENCE = ${JWT_AUDIENCE} as string | undefined;
 // -------------------------------------
 
@@ -76,7 +73,12 @@ function resolveKeys(keys: readonly string[]): string[] {
 }
 
 const API_KEYS = resolveKeys(RAW_API_KEYS);
-const HS256_SECRET = resolveValue(JWT_SHARED_SECRET);
+
+// Resolve JWT service secrets from env vars if needed
+const RESOLVED_JWT_SERVICES = JWT_SERVICES.map(svc => ({
+  issuer: svc.issuer,
+  secret: resolveValue(svc.secret)
+}));
 
 // Augment Hono context for DX
 declare module "hono" {
@@ -120,21 +122,43 @@ export async function authMiddleware(c: Context, next: Next) {
       }
       const token = m[1];
 
-      if (!HS256_SECRET) {
-        log.error("JWT strategy configured but JWT_SHARED_SECRET is empty");
+      if (!RESOLVED_JWT_SERVICES.length) {
+        log.error("JWT strategy configured but no services defined");
         return c.json({ error: "Unauthorized" }, 401);
       }
 
       // Lazy import 'jose' so projects not using JWT don't need it at runtime.
       try {
-        const { jwtVerify } = await import("jose");
-        const key = new TextEncoder().encode(HS256_SECRET);
-        log.debug("Verifying JWT with secret:", HS256_SECRET ? "present" : "missing");
-        log.debug("Expected issuer:", JWT_ISSUER);
+        const { decodeJwt, jwtVerify } = await import("jose");
+
+        // Decode without verification to extract issuer claim
+        const unverifiedPayload = decodeJwt(token);
+        const issuer = unverifiedPayload.iss;
+
+        if (!issuer) {
+          log.error("JWT missing required 'iss' (issuer) claim");
+          return c.json({ error: "Unauthorized" }, 401);
+        }
+
+        // Find matching service by issuer
+        const service = RESOLVED_JWT_SERVICES.find(s => s.issuer === issuer);
+        if (!service) {
+          log.error("Unknown JWT issuer:", issuer);
+          return c.json({ error: "Unauthorized" }, 401);
+        }
+
+        if (!service.secret) {
+          log.error("JWT service configured but secret is empty for issuer:", issuer);
+          return c.json({ error: "Unauthorized" }, 401);
+        }
+
+        // Verify JWT using the service's secret
+        const key = new TextEncoder().encode(service.secret);
+        log.debug("Verifying JWT from issuer:", issuer);
         log.debug("Expected audience:", JWT_AUDIENCE);
-        
+
         const { payload } = await jwtVerify(token, key, {
-          issuer: JWT_ISSUER || undefined,
+          issuer: issuer,
           audience: JWT_AUDIENCE || undefined,
         });
 
@@ -144,7 +168,7 @@ export async function authMiddleware(c: Context, next: Next) {
           sub: typeof payload.sub === "string" ? payload.sub : undefined,
           claims: payload as any,
         });
-        log.debug("JWT verified successfully");
+        log.debug("JWT verified successfully for issuer:", issuer);
         return next();
       } catch (verifyError: any) {
         log.error("JWT verification failed:", verifyError?.message || verifyError);

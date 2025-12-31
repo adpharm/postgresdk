@@ -3,9 +3,11 @@ export interface AuthConfig {
   apiKeyHeader?: string;
   apiKeys?: string[]; // can include "env:MY_KEY_LIST"
   jwt?: {
-    sharedSecret?: string; // can be "env:JWT_SHARED_SECRET"
-    issuer?: string;
-    audience?: string;
+    services: Array<{
+      issuer: string;    // Required - identifies the service
+      secret: string;     // Required - that service's signing secret (can be "env:VAR_NAME")
+    }>;
+    audience?: string;    // Optional - validates 'aud' claim
   };
 }
 
@@ -15,13 +17,6 @@ export type AuthConfigInput = AuthConfig | {
   apiKey?: string;
   apiKeys?: string[];
   apiKeyHeader?: string;
-  
-  // Shorthand for JWT auth
-  jwt?: string | {
-    sharedSecret?: string;
-    issuer?: string;
-    audience?: string;
-  };
 }
 
 export interface Config {
@@ -100,17 +95,10 @@ export function normalizeAuthConfig(input: AuthConfigInput | undefined): AuthCon
   }
   
   if ('jwt' in input && input.jwt) {
-    if (typeof input.jwt === 'string') {
-      return {
-        strategy: "jwt-hs256",
-        jwt: { sharedSecret: input.jwt }
-      };
-    } else {
-      return {
-        strategy: "jwt-hs256",
-        jwt: input.jwt
-      };
-    }
+    return {
+      strategy: "jwt-hs256",
+      jwt: input.jwt
+    };
   }
   
   // Default to no auth if no recognizable auth config

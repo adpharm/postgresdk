@@ -153,7 +153,11 @@ export default {
   auth: {
     apiKey: process.env.API_KEY,        // Simple API key auth
     // OR
-    jwt: process.env.JWT_SECRET,        // Simple JWT auth
+    jwt: {                              // JWT with multi-service support
+      services: [
+        { issuer: "my-app", secret: process.env.JWT_SECRET }
+      ]
+    }
   },
   
   // Test generation (optional)
@@ -338,14 +342,35 @@ const sdk = new SDK({
 export default {
   connectionString: "...",
   auth: {
-    jwt: process.env.JWT_SECRET
+    strategy: "jwt-hs256",
+    jwt: {
+      services: [
+        { issuer: "my-app", secret: process.env.JWT_SECRET }
+      ],
+      audience: "my-api"  // Optional
+    }
+  }
+};
+
+// Multi-service example (each service has its own secret)
+export default {
+  connectionString: "...",
+  auth: {
+    strategy: "jwt-hs256",
+    jwt: {
+      services: [
+        { issuer: "web-app", secret: process.env.WEB_APP_SECRET },
+        { issuer: "mobile-app", secret: process.env.MOBILE_SECRET },
+      ],
+      audience: "my-api"
+    }
   }
 };
 
 // Client SDK usage
 const sdk = new SDK({
   baseUrl: "http://localhost:3000",
-  auth: { jwt: "eyJhbGciOiJIUzI1NiIs..." }
+  auth: { jwt: "eyJhbGciOiJIUzI1NiIs..." }  // JWT must include 'iss' claim
 });
 ```
 
