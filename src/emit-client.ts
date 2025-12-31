@@ -204,8 +204,8 @@ export function emitClientIndex(tables: Table[], useJsExtensions?: boolean) {
  */
 `;
   
-  // Import BaseClient and its types
-  out += `import { BaseClient, type AuthConfig } from "./base-client${ext}";\n`;
+  // Import auth types
+  out += `import type { AuthConfig } from "./base-client${ext}";\n`;
   
   // Import all table clients
   for (const t of tables) {

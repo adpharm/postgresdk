@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- fix: Remove unused BaseClient import from generated client index
+  - Generated index.ts now only imports AuthConfig as a type
+  - Eliminates TypeScript unused import errors when using strict noUnusedLocals flag
+  - BaseClient still properly re-exported via direct export statement
+
 ## [v0.15.1] - 2025-12-31
 
 - fix: Prevent JWT secrets from being hardcoded in generated code
