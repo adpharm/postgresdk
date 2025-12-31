@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- fix: Prevent JWT secrets from being hardcoded in generated code
+  - Generator now validates that JWT secrets use `"env:VAR_NAME"` pattern in config
+  - Rejects configs with hardcoded secrets or `process.env.X` references (which evaluate at generation time)
+  - Converts `"env:JWT_SECRET"` to `process.env.JWT_SECRET` in generated auth.ts file
+  - Secrets now resolved at API server startup instead of during code generation
+  - Eliminates risk of committing secrets to version control in generated files
+  - Updated example.config.ts and types.ts with security warnings and correct patterns
+  - Added tests to verify hardcoded secrets are rejected and process.env references are generated
+
 ## [v0.14.5] - 2025-12-31
 
 - feat: Add SDK pull instructions to post-generation output

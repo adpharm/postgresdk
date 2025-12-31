@@ -4,8 +4,10 @@ export interface AuthConfig {
   apiKeys?: string[]; // can include "env:MY_KEY_LIST"
   jwt?: {
     services: Array<{
-      issuer: string;    // Required - identifies the service
-      secret: string;     // Required - that service's signing secret (can be "env:VAR_NAME")
+      issuer: string;    // Required - identifies the service (must match JWT 'iss' claim)
+      secret: string;    // Required - MUST use "env:VAR_NAME" format (e.g., "env:JWT_SECRET")
+                         // ⚠️ SECURITY: Never use process.env.X or hardcoded strings in config!
+                         // Generator converts "env:JWT_SECRET" → process.env.JWT_SECRET in generated code
     }>;
     audience?: string;    // Optional - validates 'aud' claim
   };

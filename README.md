@@ -165,7 +165,7 @@ export default {
     // OR
     jwt: {                              // JWT with multi-service support
       services: [
-        { issuer: "my-app", secret: process.env.JWT_SECRET }
+        { issuer: "my-app", secret: "env:JWT_SECRET" }  // Use "env:" prefix!
       ]
     }
   },
@@ -296,7 +296,7 @@ export default {
     strategy: "jwt-hs256",
     jwt: {
       services: [
-        { issuer: "my-app", secret: process.env.JWT_SECRET }
+        { issuer: "my-app", secret: "env:JWT_SECRET" }  // Use "env:" prefix!
       ],
       audience: "my-api"  // Optional
     }
@@ -310,8 +310,8 @@ export default {
     strategy: "jwt-hs256",
     jwt: {
       services: [
-        { issuer: "web-app", secret: process.env.WEB_APP_SECRET },
-        { issuer: "mobile-app", secret: process.env.MOBILE_SECRET },
+        { issuer: "web-app", secret: "env:WEB_APP_SECRET" },
+        { issuer: "mobile-app", secret: "env:MOBILE_SECRET" },
       ],
       audience: "my-api"
     }
@@ -352,8 +352,8 @@ export default {
     strategy: "jwt-hs256",
     jwt: {
       services: [
-        { issuer: "web-app", secret: process.env.WEB_SECRET },
-        { issuer: "analytics-service", secret: process.env.ANALYTICS_SECRET }
+        { issuer: "web-app", secret: "env:WEB_SECRET" },
+        { issuer: "analytics-service", secret: "env:ANALYTICS_SECRET" }
       ],
       audience: "my-api"
     }

@@ -683,6 +683,40 @@ async function main() {
   console.log("\n1) Regenerating with JWT auth enabled...");
   
   const jwtSecret = "test-secret-key-for-jwt";
+
+  // Set the JWT secret as an environment variable so it can be resolved at runtime
+  process.env.TEST_JWT_SECRET = jwtSecret;
+
+  // Test 1: Verify hardcoded secrets are rejected
+  console.log("\n  Testing security validation...");
+  const badJwtConfig = `export default {
+  connectionString: "${PG_URL}",
+  schema: "public",
+  outDir: { server: "${JWT_SERVER_DIR}", client: "${JWT_CLIENT_DIR}" },
+  softDeleteColumn: null,
+  includeMethodsDepth: 3,
+  auth: {
+    strategy: "jwt-hs256",
+    jwt: {
+      services: [
+        { issuer: "test-app", secret: "hardcoded-secret-value" }
+      ],
+      audience: "test-client"
+    }
+  }
+};`;
+  writeFileSync(CFG_PATH, badJwtConfig, "utf-8");
+
+  try {
+    execSync(`bun run src/cli.ts generate -c ${CFG_PATH}`, { stdio: "pipe" });
+    throw new Error("Generator should have rejected hardcoded secret!");
+  } catch (e: any) {
+    if (e.message.includes("should have rejected")) throw e;
+    assert(e.stderr?.toString().includes("SECURITY ERROR"), "Should show security error");
+    console.log("  ✓ Generator rejects hardcoded secrets");
+  }
+
+  // Test 2: Generate with correct env: pattern
   const jwtConfig = `export default {
   connectionString: "${PG_URL}",
   schema: "public",
@@ -693,7 +727,7 @@ async function main() {
     strategy: "jwt-hs256",
     jwt: {
       services: [
-        { issuer: "test-app", secret: "${jwtSecret}" }
+        { issuer: "test-app", secret: "env:TEST_JWT_SECRET" }
       ],
       audience: "test-client"
     }
@@ -701,6 +735,12 @@ async function main() {
 };`;
   writeFileSync(CFG_PATH, jwtConfig, "utf-8");
   execSync(`bun run src/cli.ts generate -c ${CFG_PATH}`, { stdio: "inherit" });
+
+  // Test 3: Verify generated code contains process.env reference (not "env:" string)
+  const authFileContent = readFileSync(`${JWT_SERVER_DIR}/auth.ts`, "utf-8");
+  assert(authFileContent.includes("process.env.TEST_JWT_SECRET"), "Generated auth.ts should contain process.env.TEST_JWT_SECRET");
+  assert(!authFileContent.includes('"env:TEST_JWT_SECRET"'), "Generated auth.ts should NOT contain the env: DSL string");
+  console.log("  ✓ Generated code uses process.env.TEST_JWT_SECRET");
   
   // Import from JWT-specific directory
   const { registerAuthorsRoutes: registerAuthorsRoutesJWT } = await import(`../${JWT_SERVER_DIR}/routes/authors.ts`);

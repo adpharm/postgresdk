@@ -250,15 +250,15 @@ export default {
       services: [
         {
           issuer: "web-app",
-          secret: process.env.WEB_APP_JWT_SECRET!,  // or "env:WEB_APP_JWT_SECRET"
+          secret: "env:WEB_APP_JWT_SECRET",  // REQUIRED: Use "env:" prefix
         },
         {
           issuer: "lambda-service",
-          secret: process.env.LAMBDA_JWT_SECRET!,
+          secret: "env:LAMBDA_JWT_SECRET",  // Generator converts to: process.env.LAMBDA_JWT_SECRET
         },
         {
           issuer: "mobile-app",
-          secret: process.env.MOBILE_JWT_SECRET!,
+          secret: "env:MOBILE_JWT_SECRET",  // DO NOT use process.env.X in config - it hardcodes!
         },
       ],
 

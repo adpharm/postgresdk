@@ -9,11 +9,42 @@ export function emitAuth(cfgAuth: AuthConfig | undefined) {
   const jwtServices = cfgAuth?.jwt?.services ?? [];
   const jwtAudience = cfgAuth?.jwt?.audience ?? undefined;
 
+  // Security check: Validate that secrets use "env:" pattern
+  if (strategy === "jwt-hs256" && jwtServices.length > 0) {
+    for (const svc of jwtServices) {
+      if (!svc.secret) {
+        throw new Error(
+          `JWT service "${svc.issuer}" is missing required secret.\n\n` +
+          `Use the "env:VAR_NAME" pattern in your config:\n` +
+          `  { issuer: "${svc.issuer}", secret: "env:${svc.issuer.toUpperCase().replace(/-/g, "_")}_SECRET" }`
+        );
+      }
+      if (!svc.secret.startsWith("env:")) {
+        throw new Error(
+          `SECURITY ERROR: JWT secret for "${svc.issuer}" must use "env:VAR_NAME" pattern.\n\n` +
+          `Found: secret: ${typeof svc.secret === "string" && svc.secret.length > 20 ? '"***REDACTED***"' : JSON.stringify(svc.secret)}\n\n` +
+          `Hardcoding secrets in config files is a security risk!\n` +
+          `Instead, use:\n` +
+          `  { issuer: "${svc.issuer}", secret: "env:${svc.issuer.toUpperCase().replace(/-/g, "_")}_SECRET" }\n\n` +
+          `Then set the environment variable at runtime.`
+        );
+      }
+    }
+  }
+
   // Inline as literals; use JSON.stringify for safe embedding.
   const STRATEGY = JSON.stringify(strategy);
   const API_KEY_HEADER = JSON.stringify(apiKeyHeader);
   const RAW_API_KEYS = JSON.stringify(apiKeys);
-  const JWT_SERVICES = JSON.stringify(jwtServices);
+
+  // Convert "env:VAR_NAME" to process.env.VAR_NAME in generated code
+  const jwtServicesCode = jwtServices.length === 0
+    ? "[]"
+    : `[\n${jwtServices.map(svc => {
+        const varName = svc.secret.slice(4); // Remove "env:" prefix
+        return `  { issuer: ${JSON.stringify(svc.issuer)}, secret: process.env.${varName} ?? "" }`;
+      }).join(',\n')}\n]`;
+
   const JWT_AUDIENCE = jwtAudience === undefined ? "undefined" : JSON.stringify(jwtAudience);
 
   return `/**
@@ -32,7 +63,7 @@ const STRATEGY = ${STRATEGY} as "none" | "api-key" | "jwt-hs256";
 const API_KEY_HEADER = ${API_KEY_HEADER} as string;
 const RAW_API_KEYS = ${RAW_API_KEYS} as readonly string[];
 
-const JWT_SERVICES = ${JWT_SERVICES} as ReadonlyArray<{ issuer: string; secret?: string }>;
+const JWT_SERVICES = ${jwtServicesCode} as ReadonlyArray<{ issuer: string; secret: string }>;
 const JWT_AUDIENCE = ${JWT_AUDIENCE} as string | undefined;
 // -------------------------------------
 
@@ -46,15 +77,6 @@ const log = {
 function expandEnvList(v: string): string[] {
   if (!v) return [];
   return v.split(",").map(s => s.trim()).filter(Boolean);
-}
-
-function resolveValue(v: string | undefined): string {
-  if (!v) return "";
-  if (v.startsWith("env:")) {
-    const name = v.slice(4);
-    return process.env[name] ?? "";
-  }
-  return v;
 }
 
 function resolveKeys(keys: readonly string[]): string[] {
@@ -73,12 +95,6 @@ function resolveKeys(keys: readonly string[]): string[] {
 }
 
 const API_KEYS = resolveKeys(RAW_API_KEYS);
-
-// Resolve JWT service secrets from env vars if needed
-const RESOLVED_JWT_SERVICES = JWT_SERVICES.map(svc => ({
-  issuer: svc.issuer,
-  secret: resolveValue(svc.secret)
-}));
 
 // Augment Hono context for DX
 declare module "hono" {
@@ -122,7 +138,7 @@ export async function authMiddleware(c: Context, next: Next) {
       }
       const token = m[1];
 
-      if (!RESOLVED_JWT_SERVICES.length) {
+      if (!JWT_SERVICES.length) {
         log.error("JWT strategy configured but no services defined");
         return c.json({ error: "Unauthorized" }, 401);
       }
@@ -141,7 +157,7 @@ export async function authMiddleware(c: Context, next: Next) {
         }
 
         // Find matching service by issuer
-        const service = RESOLVED_JWT_SERVICES.find(s => s.issuer === issuer);
+        const service = JWT_SERVICES.find(s => s.issuer === issuer);
         if (!service) {
           log.error("Unknown JWT issuer:", issuer);
           return c.json({ error: "Unauthorized" }, 401);
