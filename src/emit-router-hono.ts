@@ -56,10 +56,22 @@ ${hasAuth ? `export { authMiddleware } from "./auth${ext}";` : ""}
  * const pg = new Client({ connectionString: process.env.DATABASE_URL });
  * await pg.connect();
  *
- * // OR using Neon driver (Edge-compatible)
+ * // OR using Neon driver
  * import { Pool } from "@neondatabase/serverless";
- * const pool = new Pool({ connectionString: process.env.DATABASE_URL! });
- * const pg = pool; // Pool already has the compatible query method
+ *
+ * // For serverless (Vercel/Netlify) - one connection per instance
+ * const pool = new Pool({
+ *   connectionString: process.env.DATABASE_URL!,
+ *   max: 1
+ * });
+ *
+ * // For traditional servers - connection pooling
+ * const pool = new Pool({
+ *   connectionString: process.env.DATABASE_URL!,
+ *   max: 10
+ * });
+ *
+ * const pg = pool;
  *
  * // Mount all generated routes
  * const app = new Hono();

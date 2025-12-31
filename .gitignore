@@ -214,6 +214,8 @@ test-results/
 **/*.mp4
 **/*.webm
 
+# Test output directories
+test/.test-output/
 test/.results/
 test/.results-*/
 test/.*

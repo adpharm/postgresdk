@@ -1,67 +1,17 @@
-#!/usr/bin/env bun
-
-import { test, expect, beforeAll } from "bun:test";
-import { Hono } from "hono";
+import { describe, test, expect, beforeAll } from "vitest";
+import { Hono, type Context } from "hono";
 import { serve } from "@hono/node-server";
 import { Client } from "pg";
-import { exec } from "node:child_process";
-import { promisify } from "node:util";
-
-const execAsync = promisify(exec);
-const CONTAINER_NAME = "postgresdk-test-db";
-const PG_URL = "postgres://user:pass@localhost:5432/testdb";
-
-async function ensurePostgresRunning(): Promise<void> {
-  try {
-    const { stdout } = await execAsync(`docker ps --filter "name=${CONTAINER_NAME}" --format "{{.Names}}"`);
-    if (stdout.trim() === CONTAINER_NAME) {
-      return; // Already running
-    }
-  } catch {}
-
-  // Container not running, start it
-  console.log("🐳 Starting PostgreSQL container for onRequest tests...");
-  try {
-    const { stdout } = await execAsync(`docker ps -a --filter "name=${CONTAINER_NAME}" --format "{{.Names}}"`);
-    if (stdout.trim() === CONTAINER_NAME) {
-      await execAsync(`docker start ${CONTAINER_NAME}`);
-    } else {
-      await execAsync(`docker run -d --name ${CONTAINER_NAME} -e POSTGRES_USER=user -e POSTGRES_PASSWORD=pass -e POSTGRES_DB=testdb -p 5432:5432 postgres:17-alpine`);
-    }
-  } catch (error) {
-    console.error("Failed to start container:", error);
-    throw error;
-  }
-
-  // Wait for PostgreSQL to be ready
-  console.log("  → Waiting for PostgreSQL to be ready...");
-  let attempts = 0;
-  const maxAttempts = 30;
-
-  while (attempts < maxAttempts) {
-    try {
-      const pg = new Client({ connectionString: PG_URL });
-      await pg.connect();
-      await pg.query("SELECT 1");
-      await pg.end();
-      console.log("  ✓ PostgreSQL is ready!");
-      return;
-    } catch {
-      attempts++;
-      await new Promise(resolve => setTimeout(resolve, 1000));
-    }
-  }
-
-  throw new Error("PostgreSQL failed to start in time");
-}
+import { TEST_PATHS, TEST_PORTS, PG_URL, ensurePostgresRunning } from "./test-utils";
 
 beforeAll(async () => {
   await ensurePostgresRunning();
 });
 
-test("onRequest hook is called and can set session variables", async () => {
-  const pg = new Client({ connectionString: PG_URL });
-  await pg.connect();
+describe("onRequest hook tests", () => {
+  test("onRequest hook is called and can set session variables", async () => {
+    const pg = new Client({ connectionString: PG_URL });
+    await pg.connect();
 
   try {
     // Clean up
@@ -80,7 +30,7 @@ test("onRequest hook is called and can set session variables", async () => {
     `);
 
     // Import generated routes
-    const { createRouter } = await import("./.results/server/router");
+    const { createRouter } = await import(`../${TEST_PATHS.gen}/server/router`);
 
     // Track onRequest calls
     const onRequestCalls: Array<{ path: string; method: string }> = [];
@@ -88,7 +38,7 @@ test("onRequest hook is called and can set session variables", async () => {
     // Create router with onRequest hook
     const router = createRouter({
       pg,
-      onRequest: async (c, pgClient) => {
+      onRequest: async (c: Context, pgClient: Client) => {
         // Track that onRequest was called
         onRequestCalls.push({
           path: c.req.path,
@@ -113,14 +63,16 @@ test("onRequest hook is called and can set session variables", async () => {
     const app = new Hono();
     app.route("/", router);
 
-    const server = serve({ fetch: app.fetch, port: 3463 });
+    const server = serve({ fetch: app.fetch, port: TEST_PORTS.onRequest });
 
     // Give server time to start
     await new Promise(resolve => setTimeout(resolve, 100));
 
     try {
+      const baseUrl = `http://localhost:${TEST_PORTS.onRequest}`;
+
       // Test CREATE operation
-      const createRes = await fetch("http://localhost:3463/v1/authors", {
+      const createRes = await fetch(`${baseUrl}/v1/authors`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: "Test Author" })
@@ -133,14 +85,14 @@ test("onRequest hook is called and can set session variables", async () => {
       expect(onRequestCalls.some(c => c.method === "POST" && c.path.includes("/authors"))).toBe(true);
 
       // Test GET operation
-      const getRes = await fetch(`http://localhost:3463/v1/authors/${created.id}`);
+      const getRes = await fetch(`${baseUrl}/v1/authors/${created.id}`);
       expect(getRes.ok).toBe(true);
 
       // Verify onRequest was called for GET
       expect(onRequestCalls.some(c => c.method === "GET")).toBe(true);
 
       // Test LIST operation
-      const listRes = await fetch("http://localhost:3463/v1/authors/list", {
+      const listRes = await fetch(`${baseUrl}/v1/authors/list`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({})
@@ -148,7 +100,7 @@ test("onRequest hook is called and can set session variables", async () => {
       expect(listRes.ok).toBe(true);
 
       // Test UPDATE operation
-      const updateRes = await fetch(`http://localhost:3463/v1/authors/${created.id}`, {
+      const updateRes = await fetch(`${baseUrl}/v1/authors/${created.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: "Updated Author" })
@@ -156,7 +108,7 @@ test("onRequest hook is called and can set session variables", async () => {
       expect(updateRes.ok).toBe(true);
 
       // Test DELETE operation
-      const deleteRes = await fetch(`http://localhost:3463/v1/authors/${created.id}`, {
+      const deleteRes = await fetch(`${baseUrl}/v1/authors/${created.id}`, {
         method: "DELETE"
       });
       expect(deleteRes.ok).toBe(true);
@@ -187,51 +139,51 @@ test("onRequest hook is called and can set session variables", async () => {
     await pg.query("DROP TABLE IF EXISTS request_log");
     await pg.end();
   }
-});
+  });
 
-test("router works without onRequest (backward compatible)", async () => {
-  const pg = new Client({ connectionString: PG_URL });
-  await pg.connect();
-
-  try {
-    await pg.query("DELETE FROM authors");
-
-    // Import generated routes
-    const { createRouter } = await import("./.results/server/router");
-
-    // Create router WITHOUT onRequest (should still work)
-    const router = createRouter({ pg });
-
-    const app = new Hono();
-    app.route("/", router);
-
-    const server = serve({ fetch: app.fetch, port: 3464 });
-
-    await new Promise(resolve => setTimeout(resolve, 100));
+  test("router works without onRequest (backward compatible)", async () => {
+    const pg = new Client({ connectionString: PG_URL });
+    await pg.connect();
 
     try {
-      // Test that basic operations still work without onRequest
-      const createRes = await fetch("http://localhost:3464/v1/authors", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: "Test Author No Hook" })
-      });
+      await pg.query("DELETE FROM authors");
 
-      expect(createRes.ok).toBe(true);
-      const created = await createRes.json() as any;
-      expect(created.name).toBe("Test Author No Hook");
+      // Import generated routes
+      const { createRouter } = await import(`../${TEST_PATHS.gen}/server/router`);
 
-      const getRes = await fetch(`http://localhost:3464/v1/authors/${created.id}`);
-      expect(getRes.ok).toBe(true);
-      const fetched = await getRes.json() as any;
-      expect(fetched.name).toBe("Test Author No Hook");
+      // Create router WITHOUT onRequest (should still work)
+      const router = createRouter({ pg });
 
-      console.log("\n✅ Backward compatibility test passed!");
-      console.log("  → Router works without onRequest parameter");
+      const app = new Hono();
+      app.route("/", router);
+
+      const server = serve({ fetch: app.fetch, port: TEST_PORTS.onRequestNoHook });
+
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      try {
+        const baseUrl = `http://localhost:${TEST_PORTS.onRequestNoHook}`;
+
+        // Test that basic operations still work without onRequest
+        const createRes = await fetch(`${baseUrl}/v1/authors`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: "Test Author No Hook" })
+        });
+
+        expect(createRes.ok).toBe(true);
+        const created = await createRes.json() as any;
+        expect(created.name).toBe("Test Author No Hook");
+
+        const getRes = await fetch(`${baseUrl}/v1/authors/${created.id}`);
+        expect(getRes.ok).toBe(true);
+        const fetched = await getRes.json() as any;
+        expect(fetched.name).toBe("Test Author No Hook");
+      } finally {
+        server.close();
+      }
     } finally {
-      server.close();
+      await pg.end();
     }
-  } finally {
-    await pg.end();
-  }
+  });
 });

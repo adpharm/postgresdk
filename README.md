@@ -434,6 +434,42 @@ app.route("/", apiRouter);
 serve({ fetch: app.fetch, port: 3000 });
 ```
 
+## Deployment
+
+### Serverless (Vercel, Netlify, Cloudflare Workers)
+
+Use `max: 1` - each serverless instance should hold one connection:
+
+```typescript
+import { Pool } from "@neondatabase/serverless";
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  max: 1  // One connection per serverless instance
+});
+
+const apiRouter = createRouter({ pg: pool });
+```
+
+**Why `max: 1`?** Serverless functions are ephemeral and isolated. Each instance handles one request at a time, so connection pooling provides no benefit and wastes database connections.
+
+### Traditional Servers (Railway, Render, VPS)
+
+Use connection pooling to reuse connections across requests:
+
+```typescript
+import { Pool } from "@neondatabase/serverless";
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  max: 10  // Reuse connections across requests
+});
+
+const apiRouter = createRouter({ pg: pool });
+```
+
+**Why `max: 10`?** Long-running servers handle many concurrent requests. Pooling prevents opening/closing connections for every request, significantly improving performance.
+
 ## SDK Distribution
 
 Your generated SDK can be pulled by client applications:
