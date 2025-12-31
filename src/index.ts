@@ -326,6 +326,13 @@ export async function generate(configPath: string) {
   console.log(`    app.route("/", api);`);
   console.log(`\n  Client:`);
   console.log(`    import { SDK } from "./${relative(process.cwd(), clientDir)}";`);
-  console.log(`    const sdk = new SDK({ baseUrl: "http://localhost:3000" });`);
+  console.log(`    const sdk = new SDK({ baseUrl: "<your-api-url>" });`);
   console.log(`    const users = await sdk.users.list();`);
+  console.log(`\n  Client (separate app):`);
+  console.log(`    # Using CLI`);
+  console.log(`    postgresdk pull --from=<your-api-url> --output=./src/sdk`);
+  console.log(`\n    # Using config file (recommended)`);
+  console.log(`    Create postgresdk.config.ts:`);
+  console.log(`      export default { pull: { from: "<your-api-url>", output: "./src/sdk" } }`);
+  console.log(`    Then run: postgresdk pull`);
 }
