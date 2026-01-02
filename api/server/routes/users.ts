@@ -19,7 +19,7 @@ const columnEnum = z.enum(["id", "email", "role", "backup_role"]);
 const listSchema = z.object({
   where: z.any().optional(),
   include: z.any().optional(),
-  limit: z.number().int().positive().max(100).optional(),
+  limit: z.number().int().positive().max(1000).optional(),
   offset: z.number().int().min(0).optional(),
   orderBy: z.union([columnEnum, z.array(columnEnum)]).optional(),
   order: z.union([z.enum(["asc", "desc"]), z.array(z.enum(["asc", "desc"]))]).optional()
