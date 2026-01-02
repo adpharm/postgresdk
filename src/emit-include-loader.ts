@@ -151,7 +151,7 @@ export async function loadIncludes(
           for (const r of rows) r[key] = [];
         }
         // Recurse if nested include specified
-        const childSpec = s[key] && typeof s[key] === "object" ? (s[key] as any).include : undefined;
+        const childSpec = s[key] && typeof s[key] === "object" ? s[key] : undefined;
         if (childSpec) {
           const children = rows.flatMap(r => (r[key] ?? []));
           try {
@@ -171,7 +171,7 @@ export async function loadIncludes(
           log.error("loadOneToMany failed", { table, key, target }, e?.message ?? e);
           for (const r of rows) r[key] = [];
         }
-        const childSpec = s[key] && typeof s[key] === "object" ? (s[key] as any).include : undefined;
+        const childSpec = s[key] && typeof s[key] === "object" ? s[key] : undefined;
         if (childSpec) {
           const children = rows.flatMap(r => (r[key] ?? []));
           try {
@@ -200,7 +200,7 @@ export async function loadIncludes(
             for (const r of rows) r[key] = null;
           }
         }
-        const childSpec = s[key] && typeof s[key] === "object" ? (s[key] as any).include : undefined;
+        const childSpec = s[key] && typeof s[key] === "object" ? s[key] : undefined;
         if (childSpec) {
           const children = rows.map(r => r[key]).filter(Boolean);
           try {

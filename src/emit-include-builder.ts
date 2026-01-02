@@ -24,7 +24,7 @@ export function buildWith(root: TableName, spec: any, maxDepth = ${maxDepth}) {
       const v = s[key];
       if (v === true) out[key] = true;
       else if (v && typeof v === "object") {
-        const child = "include" in v ? walk(rel.target, v.include, depth + 1) : undefined;
+        const child = walk(rel.target, v, depth + 1);
         out[key] = child ? { with: child } : true;
       }
     }

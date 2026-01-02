@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- fix: Support direct nested includes without explicit wrapper syntax
+  - Nested includes now work with clean syntax: `{ books: { tags: true } }`
+  - Removed requirement for verbose wrapper: `{ books: { include: { tags: true } } }`
+  - Fixes bug where nested relationships were silently ignored
+  - Example: `include: { recording_job: { configuration_set: true } }` now correctly loads nested data
+  - Breaking: Old explicit `.include` wrapper syntax no longer supported (clean up your include specs)
+
 ## [v0.15.2] - 2025-12-31
 
 - fix: Remove unused BaseClient import from generated client index

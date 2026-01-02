@@ -337,9 +337,7 @@ async function main() {
     const authorsWithBooksAndTagsResult = await sdk.authors.list({
       include: {
         books: {
-          include: {
-            tags: true,
-          },
+          tags: true,
         },
       },
     });

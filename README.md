@@ -588,9 +588,7 @@ const books = booksResult.data;
 const nestedResult = await sdk.authors.list({
   include: {
     books: {
-      include: {
-        tags: true
-      }
+      tags: true
     }
   }
 });
