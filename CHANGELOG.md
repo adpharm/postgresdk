@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [v0.15.5] - 2026-01-02
 
 - fix: Increase max pagination limit to 1000 for consistency
   - Server-side validation now accepts up to 1000 records per request (was 100)
