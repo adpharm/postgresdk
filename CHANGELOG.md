@@ -13,6 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Fixes bug where nested relationships were silently ignored
   - Example: `include: { recording_job: { configuration_set: true } }` now correctly loads nested data
   - Breaking: Old explicit `.include` wrapper syntax no longer supported (clean up your include specs)
+- docs: Use `@latest` pattern instead of global installation
+  - All commands now use `npx postgresdk@latest`, `bunx postgresdk@latest`, or `pnpm dlx postgresdk@latest`
+  - Removed installation instructions - no need to install globally or as dev dependency
+  - Users always run latest version automatically
+  - Matches modern CLI tool best practices (Vite, Next.js, etc.)
 
 ## [v0.15.2] - 2025-12-31
 

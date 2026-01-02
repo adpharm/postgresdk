@@ -62,19 +62,6 @@ const filtered = await sdk.users.list({
 
 ## Getting Started
 
-### Installation
-
-```bash
-npm install -g postgresdk
-# or
-npx postgresdk generate
-
-# With Bun
-bun install -g postgresdk
-# or
-bunx postgresdk generate
-```
-
 > **Note:** Currently only generates **Hono** server code. See [Supported Frameworks](#supported-frameworks) for details.
 
 ### Quick Start
@@ -82,9 +69,11 @@ bunx postgresdk generate
 1. Initialize your project:
 
 ```bash
-npx postgresdk init
-# or with Bun
-bunx postgresdk init
+npx postgresdk@latest init
+# or
+bunx postgresdk@latest init
+# or
+pnpm dlx postgresdk@latest init
 ```
 
 This creates a `postgresdk.config.ts` file with all available options documented.
@@ -101,9 +90,11 @@ export default {
 3. Run the generator:
 
 ```bash
-postgresdk generate
-# or with Bun
-bunx postgresdk generate
+npx postgresdk@latest generate
+# or
+bunx postgresdk@latest generate
+# or
+pnpm dlx postgresdk@latest generate
 ```
 
 4. Set up your server:
@@ -498,23 +489,17 @@ When you run `postgresdk generate`, the client SDK is automatically bundled into
 
 **On client applications:**
 
-1. Install postgresdk in your client project:
+1. Pull the SDK from your API:
 
 ```bash
-npm install -D postgresdk
+npx postgresdk@latest pull --from=https://api.myapp.com --output=./src/sdk
 # or
-bun install -D postgresdk
+bunx postgresdk@latest pull --from=https://api.myapp.com --output=./src/sdk
+# or
+pnpm dlx postgresdk@latest pull --from=https://api.myapp.com --output=./src/sdk
 ```
 
-2. Pull the SDK from your API:
-
-```bash
-npx postgresdk pull --from=https://api.myapp.com --output=./src/sdk
-# or with Bun
-bunx postgresdk pull --from=https://api.myapp.com --output=./src/sdk
-```
-
-3. Use the generated SDK with full TypeScript types:
+2. Use the generated SDK with full TypeScript types:
 
 ```typescript
 import { SDK } from "./src/sdk";
@@ -538,9 +523,11 @@ export default {
 
 Then run:
 ```bash
-npx postgresdk pull
+npx postgresdk@latest pull
 # or
-bunx postgresdk pull
+bunx postgresdk@latest pull
+# or
+pnpm dlx postgresdk@latest pull
 ```
 
 The SDK files are written directly to your client project, giving you full TypeScript autocomplete and type safety.
@@ -694,7 +681,9 @@ See the generated SDK documentation for all available operators: `$eq`, `$ne`, `
 ### CLI Commands
 
 ```bash
-postgresdk <command> [options]
+npx postgresdk@latest <command> [options]
+# or: bunx postgresdk@latest
+# or: pnpm dlx postgresdk@latest
 
 Commands:
   init                 Create a postgresdk.config.ts file
@@ -711,12 +700,12 @@ Init flags:
   --sdk                Generate SDK-side config (for consuming remote SDK)
 
 Examples:
-  postgresdk init                              # Interactive prompt
-  postgresdk init --api                        # API-side config
-  postgresdk init --sdk                        # SDK-side config
-  postgresdk generate
-  postgresdk generate -c custom.config.ts
-  postgresdk pull --from=https://api.com --output=./src/sdk
+  npx postgresdk@latest init                              # Interactive prompt
+  npx postgresdk@latest init --api                        # API-side config
+  npx postgresdk@latest init --sdk                        # SDK-side config
+  npx postgresdk@latest generate
+  npx postgresdk@latest generate -c custom.config.ts
+  npx postgresdk@latest pull --from=https://api.com --output=./src/sdk
 ```
 
 ### Generated Tests
