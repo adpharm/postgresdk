@@ -177,10 +177,10 @@ export default {
 export async function initCommand(args: string[]): Promise<void> {
   console.log("🚀 Initializing postgresdk configuration...\n");
 
-  // Check for flags
+  // Check for flags and subcommands
   const forceError = args.includes("--force-error");
   const isApiSide = args.includes("--api");
-  const isSdkSide = args.includes("--sdk");
+  const isSdkSide = args.includes("--sdk") || args[0] === "pull";
 
   // Check for existing config file
   const configPath = resolve(process.cwd(), "postgresdk.config.ts");
@@ -330,7 +330,7 @@ export async function initCommand(args: string[]): Promise<void> {
   let projectType: string;
 
   if (isApiSide && isSdkSide) {
-    console.error("❌ Error: Cannot use both --api and --sdk flags");
+    console.error("❌ Error: Cannot use both --api and --sdk/pull options");
     process.exit(1);
   } else if (isApiSide) {
     projectType = "api";

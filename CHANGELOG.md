@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Fixes bug where nested relationships were silently ignored
   - Example: `include: { recording_job: { configuration_set: true } }` now correctly loads nested data
   - Breaking: Old explicit `.include` wrapper syntax no longer supported (clean up your include specs)
+- feat: Add `init pull` subcommand for pull-only config generation
+  - Run `postgresdk init pull` to create config with only `pull` section
+  - Alias for `init --sdk` with more intuitive naming
+  - Improved error message when running `pull` without config - suggests `init pull`
 - docs: Use `@latest` pattern instead of global installation
   - All commands now use `npx postgresdk@latest`, `bunx postgresdk@latest`, or `pnpm dlx postgresdk@latest`
   - Removed installation instructions - no need to install globally or as dev dependency

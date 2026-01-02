@@ -695,14 +695,15 @@ Commands:
 Options:
   -c, --config <path>  Path to config file (default: postgresdk.config.ts)
 
-Init flags:
-  --api                Generate API-side config (for database introspection)
-  --sdk                Generate SDK-side config (for consuming remote SDK)
+Init subcommands/flags:
+  init pull            Generate pull-only config (alias for --sdk)
+  init --api           Generate API-side config (for database introspection)
+  init --sdk           Generate SDK-side config (for consuming remote SDK)
 
 Examples:
   npx postgresdk@latest init                              # Interactive prompt
+  npx postgresdk@latest init pull                         # Pull-only config
   npx postgresdk@latest init --api                        # API-side config
-  npx postgresdk@latest init --sdk                        # SDK-side config
   npx postgresdk@latest generate
   npx postgresdk@latest generate -c custom.config.ts
   npx postgresdk@latest pull --from=https://api.com --output=./src/sdk

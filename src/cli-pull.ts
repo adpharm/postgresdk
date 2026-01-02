@@ -55,14 +55,11 @@ export async function pullCommand(args: string[]) {
   
   // 5. Validate required fields
   if (!config.from) {
-    console.error("❌ Missing API URL. Specify via --from or in postgresdk.config.ts");
-    console.error("\nExample config file:");
-    console.error(`export default {
-  pull: {
-    from: "https://api.company.com",
-    output: "./src/sdk"
-  }
-}`);
+    console.error("❌ Missing API URL");
+    console.error("\nOptions:");
+    console.error("  1. Use CLI args:    npx postgresdk@latest pull --from=https://api.company.com --output=./src/sdk");
+    console.error("  2. Create config:   npx postgresdk@latest init pull");
+    console.error("                      (then edit postgresdk.config.ts and run 'postgresdk pull')");
     process.exit(1);
   }
   
