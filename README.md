@@ -284,7 +284,6 @@ const sdk = new SDK({
 export default {
   connectionString: "...",
   auth: {
-    strategy: "jwt-hs256",
     jwt: {
       services: [
         { issuer: "my-app", secret: "env:JWT_SECRET" }  // Use "env:" prefix!
@@ -298,7 +297,6 @@ export default {
 export default {
   connectionString: "...",
   auth: {
-    strategy: "jwt-hs256",
     jwt: {
       services: [
         { issuer: "web-app", secret: "env:WEB_APP_SECRET" },
@@ -340,7 +338,6 @@ const token = sign({
 export default {
   connectionString: process.env.DATABASE_URL,
   auth: {
-    strategy: "jwt-hs256",
     jwt: {
       services: [
         { issuer: "web-app", secret: "env:WEB_SECRET" },

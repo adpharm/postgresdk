@@ -1,5 +1,4 @@
 export interface AuthConfig {
-  strategy?: "none" | "api-key" | "jwt-hs256";
   apiKeyHeader?: string;
   apiKeys?: string[]; // can include "env:MY_KEY_LIST"
   jwt?: {
@@ -11,6 +10,14 @@ export interface AuthConfig {
     }>;
     audience?: string;    // Optional - validates 'aud' claim
   };
+}
+
+// Helper to infer auth strategy from config
+export function getAuthStrategy(auth: AuthConfig | undefined): "none" | "api-key" | "jwt-hs256" {
+  if (!auth) return "none";
+  if (auth.jwt) return "jwt-hs256";
+  if (auth.apiKeys && auth.apiKeys.length > 0) return "api-key";
+  return "none";
 }
 
 // Simplified auth syntax support
@@ -73,36 +80,20 @@ export interface PullConfig {
 // Normalize simplified auth syntax to full AuthConfig
 export function normalizeAuthConfig(input: AuthConfigInput | undefined): AuthConfig | undefined {
   if (!input) return undefined;
-  
-  // If it already has a strategy, assume it's a full AuthConfig
-  if ('strategy' in input && input.strategy) {
+
+  // If it already looks like a full AuthConfig (has jwt or apiKeys), return as-is
+  if ('jwt' in input || 'apiKeys' in input) {
     return input as AuthConfig;
   }
-  
+
   // Handle shorthand syntax
   if ('apiKey' in input && input.apiKey) {
     return {
-      strategy: "api-key",
       apiKeyHeader: input.apiKeyHeader,
       apiKeys: [input.apiKey, ...(input.apiKeys || [])]
     };
   }
-  
-  if ('apiKeys' in input && input.apiKeys?.length) {
-    return {
-      strategy: "api-key",
-      apiKeyHeader: input.apiKeyHeader,
-      apiKeys: input.apiKeys
-    };
-  }
-  
-  if ('jwt' in input && input.jwt) {
-    return {
-      strategy: "jwt-hs256",
-      jwt: input.jwt
-    };
-  }
-  
-  // Default to no auth if no recognizable auth config
-  return { strategy: "none" };
+
+  // No recognizable auth config
+  return undefined;
 }

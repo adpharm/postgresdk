@@ -11,9 +11,6 @@ const config: Config = {
     output: "test/.drizzle-e2e-results/tests",
     framework: "vitest"
   },
-  auth: {
-    strategy: "none",
-  },
 };
 
 export default config;

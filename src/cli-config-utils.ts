@@ -48,25 +48,34 @@ export function extractConfigFields(configContent: string): ConfigField[] {
     });
   }
   
-  // Extract outServer
+  // Extract outDir (new format) or migrate old outServer/outClient
+  const outDirMatch = configContent.match(/^\s*(\/\/)?\s*outDir:\s*(.+)/m);
   const outServerMatch = configContent.match(/^\s*(\/\/)?\s*outServer:\s*"(.+)"/m);
-  if (outServerMatch) {
-    fields.push({
-      key: "outServer",
-      value: outServerMatch[2],
-      description: "Output directory for server-side code",
-      isCommented: !!outServerMatch[1],
-    });
-  }
-  
-  // Extract outClient
   const outClientMatch = configContent.match(/^\s*(\/\/)?\s*outClient:\s*"(.+)"/m);
-  if (outClientMatch) {
+
+  if (outDirMatch) {
+    // New format - extract the value
+    let value = outDirMatch[2]?.trim() || "";
+    // Remove trailing comma if present
+    value = value.replace(/,\s*$/, '');
+
     fields.push({
-      key: "outClient",
-      value: outClientMatch[2],
-      description: "Output directory for client SDK",
-      isCommented: !!outClientMatch[1],
+      key: "outDir",
+      value,
+      description: "Output directory for generated code",
+      isCommented: !!outDirMatch[1],
+    });
+  } else if (outServerMatch || outClientMatch) {
+    // Old format - migrate to new outDir format
+    const serverPath = outServerMatch?.[2] || "./api/server";
+    const clientPath = outClientMatch?.[2] || "./api/client";
+    const isCommented = !!(outServerMatch?.[1] && outClientMatch?.[1]);
+
+    fields.push({
+      key: "outDir",
+      value: `{ server: "${serverPath}", client: "${clientPath}" }`,
+      description: "Output directory for generated code",
+      isCommented,
     });
   }
   
@@ -264,18 +273,19 @@ export default {
    * @default "public"
    */
   ${getFieldLine("schema", existingFields, mergeStrategy, '"public"', userChoices)}
-  
+
   /**
-   * Output directory for server-side code (routes, validators, etc.)
-   * @default "./api/server"
+   * Output directory for generated code
+   *
+   * Simple usage (same directory for both):
+   *   outDir: "./api"
+   *
+   * Separate directories for client and server:
+   *   outDir: { client: "./sdk", server: "./api" }
+   *
+   * @default { client: "./api/client", server: "./api/server" }
    */
-  ${getFieldLine("outServer", existingFields, mergeStrategy, '"./api/server"', userChoices)}
-  
-  /**
-   * Output directory for client SDK
-   * @default "./api/client"
-   */
-  ${getFieldLine("outClient", existingFields, mergeStrategy, '"./api/client"', userChoices)}
+  ${getFieldLine("outDir", existingFields, mergeStrategy, '"./api"', userChoices)}
   
   // ========== ADVANCED OPTIONS ==========
   
@@ -405,9 +415,13 @@ function getFieldLine(
     (mergeStrategy === "interactive" && userChoices?.get(key) === "new");
   
   if (shouldUseExisting && existing) {
-    const value = typeof existing.value === "string" && !existing.value.startsWith('"') 
-      ? `"${existing.value}"`
-      : existing.value;
+    let value = existing.value;
+
+    // Only wrap in quotes if it's a plain string (not already quoted, not an object/array)
+    if (typeof value === "string" && !value.startsWith('"') && !value.startsWith('{') && !value.startsWith('[')) {
+      value = `"${value}"`;
+    }
+
     return `${key}: ${value},`;
   }
   
@@ -460,9 +474,6 @@ function getDefaultComplexBlock(key: string): string {
     
     case "auth":
       return `// auth: {
-  //   // Strategy: "none" | "api-key" | "jwt-hs256"
-  //   strategy: "none",
-  //   
   //   // For API Key authentication
   //   apiKeyHeader: "x-api-key",  // Header name for API key
   //   apiKeys: [                  // List of valid API keys
@@ -473,8 +484,8 @@ function getDefaultComplexBlock(key: string): string {
   //   // For JWT (HS256) authentication
   //   jwt: {
   //     services: [                            // Array of services that can authenticate
-  //       { issuer: "web-app", secret: process.env.WEB_APP_SECRET },
-  //       { issuer: "mobile-app", secret: process.env.MOBILE_SECRET },
+  //       { issuer: "web-app", secret: "env:WEB_APP_SECRET" },
+  //       { issuer: "mobile-app", secret: "env:MOBILE_SECRET" },
   //     ],
   //     audience: "my-api",                    // Optional: validate 'aud' claim
   //   }

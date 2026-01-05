@@ -27,7 +27,7 @@ import { emitTableTest, emitTestSetup, emitDockerCompose, emitTestScript, emitVi
 import { emitUnifiedContract } from "./emit-sdk-contract";
 import { ensureDirs, writeFiles } from "./utils";
 import type { Config } from "./types";
-import { normalizeAuthConfig } from "./types";
+import { normalizeAuthConfig, getAuthStrategy } from "./types";
 
 export async function generate(configPath: string) {
   // Check if config file exists
@@ -145,7 +145,7 @@ export async function generate(configPath: string) {
   files.push({ path: join(serverDir, "logger.ts"), content: emitLogger() });
 
   // auth (server) - only if auth is configured
-  if (normalizedAuth?.strategy && normalizedAuth.strategy !== "none") {
+  if (getAuthStrategy(normalizedAuth) !== "none") {
     files.push({ path: join(serverDir, "auth.ts"), content: emitAuth(normalizedAuth) });
   }
 
@@ -180,7 +180,7 @@ export async function generate(configPath: string) {
       routeContent = emitHonoRoutes(table, graph, {
         softDeleteColumn: cfg.softDeleteColumn || null,
         includeMethodsDepth: cfg.includeMethodsDepth || 2,
-        authStrategy: normalizedAuth?.strategy,
+        authStrategy: getAuthStrategy(normalizedAuth),
         useJsExtensions: cfg.useJsExtensions,
         apiPathPrefix: cfg.apiPathPrefix || "/v1",
       });
@@ -215,7 +215,7 @@ export async function generate(configPath: string) {
   if (serverFramework === "hono") {
     files.push({
       path: join(serverDir, "router.ts"),
-      content: emitHonoRouter(Object.values(model.tables), !!normalizedAuth?.strategy && normalizedAuth.strategy !== "none", cfg.useJsExtensions),
+      content: emitHonoRouter(Object.values(model.tables), getAuthStrategy(normalizedAuth) !== "none", cfg.useJsExtensions),
     });
   }
   // Future: Add emitExpressRouter, emitFastifyRouter, etc.

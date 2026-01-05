@@ -1,5 +1,6 @@
 import type { Table, Model } from "./introspect";
 import type { Config, AuthConfig } from "./types";
+import { getAuthStrategy } from "./types";
 import type { Graph } from "./rel-classify";
 import { pascal } from "./utils";
 import { generateIncludeMethods } from "./emit-include-methods";
@@ -155,8 +156,9 @@ const sdk = new SDK({
 
 function generateSDKAuthExamples(auth?: AuthConfig): SDKAuthExample[] {
   const examples: SDKAuthExample[] = [];
-  
-  if (!auth || auth.strategy === 'none' || !auth.strategy) {
+  const strategy = getAuthStrategy(auth);
+
+  if (strategy === 'none') {
     examples.push({
       strategy: "none",
       description: "No authentication required",
@@ -165,8 +167,8 @@ function generateSDKAuthExamples(auth?: AuthConfig): SDKAuthExample[] {
 });`
     });
   }
-  
-  if (auth?.strategy === 'api-key') {
+
+  if (strategy === 'api-key') {
     examples.push({
       strategy: "apiKey",
       description: "API Key authentication",
@@ -179,8 +181,8 @@ function generateSDKAuthExamples(auth?: AuthConfig): SDKAuthExample[] {
 });`
     });
   }
-  
-  if (auth?.strategy === 'jwt-hs256') {
+
+  if (strategy === 'jwt-hs256') {
     examples.push({
       strategy: "jwt",
       description: "JWT Bearer token authentication",

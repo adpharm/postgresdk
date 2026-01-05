@@ -103,7 +103,6 @@ async function applySchemaWithPg(sqlPath: string) {
 function writeTestConfig(withAuth = false) {
   const authConfig = withAuth ? `,
   auth: {
-    strategy: "api-key",
     apiKeyHeader: "x-api-key",
     apiKeys: ["test-key-123", "test-key-456"]
   }` : "";
@@ -592,7 +591,6 @@ async function main() {
   softDeleteColumn: null,
   includeMethodsDepth: 3,
   auth: {
-    strategy: "api-key",
     apiKeyHeader: "x-api-key",
     apiKeys: ["test-key-123", "test-key-456"]
   }
@@ -694,7 +692,6 @@ async function main() {
   softDeleteColumn: null,
   includeMethodsDepth: 3,
   auth: {
-    strategy: "jwt-hs256",
     jwt: {
       services: [
         { issuer: "test-app", secret: "hardcoded-secret-value" }
@@ -722,7 +719,6 @@ async function main() {
   softDeleteColumn: null,
   includeMethodsDepth: 3,
   auth: {
-    strategy: "jwt-hs256",
     jwt: {
       services: [
         { issuer: "test-app", secret: "env:TEST_JWT_SECRET" }

@@ -1,7 +1,8 @@
 import type { AuthConfig } from "./types";
+import { getAuthStrategy } from "./types";
 
 export function emitAuth(cfgAuth: AuthConfig | undefined) {
-  const strategy = cfgAuth?.strategy ?? "none";
+  const strategy = getAuthStrategy(cfgAuth);
 
   const apiKeyHeader = cfgAuth?.apiKeyHeader ?? "x-api-key";
   const apiKeys = cfgAuth?.apiKeys ?? [];

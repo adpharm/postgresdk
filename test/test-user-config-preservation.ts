@@ -6,8 +6,7 @@ import { extractConfigFields, generateMergedConfig } from "../src/cli-config-uti
 const userConfig = `export default {
   connectionString: process.env.DATABASE_URL || "postgres://user:pass@localhost:5432/mydb",
   schema: "public",
-  outServer: "./api/server",
-  outClient: "./api/client",
+  outDir: { server: "./api/server", client: "./api/client" },
   tests: {
     generate: true,
     output: "./api-generated",

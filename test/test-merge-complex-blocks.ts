@@ -12,7 +12,6 @@ const configWithComplexBlocks = `export default {
     framework: "bun", // or "jest" or "bun"
   },
   auth: {
-    strategy: "api-key",
     apiKeys: [
       process.env.API_KEY_1,
       process.env.API_KEY_2,
@@ -42,7 +41,7 @@ const hasCompleteTestsBlock = keepExistingConfig.includes('generate: true') &&
                               keepExistingConfig.includes('output: "./api-generated"') && 
                               keepExistingConfig.includes('framework: "bun"');
 
-const hasCompleteAuthBlock = keepExistingConfig.includes('strategy: "api-key"') && 
+const hasCompleteAuthBlock = keepExistingConfig.includes('apiKeys:') &&
                              keepExistingConfig.includes('process.env.API_KEY_1');
 
 const hasCompletePullBlock = keepExistingConfig.includes('from: "https://api.myapp.com"') && 

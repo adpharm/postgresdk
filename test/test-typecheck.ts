@@ -58,7 +58,6 @@ const testCases: TestCase[] = [
         client: "${TEST_DIR}/auth-apikey/client"
       },
       auth: {
-        strategy: "api-key",
         apiKeyHeader: "x-api-key",
         apiKeys: ["test-key"]
       }
@@ -75,7 +74,6 @@ const testCases: TestCase[] = [
         client: "${TEST_DIR}/auth-jwt/client"
       },
       auth: {
-        strategy: "jwt-hs256",
         jwt: {
           services: [
             { issuer: "test", secret: "env:TEST_JWT_SECRET" }

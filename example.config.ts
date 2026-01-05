@@ -205,9 +205,6 @@ export default {
    * === Full syntax for advanced options ===
    */
   auth: {
-    // Strategy: "none" | "api-key" | "jwt-hs256"
-    strategy: "api-key",
-
     // ===== For API Key authentication =====
 
     /**
@@ -332,10 +329,9 @@ export default {
  *   includeMethodsDepth: 2,
  *   dateType: "string",
  *   auth: {
- *     strategy: "jwt-hs256",
  *     jwt: {
  *       services: [
- *         { issuer: "my-saas-app", secret: process.env.JWT_SECRET! }
+ *         { issuer: "my-saas-app", secret: "env:JWT_SECRET" }
  *       ],
  *       audience: "customers"
  *     }
