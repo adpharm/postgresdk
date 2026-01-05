@@ -599,6 +599,8 @@ result.limit;      // number - page size used
 result.offset;     // number - offset used
 result.hasMore;    // boolean - more pages available
 
+// Note: Maximum limit is 1000 records per request
+
 // Calculate pagination info
 const totalPages = Math.ceil(result.total / result.limit);
 const currentPage = Math.floor(result.offset / result.limit) + 1;
