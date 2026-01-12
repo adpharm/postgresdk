@@ -3,10 +3,18 @@ import type { Graph } from "./rel-classify";
 import { pascal } from "./utils";
 import { generateIncludeMethods } from "./emit-include-methods";
 
+/**
+ * Check if a PostgreSQL type is a vector type (vector, halfvec, sparsevec, bit)
+ */
+function isVectorType(pgType: string): boolean {
+  const t = pgType.toLowerCase();
+  return t === "vector" || t === "halfvec" || t === "sparsevec" || t === "bit";
+}
+
 export function emitClient(
-  table: Table, 
+  table: Table,
   graph: Graph,
-  opts: { 
+  opts: {
     useJsExtensions?: boolean;
     includeMethodsDepth?: number;
     skipJunctionTables?: boolean;
@@ -15,6 +23,9 @@ export function emitClient(
 ) {
   const Type = pascal(table.name);
   const ext = opts.useJsExtensions ? ".js" : "";
+
+  // Check if table has any vector columns
+  const hasVectorColumns = table.columns.some(c => isVectorType(c.pgType));
 
   // Normalize PKs
   const pkCols: string[] = Array.isArray((table as any).pk)
@@ -192,7 +203,7 @@ export class ${Type}Client extends BaseClient {
     where?: Where<Select${Type}>;
     orderBy?: string | string[];
     order?: "asc" | "desc" | ("asc" | "desc")[];
-  }): Promise<PaginatedResponse<Select${Type}>>;
+  }): Promise<PaginatedResponse<Select${Type}>>;${hasVectorColumns ? `
   /**
    * List ${table.name} records with vector similarity search
    * @param params - Query parameters with vector search enabled
@@ -212,7 +223,7 @@ export class ${Type}Client extends BaseClient {
     };
     orderBy?: string | string[];
     order?: "asc" | "desc" | ("asc" | "desc")[];
-  }): Promise<PaginatedResponse<Select${Type} & { _distance: number }>>;
+  }): Promise<PaginatedResponse<Select${Type} & { _distance: number }>>;` : ""}
   /**
    * List ${table.name} records with pagination and filtering, with JSONB type overrides
    * @param params - Query parameters with typed JSONB fields in where clause
@@ -222,13 +233,13 @@ export class ${Type}Client extends BaseClient {
     include?: any;
     limit?: number;
     offset?: number;
-    where?: Where<MergeJsonb<Select${Type}, TJsonb>>;
+    where?: Where<MergeJsonb<Select${Type}, TJsonb>>;${hasVectorColumns ? `
     vector?: {
       field: string;
       query: number[];
       metric?: "cosine" | "l2" | "inner";
       maxDistance?: number;
-    };
+    };` : ""}
     orderBy?: string | string[];
     order?: "asc" | "desc" | ("asc" | "desc")[];
   }): Promise<PaginatedResponse<MergeJsonb<Select${Type}, TJsonb>>>;

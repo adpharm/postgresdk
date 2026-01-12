@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - TypeScript types restrict JSONB operators to object/unknown columns only
   - Full integration test coverage for all JSONB operators
 - feat: Add pgvector similarity search support
-  - Automatically detects `vector` columns during introspection
+  - Automatically detects vector columns during introspection (vector, halfvec, sparsevec, bit)
   - Extracts vector dimensions from PostgreSQL type metadata
   - Added `vector` parameter to list operations with field, query, metric, and maxDistance options
   - Supports three distance metrics: cosine (default), L2, and inner product
@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Hybrid search: combine vector similarity with traditional WHERE filters
   - Parallel multi-modal search across multiple vector fields (vision + text embeddings)
   - Auto-excludes NULL embeddings from vector search results
+  - Vector overloads only generated for tables with vector columns (cleaner types for non-vector tables)
   - Full integration test coverage with pgvector Docker image
 - feat: Add JSONB type generics to client SDK methods
   - All CRUD methods now support type parameter for JSONB field overrides

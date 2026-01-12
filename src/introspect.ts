@@ -105,9 +105,10 @@ export async function introspect(connectionString: string, schema: string): Prom
         hasDefault: r.column_default != null,
       };
 
-      // Extract vector dimension if column is vector type
-      if (pgType === "vector" && r.atttypmod != null && r.atttypmod !== -1) {
-        // atttypmod for vector stores dimension + 4 (typmod encoding)
+      // Extract vector dimension if column is a vector type (vector, halfvec, sparsevec, bit)
+      const isVectorType = pgType === "vector" || pgType === "halfvec" || pgType === "sparsevec" || pgType === "bit";
+      if (isVectorType && r.atttypmod != null && r.atttypmod !== -1) {
+        // atttypmod for vector types stores dimension + 4 (typmod encoding)
         col.vectorDimension = r.atttypmod - 4;
       }
 
