@@ -5,6 +5,7 @@ export type Column = {
   pgType: string;
   nullable: boolean;
   hasDefault: boolean;
+  vectorDimension?: number;
 };
 
 export type ForeignKey = {
@@ -74,23 +75,43 @@ export async function introspect(connectionString: string, schema: string): Prom
       udt_name: string;
       data_type: string;
       column_default: string | null;
+      atttypmod: number | null;
     }>(
       `
-      SELECT table_name, column_name, is_nullable, udt_name, data_type, column_default
-      FROM information_schema.columns
-      WHERE table_schema = $1
-      ORDER BY table_name, ordinal_position
+      SELECT
+        c.table_name,
+        c.column_name,
+        c.is_nullable,
+        c.udt_name,
+        c.data_type,
+        c.column_default,
+        a.atttypmod
+      FROM information_schema.columns c
+      LEFT JOIN pg_catalog.pg_class cl ON cl.relname = c.table_name
+      LEFT JOIN pg_catalog.pg_namespace n ON n.oid = cl.relnamespace AND n.nspname = c.table_schema
+      LEFT JOIN pg_catalog.pg_attribute a ON a.attrelid = cl.oid AND a.attname = c.column_name
+      WHERE c.table_schema = $1
+      ORDER BY c.table_name, c.ordinal_position
       `,
       [schema]
     );
     for (const r of colsRows.rows) {
       const t = ensureTable(tables, r.table_name);
-      t.columns.push({
+      const pgType = (r.udt_name ?? r.data_type).toLowerCase();
+      const col: Column = {
         name: r.column_name,
-        pgType: (r.udt_name ?? r.data_type).toLowerCase(),
+        pgType,
         nullable: r.is_nullable === "YES",
         hasDefault: r.column_default != null,
-      });
+      };
+
+      // Extract vector dimension if column is vector type
+      if (pgType === "vector" && r.atttypmod != null && r.atttypmod !== -1) {
+        // atttypmod for vector stores dimension + 4 (typmod encoding)
+        col.vectorDimension = r.atttypmod - 4;
+      }
+
+      t.columns.push(col);
     }
 
     const pkRows = await pg.query<{ table_name: string; cols: string[] }>(

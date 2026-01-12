@@ -5,7 +5,11 @@
 -- Needed for gen_random_uuid()
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
+-- Needed for vector similarity search
+CREATE EXTENSION IF NOT EXISTS "vector";
+
 -- Drop in dependency order (M:N junctions first)
+DROP TABLE IF EXISTS video_sections CASCADE;
 DROP TABLE IF EXISTS book_tags CASCADE;
 DROP TABLE IF EXISTS books CASCADE;
 DROP TABLE IF EXISTS tags CASCADE;
@@ -41,3 +45,18 @@ CREATE TABLE book_tags (
 CREATE INDEX IF NOT EXISTS idx_books_author ON books(author_id);
 CREATE INDEX IF NOT EXISTS idx_book_tags_book ON book_tags(book_id);
 CREATE INDEX IF NOT EXISTS idx_book_tags_tag ON book_tags(tag_id);
+
+-- Video sections for vector search testing
+CREATE TABLE video_sections (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title             TEXT NOT NULL,
+  status            TEXT DEFAULT 'draft',
+  vision_embedding  vector(3),  -- Small dimension for testing
+  text_embedding    vector(3),
+  created_at        TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Vector indexes for similarity search performance
+-- NOTE: Commented out for tests as ivfflat requires more data to work properly
+-- CREATE INDEX IF NOT EXISTS idx_video_sections_vision ON video_sections USING ivfflat (vision_embedding vector_cosine_ops);
+-- CREATE INDEX IF NOT EXISTS idx_video_sections_text ON video_sections USING ivfflat (text_embedding vector_cosine_ops);

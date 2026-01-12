@@ -85,7 +85,13 @@ const listSchema = z.object({
   include: z.any().optional(),         // TODO: typed include spec in later pass
   limit: z.number().int().positive().max(1000).optional(),
   offset: z.number().int().min(0).optional(),
-  orderBy: z.any().optional()          // TODO: typed orderBy in a later pass
+  orderBy: z.any().optional(),         // TODO: typed orderBy in a later pass
+  vector: z.object({
+    field: z.string(),
+    query: z.array(z.number()),
+    metric: z.enum(["cosine", "l2", "inner"]).optional(),
+    maxDistance: z.number().optional()
+  }).optional()
 });
 
 export function register${Type}Routes(app: Hono, deps: { pg: { query: (text: string, params?: any[]) => Promise<{ rows: any[] }> } }) {

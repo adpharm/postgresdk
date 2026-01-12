@@ -7,9 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- feat: Add JSONB query operators for PostgreSQL JSON columns
+  - Added `$jsonbContains` operator for containment checks (`@>`)
+  - Added `$jsonbContainedBy` operator for reverse containment (`<@`)
+  - Added `$jsonbHasKey`, `$jsonbHasAnyKeys`, `$jsonbHasAllKeys` for key existence checks
+  - Added `$jsonbPath` operator for querying nested values with deep path traversal
+  - Supports equality, comparison, and pattern matching operators on nested paths
+  - All operators work with existing `$and`/`$or` logical operators
+  - TypeScript types restrict JSONB operators to object/unknown columns only
+  - Full integration test coverage for all JSONB operators
+- feat: Add pgvector similarity search support
+  - Automatically detects `vector` columns during introspection
+  - Extracts vector dimensions from PostgreSQL type metadata
+  - Added `vector` parameter to list operations with field, query, metric, and maxDistance options
+  - Supports three distance metrics: cosine (default), L2, and inner product
+  - Returns `_distance` field in results ordered by similarity
+  - Optional `maxDistance` threshold for filtering results
+  - Hybrid search: combine vector similarity with traditional WHERE filters
+  - Parallel multi-modal search across multiple vector fields (vision + text embeddings)
+  - Auto-excludes NULL embeddings from vector search results
+  - Full integration test coverage with pgvector Docker image
+- feat: Add JSONB type generics to client SDK methods
+  - All CRUD methods now support type parameter for JSONB field overrides
+  - Enables type-safe JSONB queries: `list<{ metadata: Metadata }>({ where: ... })`
+  - Introduced `MergeJsonb<TBase, TJsonb>` helper type for combining base types with JSONB overrides
+  - JSDoc examples demonstrate usage patterns
+  - Overloaded method signatures preserve backward compatibility
 - docs: Document 1000 record pagination limit in README
   - Added note in Filtering & Pagination section clarifying max limit per request
   - Aligns documentation with v0.15.5 server-side validation change
+- docs: Add JSONB query examples to README
+  - Show all JSONB operators with practical examples
+  - Demonstrate type-safe JSONB with TypeScript generics
+  - Include examples of combining JSONB operators with `$and`/`$or`
+- docs: Add vector search documentation to README
+  - Comprehensive examples for basic similarity search, distance thresholds, hybrid search
+  - Show parallel multi-modal search pattern (vision + text embeddings)
+  - Document all three distance metrics with use cases
+  - Explain NULL embedding handling and auto-exclusion behavior
 
 ## [v0.15.6] - 2026-01-05
 

@@ -13,6 +13,25 @@ export function emitWhereTypes() {
  */
 
 /**
+ * Deep partial type for JSONB contains operator
+ */
+type DeepPartial<T> = T extends object ? {
+  [P in keyof T]?: DeepPartial<T[P]>;
+} : T;
+
+/**
+ * JSONB path query configuration
+ */
+type JsonbPathQuery = {
+  /** Array of keys to traverse (e.g., ['user', 'preferences', 'theme']) */
+  path: string[];
+  /** Operator to apply to the value at the path (defaults to '$eq') */
+  operator?: '$eq' | '$ne' | '$gt' | '$gte' | '$lt' | '$lte' | '$like' | '$ilike';
+  /** Value to compare against */
+  value: any;
+};
+
+/**
  * WHERE clause operators for filtering
  */
 export type WhereOperator<T> = {
@@ -40,6 +59,20 @@ export type WhereOperator<T> = {
   $is?: null;
   /** IS NOT NULL */
   $isNot?: null;
+
+  // JSONB operators (only available for object/unknown types)
+  /** JSONB contains (@>) - check if column contains the specified JSON structure */
+  $jsonbContains?: T extends object | unknown ? (unknown extends T ? any : DeepPartial<T>) : never;
+  /** JSONB contained by (<@) - check if column is contained by the specified JSON */
+  $jsonbContainedBy?: T extends object | unknown ? any : never;
+  /** JSONB has key (?) - check if top-level key exists */
+  $jsonbHasKey?: T extends object | unknown ? string : never;
+  /** JSONB has any keys (?|) - check if any of the specified keys exist */
+  $jsonbHasAnyKeys?: T extends object | unknown ? string[] : never;
+  /** JSONB has all keys (?&) - check if all of the specified keys exist */
+  $jsonbHasAllKeys?: T extends object | unknown ? string[] : never;
+  /** JSONB path query - query nested values. For multiple paths on same column, use $and */
+  $jsonbPath?: T extends object | unknown ? JsonbPathQuery : never;
 };
 
 /**

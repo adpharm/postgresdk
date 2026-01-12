@@ -61,7 +61,13 @@ const listSchema = z.object({
   limit: z.number().int().positive().max(1000).optional(),
   offset: z.number().int().min(0).optional(),
   orderBy: z.union([columnEnum, z.array(columnEnum)]).optional(),
-  order: z.union([z.enum(["asc", "desc"]), z.array(z.enum(["asc", "desc"]))]).optional()
+  order: z.union([z.enum(["asc", "desc"]), z.array(z.enum(["asc", "desc"]))]).optional(),
+  vector: z.object({
+    field: z.string(),
+    query: z.array(z.number()),
+    metric: z.enum(["cosine", "l2", "inner"]).optional(),
+    maxDistance: z.number().optional()
+  }).optional()
 });
 
 /**

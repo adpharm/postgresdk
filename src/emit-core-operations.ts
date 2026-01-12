@@ -190,6 +190,100 @@ function buildWhereClause(
               whereParts.push(\`"\${key}" IS NOT NULL\`);
             }
             break;
+          case '$jsonbContains':
+            whereParts.push(\`"\${key}" @> $\${paramIndex}\`);
+            whereParams.push(JSON.stringify(opValue));
+            paramIndex++;
+            break;
+          case '$jsonbContainedBy':
+            whereParts.push(\`"\${key}" <@ $\${paramIndex}\`);
+            whereParams.push(JSON.stringify(opValue));
+            paramIndex++;
+            break;
+          case '$jsonbHasKey':
+            whereParts.push(\`"\${key}" ? $\${paramIndex}\`);
+            whereParams.push(opValue);
+            paramIndex++;
+            break;
+          case '$jsonbHasAnyKeys':
+            if (Array.isArray(opValue) && opValue.length > 0) {
+              whereParts.push(\`"\${key}" ?| $\${paramIndex}\`);
+              whereParams.push(opValue);
+              paramIndex++;
+            }
+            break;
+          case '$jsonbHasAllKeys':
+            if (Array.isArray(opValue) && opValue.length > 0) {
+              whereParts.push(\`"\${key}" ?& $\${paramIndex}\`);
+              whereParams.push(opValue);
+              paramIndex++;
+            }
+            break;
+          case '$jsonbPath':
+            const pathConfig = opValue;
+            const pathKeys = pathConfig.path;
+            const pathOperator = pathConfig.operator || '$eq';
+            const pathValue = pathConfig.value;
+
+            if (!Array.isArray(pathKeys) || pathKeys.length === 0) {
+              break;
+            }
+
+            // Build path accessor: metadata->'user'->'preferences'->>'theme'
+            // Use -> for all keys except the last one, use ->> for the last to get text
+            const pathParts = pathKeys.slice(0, -1);
+            const lastKey = pathKeys[pathKeys.length - 1];
+
+            let pathExpr = \`"\${key}"\`;
+            for (const part of pathParts) {
+              pathExpr += \`->'\${part}'\`;
+            }
+            pathExpr += \`->>'\${lastKey}'\`;
+
+            // Apply the operator
+            switch (pathOperator) {
+              case '$eq':
+                whereParts.push(\`\${pathExpr} = $\${paramIndex}\`);
+                whereParams.push(String(pathValue));
+                paramIndex++;
+                break;
+              case '$ne':
+                whereParts.push(\`\${pathExpr} != $\${paramIndex}\`);
+                whereParams.push(String(pathValue));
+                paramIndex++;
+                break;
+              case '$gt':
+                whereParts.push(\`(\${pathExpr})::numeric > $\${paramIndex}\`);
+                whereParams.push(pathValue);
+                paramIndex++;
+                break;
+              case '$gte':
+                whereParts.push(\`(\${pathExpr})::numeric >= $\${paramIndex}\`);
+                whereParams.push(pathValue);
+                paramIndex++;
+                break;
+              case '$lt':
+                whereParts.push(\`(\${pathExpr})::numeric < $\${paramIndex}\`);
+                whereParams.push(pathValue);
+                paramIndex++;
+                break;
+              case '$lte':
+                whereParts.push(\`(\${pathExpr})::numeric <= $\${paramIndex}\`);
+                whereParams.push(pathValue);
+                paramIndex++;
+                break;
+              case '$like':
+                whereParts.push(\`\${pathExpr} LIKE $\${paramIndex}\`);
+                whereParams.push(pathValue);
+                paramIndex++;
+                break;
+              case '$ilike':
+                whereParts.push(\`\${pathExpr} ILIKE $\${paramIndex}\`);
+                whereParams.push(pathValue);
+                paramIndex++;
+                break;
+            }
+            break;
         }
       }
     } else if (value === null) {
@@ -245,17 +339,51 @@ function buildWhereClause(
 }
 
 /**
- * LIST operation - Get multiple records with optional filters
+ * Get distance operator for vector similarity search
+ */
+function getVectorDistanceOperator(metric?: string): string {
+  switch (metric) {
+    case "l2":
+      return "<->";
+    case "inner":
+      return "<#>";
+    case "cosine":
+    default:
+      return "<=>";
+  }
+}
+
+/**
+ * LIST operation - Get multiple records with optional filters and vector search
  */
 export async function listRecords(
   ctx: OperationContext,
-  params: { where?: any; limit?: number; offset?: number; include?: any; orderBy?: string | string[]; order?: "asc" | "desc" | ("asc" | "desc")[] }
+  params: {
+    where?: any;
+    limit?: number;
+    offset?: number;
+    include?: any;
+    orderBy?: string | string[];
+    order?: "asc" | "desc" | ("asc" | "desc")[];
+    vector?: {
+      field: string;
+      query: number[];
+      metric?: "cosine" | "l2" | "inner";
+      maxDistance?: number;
+    };
+  }
 ): Promise<{ data?: any; total?: number; limit?: number; offset?: number; hasMore?: boolean; error?: string; issues?: any; needsIncludes?: boolean; includeSpec?: any; status: number }> {
   try {
-    const { where: whereClause, limit = 50, offset = 0, include, orderBy, order } = params;
+    const { where: whereClause, limit = 50, offset = 0, include, orderBy, order, vector } = params;
 
-    // Build WHERE clause
-    let paramIndex = 1;
+    // Get distance operator if vector search
+    const distanceOp = vector ? getVectorDistanceOperator(vector.metric) : "";
+
+    // Add vector to params array if present
+    const queryParams: any[] = vector ? [JSON.stringify(vector.query)] : [];
+
+    // Build WHERE clause for SELECT/UPDATE queries (with vector as $1 if present)
+    let paramIndex = vector ? 2 : 1;
     const whereParts: string[] = [];
     let whereParams: any[] = [];
 
@@ -274,11 +402,47 @@ export async function listRecords(
       }
     }
 
+    // Add vector distance threshold filter if specified
+    if (vector?.maxDistance !== undefined) {
+      whereParts.push(\`("\${vector.field}" \${distanceOp} ($1)::vector) < \${vector.maxDistance}\`);
+    }
+
     const whereSQL = whereParts.length > 0 ? \`WHERE \${whereParts.join(" AND ")}\` : "";
+
+    // Build WHERE clause for COUNT query (may need different param indices)
+    let countWhereSQL = whereSQL;
+    let countParams = whereParams;
+
+    if (vector && vector.maxDistance === undefined && whereParams.length > 0) {
+      // COUNT query doesn't use vector, so rebuild WHERE without vector offset
+      const countWhereParts: string[] = [];
+      if (ctx.softDeleteColumn) {
+        countWhereParts.push(\`"\${ctx.softDeleteColumn}" IS NULL\`);
+      }
+      if (whereClause) {
+        const result = buildWhereClause(whereClause, 1); // Start at $1 for count
+        if (result.sql) {
+          countWhereParts.push(result.sql);
+          countParams = result.params;
+        }
+      }
+      countWhereSQL = countWhereParts.length > 0 ? \`WHERE \${countWhereParts.join(" AND ")}\` : "";
+    } else if (vector?.maxDistance !== undefined) {
+      // COUNT query includes vector for maxDistance filter
+      countParams = [...queryParams, ...whereParams];
+    }
+
+    // Build SELECT clause
+    const selectClause = vector
+      ? \`*, ("\${vector.field}" \${distanceOp} ($1)::vector) AS _distance\`
+      : "*";
 
     // Build ORDER BY clause
     let orderBySQL = "";
-    if (orderBy) {
+    if (vector) {
+      // For vector search, always order by distance
+      orderBySQL = \`ORDER BY "\${vector.field}" \${distanceOp} ($1)::vector\`;
+    } else if (orderBy) {
       const columns = Array.isArray(orderBy) ? orderBy : [orderBy];
       const directions = Array.isArray(order) ? order : (order ? Array(columns.length).fill(order) : Array(columns.length).fill("asc"));
 
@@ -293,16 +457,16 @@ export async function listRecords(
     // Add limit and offset params
     const limitParam = \`$\${paramIndex}\`;
     const offsetParam = \`$\${paramIndex + 1}\`;
-    const allParams = [...whereParams, limit, offset];
+    const allParams = [...queryParams, ...whereParams, limit, offset];
 
     // Get total count for pagination
-    const countText = \`SELECT COUNT(*) FROM "\${ctx.table}" \${whereSQL}\`;
-    log.debug(\`LIST \${ctx.table} COUNT SQL:\`, countText, "params:", whereParams);
-    const countResult = await ctx.pg.query(countText, whereParams);
+    const countText = \`SELECT COUNT(*) FROM "\${ctx.table}" \${countWhereSQL}\`;
+    log.debug(\`LIST \${ctx.table} COUNT SQL:\`, countText, "params:", countParams);
+    const countResult = await ctx.pg.query(countText, countParams);
     const total = parseInt(countResult.rows[0].count, 10);
 
     // Get paginated data
-    const text = \`SELECT * FROM "\${ctx.table}" \${whereSQL} \${orderBySQL} LIMIT \${limitParam} OFFSET \${offsetParam}\`;
+    const text = \`SELECT \${selectClause} FROM "\${ctx.table}" \${whereSQL} \${orderBySQL} LIMIT \${limitParam} OFFSET \${offsetParam}\`;
     log.debug(\`LIST \${ctx.table} SQL:\`, text, "params:", allParams);
 
     const { rows } = await ctx.pg.query(text, allParams);

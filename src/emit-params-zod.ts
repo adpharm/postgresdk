@@ -27,6 +27,7 @@ export function emitParamsZod(table: Table, graph: Graph) {
     : `z.string().min(1)`;
 
   return `import { z } from "zod";
+import { VectorSearchParamsSchema } from "./shared.js";
 
 // Schema for primary key parameters
 export const ${Type}PkSchema = ${pkSchema};
@@ -37,6 +38,7 @@ export const ${Type}ListParamsSchema = z.object({
   limit: z.number().int().positive().max(1000).optional(),
   offset: z.number().int().nonnegative().optional(),
   where: z.any().optional(),
+  vector: VectorSearchParamsSchema.optional(),
   orderBy: z.enum([${columnNames}]).optional(),
   order: z.enum(["asc", "desc"]).optional()
 }).strict();

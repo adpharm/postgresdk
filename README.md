@@ -54,6 +54,7 @@ const filtered = await sdk.users.list({
 - 🔒 **Type Safety** - Full TypeScript types derived from your database schema (including enum types)
 - ✅ **Runtime Validation** - Zod schemas for request/response validation
 - 🔗 **Smart Relationships** - Automatic handling of 1:N and M:N relationships with eager loading
+- 🔍 **Vector Search** - Built-in pgvector support for similarity search with multiple distance metrics
 - 🔐 **Built-in Auth** - API key and JWT authentication
 - 🎯 **Zero Config** - Works out of the box with sensible defaults
 - 📦 **Lightweight** - Minimal dependencies, optimized bundle size
@@ -157,7 +158,8 @@ export default {
     jwt: {                              // JWT with multi-service support
       services: [
         { issuer: "my-app", secret: "env:JWT_SECRET" }  // Use "env:" prefix!
-      ]
+      ],
+      audience: "my-api"                // Optional: validate aud claim
     }
   },
 
@@ -669,9 +671,127 @@ do {
   offset += limit;
   if (!page.hasMore) break;
 } while (true);
+
+// JSONB queries
+const products = await sdk.products.list({
+  where: {
+    metadata: { $jsonbContains: { tags: ["premium"] } },  // Contains check
+    settings: { $jsonbHasKey: "theme" },                  // Key exists
+    $and: [
+      { config: { $jsonbPath: { path: ["price"], operator: "$gte", value: 100 } } },  // Nested value
+      { config: { $jsonbPath: { path: ["category"], value: "electronics" } } }
+    ]
+  }
+});
+
+// Type-safe JSONB with generics
+type Metadata = { tags: string[]; stats: { views: number } };
+const users = await sdk.users.list<{ metadata: Metadata }>({
+  where: {
+    metadata: { $jsonbContains: { tags: ["vip"] } }  // Fully typed!
+  }
+});
+users.data[0].metadata.stats.views;  // TypeScript knows this is a number
 ```
 
-See the generated SDK documentation for all available operators: `$eq`, `$ne`, `$gt`, `$gte`, `$lt`, `$lte`, `$in`, `$nin`, `$like`, `$ilike`, `$is`, `$isNot`, `$or`, `$and`.
+#### Vector Search (pgvector)
+
+PostgreSDK automatically detects `vector` columns and enables similarity search using [pgvector](https://github.com/pgvector/pgvector). Requires pgvector extension installed.
+
+```sql
+-- Example schema with vector columns
+CREATE EXTENSION vector;
+
+CREATE TABLE video_sections (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title TEXT NOT NULL,
+  vision_embedding vector(1536),  -- Image/video embeddings
+  text_embedding vector(1536),     -- Text embeddings
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+```typescript
+// Basic vector similarity search
+const results = await sdk.video_sections.list({
+  vector: {
+    field: "vision_embedding",
+    query: visionEmbeddingArray,  // number[] - your embedding vector
+    metric: "cosine"  // "cosine" (default), "l2", or "inner"
+  },
+  limit: 10
+});
+
+// Returns records ordered by similarity, with distance included
+results.data.forEach(section => {
+  console.log(section.title, section._distance);  // _distance auto-included
+});
+
+// Distance threshold filtering
+const closeMatches = await sdk.video_sections.list({
+  vector: {
+    field: "vision_embedding",
+    query: embedding,
+    metric: "cosine",
+    maxDistance: 0.5  // Only return results within this distance
+  },
+  limit: 50
+});
+
+// Hybrid search: combine vector similarity with traditional filters
+const results = await sdk.video_sections.list({
+  vector: {
+    field: "vision_embedding",
+    query: embedding,
+    maxDistance: 0.6
+  },
+  where: {
+    status: "published",
+    vision_embedding: { $isNot: null }  // Ensure embedding exists
+  },
+  limit: 20
+});
+
+// Parallel multi-modal search (vision + text)
+const [visionResults, textResults] = await Promise.all([
+  sdk.video_sections.list({
+    vector: {
+      field: "vision_embedding",
+      query: visionQueryEmbedding,
+      metric: "cosine",
+      maxDistance: 0.6
+    },
+    where: { vision_embedding: { $isNot: null } },
+    limit: 50
+  }),
+
+  sdk.video_sections.list({
+    vector: {
+      field: "text_embedding",
+      query: textQueryEmbedding,
+      metric: "cosine",
+      maxDistance: 0.5
+    },
+    where: { text_embedding: { $isNot: null } },
+    limit: 50
+  })
+]);
+
+// Merge and deduplicate results
+const allResults = [...visionResults.data, ...textResults.data];
+const uniqueResults = Array.from(
+  new Map(allResults.map(r => [r.id, r])).values()
+);
+```
+
+**Distance Metrics:**
+- `cosine`: Cosine distance (best for normalized embeddings, range 0-2)
+- `l2`: Euclidean distance (L2 norm)
+- `inner`: Inner product (negative for similarity)
+
+**Note:** Vector columns are auto-detected during introspection. Rows with `NULL` embeddings are excluded from vector search results.
+
+See the generated SDK documentation for all available operators: `$eq`, `$ne`, `$gt`, `$gte`, `$lt`, `$lte`, `$in`, `$nin`, `$like`, `$ilike`, `$is`, `$isNot`, `$or`, `$and`, `$jsonbContains`, `$jsonbContainedBy`, `$jsonbHasKey`, `$jsonbHasAnyKeys`, `$jsonbHasAllKeys`, `$jsonbPath`.
 
 ---
 

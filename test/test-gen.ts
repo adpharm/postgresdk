@@ -45,12 +45,12 @@ async function startPostgres(): Promise<void> {
       console.log("  → Creating new container...");
       // Pull image first if needed
       try {
-        await execAsync(`docker pull postgres:17-alpine`);
+        await execAsync(`docker pull pgvector/pgvector:pg17`);
       } catch {
         // Image might already exist
       }
-      
-      await execAsync(`docker run -d --name ${CONTAINER_NAME} -e POSTGRES_USER=user -e POSTGRES_PASSWORD=pass -e POSTGRES_DB=testdb -p 5432:5432 postgres:17-alpine`);
+
+      await execAsync(`docker run -d --name ${CONTAINER_NAME} -e POSTGRES_USER=user -e POSTGRES_PASSWORD=pass -e POSTGRES_DB=testdb -p 5432:5432 pgvector/pgvector:pg17`);
     }
   } catch (error) {
     console.error("Failed to start container:", error);

@@ -122,6 +122,13 @@ ${typeImports}
 ${otherTableImports.join("\n")}
 
 /**
+ * Helper type to merge JSONB type overrides into base types
+ * @example
+ * type UserWithMetadata = MergeJsonb<SelectUser, { metadata: { tags: string[] } }>;
+ */
+type MergeJsonb<TBase, TJsonb> = Omit<TBase, keyof TJsonb> & TJsonb;
+
+/**
  * Client for ${table.name} table operations
  */
 export class ${Type}Client extends BaseClient {
@@ -132,8 +139,20 @@ export class ${Type}Client extends BaseClient {
    * @param data - The data to insert
    * @returns The created record
    */
-  async create(data: Insert${Type}): Promise<Select${Type}> {
-    return this.post<Select${Type}>(this.resource, data);
+  async create(data: Insert${Type}): Promise<Select${Type}>;
+  /**
+   * Create a new ${table.name} record with JSONB type overrides
+   * @param data - The data to insert
+   * @returns The created record with typed JSONB fields
+   * @example
+   * type Metadata = { tags: string[]; prefs: { theme: 'light' | 'dark' } };
+   * const user = await client.create<{ metadata: Metadata }>({ name: 'Alice', metadata: { tags: [], prefs: { theme: 'light' } } });
+   */
+  async create<TJsonb extends Partial<Select${Type}>>(
+    data: MergeJsonb<Insert${Type}, TJsonb>
+  ): Promise<MergeJsonb<Select${Type}, TJsonb>>;
+  async create(data: any): Promise<any> {
+    return this.post<any>(this.resource, data);
   }
 
   /**
@@ -141,9 +160,18 @@ export class ${Type}Client extends BaseClient {
    * @param pk - The primary key value${hasCompositePk ? 's' : ''}
    * @returns The record if found, null otherwise
    */
-  async getByPk(pk: ${pkType}): Promise<Select${Type} | null> {
+  async getByPk(pk: ${pkType}): Promise<Select${Type} | null>;
+  /**
+   * Get a ${table.name} record by primary key with JSONB type overrides
+   * @param pk - The primary key value${hasCompositePk ? 's' : ''}
+   * @returns The record with typed JSONB fields if found, null otherwise
+   */
+  async getByPk<TJsonb extends Partial<Select${Type}>>(
+    pk: ${pkType}
+  ): Promise<MergeJsonb<Select${Type}, TJsonb> | null>;
+  async getByPk(pk: ${pkType}): Promise<any> {
     const path = ${pkPathExpr};
-    return this.get<Select${Type} | null>(\`\${this.resource}/\${path}\`);
+    return this.get<any>(\`\${this.resource}/\${path}\`);
   }
 
   /**
@@ -164,8 +192,48 @@ export class ${Type}Client extends BaseClient {
     where?: Where<Select${Type}>;
     orderBy?: string | string[];
     order?: "asc" | "desc" | ("asc" | "desc")[];
-  }): Promise<PaginatedResponse<Select${Type}>> {
-    return this.post<PaginatedResponse<Select${Type}>>(\`\${this.resource}/list\`, params ?? {});
+  }): Promise<PaginatedResponse<Select${Type}>>;
+  /**
+   * List ${table.name} records with vector similarity search
+   * @param params - Query parameters with vector search enabled
+   * @param params.vector - Vector similarity search configuration
+   * @returns Paginated results with _distance field included
+   */
+  async list(params: {
+    include?: any;
+    limit?: number;
+    offset?: number;
+    where?: Where<Select${Type}>;
+    vector: {
+      field: string;
+      query: number[];
+      metric?: "cosine" | "l2" | "inner";
+      maxDistance?: number;
+    };
+    orderBy?: string | string[];
+    order?: "asc" | "desc" | ("asc" | "desc")[];
+  }): Promise<PaginatedResponse<Select${Type} & { _distance: number }>>;
+  /**
+   * List ${table.name} records with pagination and filtering, with JSONB type overrides
+   * @param params - Query parameters with typed JSONB fields in where clause
+   * @returns Paginated results with typed JSONB fields
+   */
+  async list<TJsonb extends Partial<Select${Type}>>(params?: {
+    include?: any;
+    limit?: number;
+    offset?: number;
+    where?: Where<MergeJsonb<Select${Type}, TJsonb>>;
+    vector?: {
+      field: string;
+      query: number[];
+      metric?: "cosine" | "l2" | "inner";
+      maxDistance?: number;
+    };
+    orderBy?: string | string[];
+    order?: "asc" | "desc" | ("asc" | "desc")[];
+  }): Promise<PaginatedResponse<MergeJsonb<Select${Type}, TJsonb>>>;
+  async list(params?: any): Promise<any> {
+    return this.post<any>(\`\${this.resource}/list\`, params ?? {});
   }
 
   /**
@@ -174,9 +242,20 @@ export class ${Type}Client extends BaseClient {
    * @param patch - Partial data to update
    * @returns The updated record if found, null otherwise
    */
-  async update(pk: ${pkType}, patch: Update${Type}): Promise<Select${Type} | null> {
+  async update(pk: ${pkType}, patch: Update${Type}): Promise<Select${Type} | null>;
+  /**
+   * Update a ${table.name} record by primary key with JSONB type overrides
+   * @param pk - The primary key value${hasCompositePk ? 's' : ''}
+   * @param patch - Partial data to update with typed JSONB fields
+   * @returns The updated record with typed JSONB fields if found, null otherwise
+   */
+  async update<TJsonb extends Partial<Select${Type}>>(
+    pk: ${pkType},
+    patch: MergeJsonb<Update${Type}, TJsonb>
+  ): Promise<MergeJsonb<Select${Type}, TJsonb> | null>;
+  async update(pk: ${pkType}, patch: any): Promise<any> {
     const path = ${pkPathExpr};
-    return this.patch<Select${Type} | null>(\`\${this.resource}/\${path}\`, patch);
+    return this.patch<any>(\`\${this.resource}/\${path}\`, patch);
   }
 
   /**
@@ -184,9 +263,18 @@ export class ${Type}Client extends BaseClient {
    * @param pk - The primary key value${hasCompositePk ? 's' : ''}
    * @returns The deleted record if found, null otherwise
    */
-  async delete(pk: ${pkType}): Promise<Select${Type} | null> {
+  async delete(pk: ${pkType}): Promise<Select${Type} | null>;
+  /**
+   * Delete a ${table.name} record by primary key with JSONB type overrides
+   * @param pk - The primary key value${hasCompositePk ? 's' : ''}
+   * @returns The deleted record with typed JSONB fields if found, null otherwise
+   */
+  async delete<TJsonb extends Partial<Select${Type}>>(
+    pk: ${pkType}
+  ): Promise<MergeJsonb<Select${Type}, TJsonb> | null>;
+  async delete(pk: ${pkType}): Promise<any> {
     const path = ${pkPathExpr};
-    return this.del<Select${Type} | null>(\`\${this.resource}/\${path}\`);
+    return this.del<any>(\`\${this.resource}/\${path}\`);
   }
 ${includeMethodsCode}}
 `;
