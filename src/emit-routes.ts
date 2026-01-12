@@ -3,6 +3,14 @@ import type { Graph } from "./rel-classify";
 import { pascal } from "./utils";
 
 /**
+ * Check if a PostgreSQL type is a vector type (vector, halfvec, sparsevec, bit)
+ */
+function isVectorType(pgType: string): boolean {
+  const t = pgType.toLowerCase();
+  return t === "vector" || t === "halfvec" || t === "sparsevec" || t === "bit";
+}
+
+/**
  * Emits a Hono router for one table, using generated Zod schemas.
  *
  * Expects:
@@ -23,6 +31,9 @@ export function emitRoutes(
 ) {
   const fileTableName = table.name; // SQL table name for file/route
   const Type = pascal(table.name); // PascalCase for type/schemas
+
+  // Check if table has any vector columns
+  const hasVectorColumns = table.columns.some(c => isVectorType(c.pgType));
 
   // Normalize pk to an array and fallback to ["id"] if empty
   const rawPk = (table as any).pk;
@@ -85,13 +96,13 @@ const listSchema = z.object({
   include: z.any().optional(),         // TODO: typed include spec in later pass
   limit: z.number().int().positive().max(1000).optional(),
   offset: z.number().int().min(0).optional(),
-  orderBy: z.any().optional(),         // TODO: typed orderBy in a later pass
+  orderBy: z.any().optional(),         // TODO: typed orderBy in a later pass${hasVectorColumns ? `,
   vector: z.object({
     field: z.string(),
     query: z.array(z.number()),
     metric: z.enum(["cosine", "l2", "inner"]).optional(),
     maxDistance: z.number().optional()
-  }).optional()
+  }).optional()` : ""}
 });
 
 export function register${Type}Routes(app: Hono, deps: { pg: { query: (text: string, params?: any[]) => Promise<{ rows: any[] }> } }) {

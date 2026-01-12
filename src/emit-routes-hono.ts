@@ -6,6 +6,14 @@ import type { Table } from "./introspect";
 import type { Graph } from "./rel-classify";
 import { pascal } from "./utils";
 
+/**
+ * Check if a PostgreSQL type is a vector type (vector, halfvec, sparsevec, bit)
+ */
+function isVectorType(pgType: string): boolean {
+  const t = pgType.toLowerCase();
+  return t === "vector" || t === "halfvec" || t === "sparsevec" || t === "bit";
+}
+
 export function emitHonoRoutes(
   table: Table,
   _graph: Graph,
@@ -13,6 +21,9 @@ export function emitHonoRoutes(
 ) {
   const fileTableName = table.name;
   const Type = pascal(table.name);
+
+  // Check if table has any vector columns
+  const hasVectorColumns = table.columns.some(c => isVectorType(c.pgType));
   
   // Normalize pk to an array and fallback to ["id"] if empty
   const rawPk = (table as any).pk;
@@ -61,13 +72,13 @@ const listSchema = z.object({
   limit: z.number().int().positive().max(1000).optional(),
   offset: z.number().int().min(0).optional(),
   orderBy: z.union([columnEnum, z.array(columnEnum)]).optional(),
-  order: z.union([z.enum(["asc", "desc"]), z.array(z.enum(["asc", "desc"]))]).optional(),
+  order: z.union([z.enum(["asc", "desc"]), z.array(z.enum(["asc", "desc"]))]).optional(),${hasVectorColumns ? `
   vector: z.object({
     field: z.string(),
     query: z.array(z.number()),
     metric: z.enum(["cosine", "l2", "inner"]).optional(),
     maxDistance: z.number().optional()
-  }).optional()
+  }).optional()` : ""}
 });
 
 /**

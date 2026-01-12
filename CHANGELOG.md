@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- refactor: Conditionally generate vector types based on table schema
+  - Vector overloads and schemas only generated for tables with vector columns
+  - Expanded vector type detection to support halfvec, sparsevec, and bit types
+  - Cleaner TypeScript types for non-vector tables (no unused vector parameters)
+  - Debug logging available via SDK_DEBUG env var for troubleshooting vector detection
+- docs: Add JSONB and vector search to generated SDK contract
+  - JSONB operators included in operator reference table
+  - Vector search section with similarity search examples
+  - Vector type properly mapped in field type documentation
+
 ## [v0.16.0] - 2026-01-12
 
 - feat: Add JSONB query operators for PostgreSQL JSON columns
@@ -17,7 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - TypeScript types restrict JSONB operators to object/unknown columns only
   - Full integration test coverage for all JSONB operators
 - feat: Add pgvector similarity search support
-  - Automatically detects vector columns during introspection (vector, halfvec, sparsevec, bit)
+  - Automatically detects vector columns during introspection
   - Extracts vector dimensions from PostgreSQL type metadata
   - Added `vector` parameter to list operations with field, query, metric, and maxDistance options
   - Supports three distance metrics: cosine (default), L2, and inner product
@@ -26,7 +38,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Hybrid search: combine vector similarity with traditional WHERE filters
   - Parallel multi-modal search across multiple vector fields (vision + text embeddings)
   - Auto-excludes NULL embeddings from vector search results
-  - Vector overloads only generated for tables with vector columns (cleaner types for non-vector tables)
   - Full integration test coverage with pgvector Docker image
 - feat: Add JSONB type generics to client SDK methods
   - All CRUD methods now support type parameter for JSONB field overrides
@@ -46,10 +57,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Show parallel multi-modal search pattern (vision + text embeddings)
   - Document all three distance metrics with use cases
   - Explain NULL embedding handling and auto-exclusion behavior
-- docs: Add JSONB and vector search to generated SDK contract
-  - JSONB operators included in operator reference table
-  - Vector search section with similarity search examples
-  - Vector type properly mapped in field type documentation
 
 ## [v0.15.6] - 2026-01-05
 

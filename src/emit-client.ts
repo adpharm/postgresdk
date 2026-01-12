@@ -27,6 +27,14 @@ export function emitClient(
   // Check if table has any vector columns
   const hasVectorColumns = table.columns.some(c => isVectorType(c.pgType));
 
+  // Debug: log vector detection
+  if (process.env.SDK_DEBUG) {
+    const vectorCols = table.columns.filter(c => isVectorType(c.pgType));
+    if (vectorCols.length > 0) {
+      console.log(`[DEBUG] Table ${table.name}: Found ${vectorCols.length} vector columns:`, vectorCols.map(c => `${c.name} (${c.pgType})`));
+    }
+  }
+
   // Normalize PKs
   const pkCols: string[] = Array.isArray((table as any).pk)
     ? (table as any).pk
