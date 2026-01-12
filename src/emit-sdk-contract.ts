@@ -5,6 +5,17 @@ import type { Graph } from "./rel-classify";
 import { pascal } from "./utils";
 import { generateIncludeMethods } from "./emit-include-methods";
 
+/**
+ * Represents any valid JSON value (for JSONB/JSON columns)
+ */
+type JsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | JsonValue[]
+  | { [key: string]: JsonValue };
+
 export interface UnifiedContract {
   version: string;
   generatedAt: string;
@@ -489,7 +500,7 @@ function postgresTypeToTsType(column: any, enums: Record<string, string[]>): str
         return 'string'; // ISO date string
       case 'json':
       case 'jsonb':
-        return 'Record<string, any>';
+        return 'JsonValue';
       case 'uuid':
         return 'string';
       case 'text[]':

@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- refactor: Replace `Record<string, any>` with type-safe `JsonValue` for JSONB columns
+  - JSONB/JSON columns now use recursive `JsonValue` type instead of loose `any`
+  - Improves type safety while maintaining flexibility for nested JSON structures
+  - `JsonValue` supports string, number, boolean, null, arrays, and nested objects
+
 ## [v0.16.2] - 2026-01-12
 
 - refactor: Conditionally generate vector types based on table schema
