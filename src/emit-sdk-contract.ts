@@ -505,6 +505,8 @@ function postgresTypeToTsType(column: any, enums: Record<string, string[]>): str
       case '_int8':
       case '_integer':
         return 'number[]';
+      case 'vector':
+        return 'number[]';
       default:
         return 'string';
     }
@@ -672,6 +674,8 @@ function postgresTypeToJsonType(pgType: string, enums: Record<string, string[]>)
     case '_int4':
     case '_int8':
     case '_integer':
+      return 'number[]';
+    case 'vector':
       return 'number[]';
     default:
       return 'string';
@@ -881,6 +885,12 @@ export function generateUnifiedContractMarkdown(contract: UnifiedContract): stri
   lines.push("| `$ilike` | Pattern match (case-insensitive) | `{ email: { $ilike: '%@GMAIL%' } }` | String |");
   lines.push("| `$is` | IS NULL | `{ deleted_at: { $is: null } }` | Nullable fields |");
   lines.push("| `$isNot` | IS NOT NULL | `{ created_by: { $isNot: null } }` | Nullable fields |");
+  lines.push("| `$jsonbContains` | JSONB contains | `{ metadata: { $jsonbContains: { tags: ['premium'] } } }` | JSONB/JSON |");
+  lines.push("| `$jsonbContainedBy` | JSONB contained by | `{ metadata: { $jsonbContainedBy: {...} } }` | JSONB/JSON |");
+  lines.push("| `$jsonbHasKey` | JSONB has key | `{ settings: { $jsonbHasKey: 'theme' } }` | JSONB/JSON |");
+  lines.push("| `$jsonbHasAnyKeys` | JSONB has any keys | `{ settings: { $jsonbHasAnyKeys: ['dark', 'light'] } }` | JSONB/JSON |");
+  lines.push("| `$jsonbHasAllKeys` | JSONB has all keys | `{ config: { $jsonbHasAllKeys: ['api', 'db'] } }` | JSONB/JSON |");
+  lines.push("| `$jsonbPath` | JSONB nested value | `{ meta: { $jsonbPath: { path: ['user', 'age'], operator: '$gte', value: 18 } } }` | JSONB/JSON |");
   lines.push("");
 
   // Logical operators
@@ -992,6 +1002,45 @@ export function generateUnifiedContractMarkdown(contract: UnifiedContract): stri
   lines.push("```");
   lines.push("");
   lines.push("**Note:** Column names are validated by Zod schemas. Only valid table columns are accepted, preventing SQL injection.");
+  lines.push("");
+
+  // Vector Search
+  lines.push("## Vector Search");
+  lines.push("");
+  lines.push("For tables with `vector` columns (requires pgvector extension), use the `vector` parameter for similarity search:");
+  lines.push("");
+  lines.push("```typescript");
+  lines.push("// Basic similarity search");
+  lines.push("const results = await sdk.embeddings.list({");
+  lines.push("  vector: {");
+  lines.push("    field: 'embedding',");
+  lines.push("    query: [0.1, 0.2, 0.3, ...],  // Your embedding vector");
+  lines.push("    metric: 'cosine'  // 'cosine' (default), 'l2', or 'inner'");
+  lines.push("  },");
+  lines.push("  limit: 10");
+  lines.push("});");
+  lines.push("");
+  lines.push("// Results include _distance field");
+  lines.push("results.data[0]._distance;  // Similarity distance");
+  lines.push("");
+  lines.push("// Distance threshold filtering");
+  lines.push("const closeMatches = await sdk.embeddings.list({");
+  lines.push("  vector: {");
+  lines.push("    field: 'embedding',");
+  lines.push("    query: queryVector,");
+  lines.push("    maxDistance: 0.5  // Only return results within this distance");
+  lines.push("  }");
+  lines.push("});");
+  lines.push("");
+  lines.push("// Hybrid search: vector + WHERE filters");
+  lines.push("const filtered = await sdk.embeddings.list({");
+  lines.push("  vector: { field: 'embedding', query: queryVector },");
+  lines.push("  where: {");
+  lines.push("    status: 'published',");
+  lines.push("    embedding: { $isNot: null }");
+  lines.push("  }");
+  lines.push("});");
+  lines.push("```");
   lines.push("");
 
   // Resources

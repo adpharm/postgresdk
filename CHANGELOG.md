@@ -45,6 +45,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Show parallel multi-modal search pattern (vision + text embeddings)
   - Document all three distance metrics with use cases
   - Explain NULL embedding handling and auto-exclusion behavior
+- docs: Add JSONB and vector search to generated SDK contract
+  - JSONB operators included in operator reference table
+  - Vector search section with similarity search examples
+  - Vector type properly mapped in field type documentation
 
 ## [v0.15.6] - 2026-01-05
 
