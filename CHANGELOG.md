@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- chore: Add enhanced error logging for JSON validation failures
+  - Create/update/list operations now detect and log detailed info for invalid JSON input
+  - Logs include input data, PostgreSQL error message, and operation context
+  - Helps debug type mismatches between TypeScript and PostgreSQL JSONB validation
+- chore: Add comprehensive JSONB arrays and primitives tests
+  - Tests verify JSONB columns can store arrays, primitives, and objects
+  - Validates array query operators ($jsonbContains) work with pure arrays
+  - Compile-time tests ensure TypeScript types work with array overrides
+  - Covers empty arrays, primitives (string/number/boolean/null), and nested structures
+- chore: Exclude test output directories from TypeScript compilation
+  - Prevents IDE performance issues from scanning large generated test files
+  - Removes test-specific compile errors from project-wide type checking
+
 ## [v0.16.4] - 2026-01-12
 
 - refactor: Conditionally generate generic client methods for JSONB tables only

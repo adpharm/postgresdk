@@ -26,5 +26,17 @@
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "noPropertyAccessFromIndexSignature": false
-  }
+  },
+  "exclude": [
+    "node_modules",
+    "test/.jsonb-types-test",
+    "test/.jsonb-sdk-test",
+    "test/.jsonb-arrays-test",
+    "test/.results",
+    "test/.results-apikey",
+    "test/.results-jwt",
+    "test/.results-same-dir",
+    "test/.drizzle-e2e-results",
+    "test/test-jsonb-types-compile.ts"
+  ]
 }
