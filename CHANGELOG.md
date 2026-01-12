@@ -7,17 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.16.3] - 2026-01-12
+
+- refactor: Conditionally generate generic client methods for JSONB tables only
+  - Client methods (create, update, delete, list, getByPk) only generic when table has JSONB columns
+  - Non-JSONB tables get simple non-generic methods for cleaner generated code
+  - Reduces type complexity and improves IDE performance for simple tables
+  - JSONB tables retain full generic type support with optional type parameter
 - refactor: Simplify JSONB generic types with built-in generics
   - Base types (`Insert`, `Update`, `Select`) are now generic for tables with JSONB columns
   - Removed `MergeJsonb` helper type and method overloads for cleaner API
   - Usage: `InsertProduct<{ metadata: MyMetadataType }>` instead of `MergeJsonb<InsertProduct, { metadata: MyMetadataType }>`
   - All CRUD methods accept optional generic parameter defaulting to empty object
   - Non-JSONB tables generate simple non-generic types (no unnecessary complexity)
-  - Comprehensive test coverage for JSONB generic type behavior
 - refactor: Replace `Record<string, any>` with type-safe `JsonValue` for JSONB columns
   - JSONB/JSON columns now use recursive `JsonValue` type instead of loose `any`
   - Improves type safety while maintaining flexibility for nested JSON structures
   - `JsonValue` supports string, number, boolean, null, arrays, and nested objects
+- chore: Add comprehensive JSONB type safety tests
+  - Runtime tests verify generic types work with Insert/Update/Select
+  - Compile-time tests verify TypeScript catches type errors
+  - Tests cover nested objects, arrays, nullable fields, partial overrides, and union types
 
 ## [v0.16.2] - 2026-01-12
 

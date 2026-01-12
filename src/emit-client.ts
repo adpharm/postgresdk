@@ -11,6 +11,14 @@ function isVectorType(pgType: string): boolean {
   return t === "vector" || t === "halfvec" || t === "sparsevec" || t === "bit";
 }
 
+/**
+ * Check if a PostgreSQL type is a JSONB/JSON type
+ */
+function isJsonbType(pgType: string): boolean {
+  const t = pgType.toLowerCase();
+  return t === "json" || t === "jsonb";
+}
+
 export function emitClient(
   table: Table,
   graph: Graph,
@@ -26,6 +34,9 @@ export function emitClient(
 
   // Check if table has any vector columns
   const hasVectorColumns = table.columns.some(c => isVectorType(c.pgType));
+
+  // Check if table has any JSONB columns
+  const hasJsonbColumns = table.columns.some(c => isJsonbType(c.pgType));
 
   // Debug: log vector detection
   if (process.env.SDK_DEBUG) {
@@ -146,7 +157,7 @@ ${otherTableImports.join("\n")}
 export class ${Type}Client extends BaseClient {
   private readonly resource = "/v1/${table.name}";
 
-  /**
+${hasJsonbColumns ? `  /**
    * Create a new ${table.name} record
    * @param data - The data to insert
    * @returns The created record
@@ -159,9 +170,16 @@ export class ${Type}Client extends BaseClient {
     data: Insert${Type}<TJsonb>
   ): Promise<Select${Type}<TJsonb>> {
     return this.post<Select${Type}<TJsonb>>(this.resource, data);
-  }
+  }` : `  /**
+   * Create a new ${table.name} record
+   * @param data - The data to insert
+   * @returns The created record
+   */
+  async create(data: Insert${Type}): Promise<Select${Type}> {
+    return this.post<Select${Type}>(this.resource, data);
+  }`}
 
-  /**
+${hasJsonbColumns ? `  /**
    * Get a ${table.name} record by primary key
    * @param pk - The primary key value${hasCompositePk ? 's' : ''}
    * @returns The record if found, null otherwise
@@ -174,9 +192,17 @@ export class ${Type}Client extends BaseClient {
   ): Promise<Select${Type}<TJsonb> | null> {
     const path = ${pkPathExpr};
     return this.get<Select${Type}<TJsonb> | null>(\`\${this.resource}/\${path}\`);
-  }
+  }` : `  /**
+   * Get a ${table.name} record by primary key
+   * @param pk - The primary key value${hasCompositePk ? 's' : ''}
+   * @returns The record if found, null otherwise
+   */
+  async getByPk(pk: ${pkType}): Promise<Select${Type} | null> {
+    const path = ${pkPathExpr};
+    return this.get<Select${Type} | null>(\`\${this.resource}/\${path}\`);
+  }`}
 
-  /**
+${hasJsonbColumns ? `  /**
    * List ${table.name} records with pagination and filtering
    * @param params - Query parameters
    * @param params.where - Filter conditions using operators like $eq, $gt, $in, $like, etc.
@@ -204,10 +230,36 @@ export class ${Type}Client extends BaseClient {
     orderBy?: string | string[];
     order?: "asc" | "desc" | ("asc" | "desc")[];
   }): Promise<PaginatedResponse<Select${Type}<TJsonb>${hasVectorColumns ? ' & { _distance?: number }' : ''}>> {
-    return this.post<PaginatedResponse<Select${Type}<TJsonb>${hasVectorColumns ? ' & { _distance?: number }' : ''}>(\`\${this.resource}/list\`, params ?? {});
-  }
+    return this.post<PaginatedResponse<Select${Type}<TJsonb>${hasVectorColumns ? ' & { _distance?: number }' : ''}>>(\`\${this.resource}/list\`, params ?? {});
+  }` : `  /**
+   * List ${table.name} records with pagination and filtering
+   * @param params - Query parameters
+   * @param params.where - Filter conditions using operators like $eq, $gt, $in, $like, etc.
+   * @param params.orderBy - Column(s) to sort by
+   * @param params.order - Sort direction(s): "asc" or "desc"
+   * @param params.limit - Maximum number of records to return (default: 50, max: 100)
+   * @param params.offset - Number of records to skip for pagination
+   * @param params.include - Related records to include (see listWith* methods for typed includes)
+   * @returns Paginated results with data, total count, and hasMore flag
+   */
+  async list(params?: {
+    include?: any;
+    limit?: number;
+    offset?: number;
+    where?: Where<Select${Type}>;${hasVectorColumns ? `
+    vector?: {
+      field: string;
+      query: number[];
+      metric?: "cosine" | "l2" | "inner";
+      maxDistance?: number;
+    };` : ""}
+    orderBy?: string | string[];
+    order?: "asc" | "desc" | ("asc" | "desc")[];
+  }): Promise<PaginatedResponse<Select${Type}${hasVectorColumns ? ' & { _distance?: number }' : ''}>> {
+    return this.post<PaginatedResponse<Select${Type}${hasVectorColumns ? ' & { _distance?: number }' : ''}>>(\`\${this.resource}/list\`, params ?? {});
+  }`}
 
-  /**
+${hasJsonbColumns ? `  /**
    * Update a ${table.name} record by primary key
    * @param pk - The primary key value${hasCompositePk ? 's' : ''}
    * @param patch - Partial data to update
@@ -222,9 +274,18 @@ export class ${Type}Client extends BaseClient {
   ): Promise<Select${Type}<TJsonb> | null> {
     const path = ${pkPathExpr};
     return this.patch<Select${Type}<TJsonb> | null>(\`\${this.resource}/\${path}\`, patch);
-  }
+  }` : `  /**
+   * Update a ${table.name} record by primary key
+   * @param pk - The primary key value${hasCompositePk ? 's' : ''}
+   * @param patch - Partial data to update
+   * @returns The updated record if found, null otherwise
+   */
+  async update(pk: ${pkType}, patch: Update${Type}): Promise<Select${Type} | null> {
+    const path = ${pkPathExpr};
+    return this.patch<Select${Type} | null>(\`\${this.resource}/\${path}\`, patch);
+  }`}
 
-  /**
+${hasJsonbColumns ? `  /**
    * Delete a ${table.name} record by primary key
    * @param pk - The primary key value${hasCompositePk ? 's' : ''}
    * @returns The deleted record if found, null otherwise
@@ -237,7 +298,15 @@ export class ${Type}Client extends BaseClient {
   ): Promise<Select${Type}<TJsonb> | null> {
     const path = ${pkPathExpr};
     return this.del<Select${Type}<TJsonb> | null>(\`\${this.resource}/\${path}\`);
-  }
+  }` : `  /**
+   * Delete a ${table.name} record by primary key
+   * @param pk - The primary key value${hasCompositePk ? 's' : ''}
+   * @returns The deleted record if found, null otherwise
+   */
+  async delete(pk: ${pkType}): Promise<Select${Type} | null> {
+    const path = ${pkPathExpr};
+    return this.del<Select${Type} | null>(\`\${this.resource}/\${path}\`);
+  }`}
 ${includeMethodsCode}}
 `;
 }
