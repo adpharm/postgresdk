@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- refactor: Simplify JSONB generic types with built-in generics
+  - Base types (`Insert`, `Update`, `Select`) are now generic for tables with JSONB columns
+  - Removed `MergeJsonb` helper type and method overloads for cleaner API
+  - Usage: `InsertProduct<{ metadata: MyMetadataType }>` instead of `MergeJsonb<InsertProduct, { metadata: MyMetadataType }>`
+  - All CRUD methods accept optional generic parameter defaulting to empty object
+  - Non-JSONB tables generate simple non-generic types (no unnecessary complexity)
+  - Comprehensive test coverage for JSONB generic type behavior
 - refactor: Replace `Record<string, any>` with type-safe `JsonValue` for JSONB columns
   - JSONB/JSON columns now use recursive `JsonValue` type instead of loose `any`
   - Improves type safety while maintaining flexibility for nested JSON structures
