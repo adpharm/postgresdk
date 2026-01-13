@@ -10,10 +10,12 @@ export function emitHonoRouter(tables: Table[], hasAuth: boolean, useJsExtension
 
   // Resolve pullToken if it uses "env:" syntax
   let resolvedPullToken: string | undefined;
+  let pullTokenEnvVar: string | undefined;
   if (pullToken) {
     if (pullToken.startsWith("env:")) {
       const envVarName = pullToken.slice(4);
       resolvedPullToken = `process.env.${envVarName}`;
+      pullTokenEnvVar = envVarName;
     } else {
       // Hardcoded token (not recommended, but support it)
       resolvedPullToken = JSON.stringify(pullToken);
@@ -123,7 +125,9 @@ ${pullToken ? `
 
     if (!expectedToken) {
       // Token not configured in environment - reject request
-      return c.json({ error: "SDK endpoints are protected but token not configured" }, 500);
+      return c.json({
+        error: "SDK endpoints are protected but pullToken environment variable not set. ${pullTokenEnvVar ? `Set ${pullTokenEnvVar} in your environment or remove pullToken from config.` : 'Set the pullToken environment variable or remove pullToken from config.'}"
+      }, 500);
     }
 
     if (!authHeader || !authHeader.startsWith("Bearer ")) {

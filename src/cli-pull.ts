@@ -85,9 +85,18 @@ export async function pullCommand(args: string[]) {
       : {};
     
     const manifestRes = await fetch(`${config.from}/_psdk/sdk/manifest`, { headers });
-    
+
     if (!manifestRes.ok) {
-      throw new Error(`Failed to fetch SDK manifest: ${manifestRes.status} ${manifestRes.statusText}`);
+      let errorMsg = `${manifestRes.status} ${manifestRes.statusText}`;
+      try {
+        const errorBody = await manifestRes.json() as { error?: string };
+        if (errorBody.error) {
+          errorMsg = errorBody.error;
+        }
+      } catch {
+        // Failed to parse error body, use status text
+      }
+      throw new Error(`Failed to fetch SDK manifest: ${errorMsg}`);
     }
     
     const manifest = await manifestRes.json() as { version: string; generated: string; files: string[] };
@@ -97,9 +106,18 @@ export async function pullCommand(args: string[]) {
     
     // Fetch full SDK
     const sdkRes = await fetch(`${config.from}/_psdk/sdk/download`, { headers });
-    
+
     if (!sdkRes.ok) {
-      throw new Error(`Failed to download SDK: ${sdkRes.status} ${sdkRes.statusText}`);
+      let errorMsg = `${sdkRes.status} ${sdkRes.statusText}`;
+      try {
+        const errorBody = await sdkRes.json() as { error?: string };
+        if (errorBody.error) {
+          errorMsg = errorBody.error;
+        }
+      } catch {
+        // Failed to parse error body, use status text
+      }
+      throw new Error(`Failed to download SDK: ${errorMsg}`);
     }
     
     const sdk = await sdkRes.json() as { files: Record<string, string>; version: string; generated: string };

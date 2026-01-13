@@ -298,6 +298,7 @@ export async function initCommand(args: string[]): Promise<void> {
       const newOptions = [
         { key: "tests", description: "Enable test generation" },
         { key: "auth", description: "Add authentication" },
+        { key: "pullToken", description: "Add SDK endpoint protection" },
         { key: "pull", description: "Configure SDK distribution" }
       ];
       

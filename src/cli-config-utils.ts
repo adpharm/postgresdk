@@ -166,7 +166,18 @@ export function extractConfigFields(configContent: string): ConfigField[] {
       isCommented: pullBlock.isCommented,
     });
   }
-  
+
+  // Extract pullToken
+  const pullTokenMatch = configContent.match(/^\s*(\/\/)?\s*pullToken:\s*(.+),?$/m);
+  if (pullTokenMatch) {
+    fields.push({
+      key: "pullToken",
+      value: pullTokenMatch[2]?.trim().replace(/,$/, ''),
+      description: "Token for protecting /_psdk/* endpoints",
+      isCommented: !!pullTokenMatch[1],
+    });
+  }
+
   return fields;
 }
 
@@ -334,21 +345,36 @@ export default {
   ${getComplexBlockLine("tests", existingFields, mergeStrategy, userChoices)}
   
   // ========== AUTHENTICATION ==========
-  
+
   /**
    * Authentication configuration for your API
-   * 
+   *
    * Simple syntax examples:
    *   auth: { apiKey: process.env.API_KEY }
    *   auth: { jwt: process.env.JWT_SECRET }
-   * 
+   *
    * Multiple API keys:
    *   auth: { apiKeys: [process.env.KEY1, process.env.KEY2] }
-   * 
+   *
    * Full syntax for advanced options:
    */
   ${getComplexBlockLine("auth", existingFields, mergeStrategy, userChoices)}
-  
+
+  // ========== SDK ENDPOINT PROTECTION ==========
+
+  /**
+   * Token for protecting /_psdk/* endpoints (SDK distribution and contract endpoints)
+   *
+   * When set, clients must provide this token via Authorization header when pulling SDK.
+   * If not set, /_psdk/* endpoints are publicly accessible.
+   *
+   * This is separate from the main auth strategy (JWT/API key) used for CRUD operations.
+   *
+   * Use "env:" prefix to read from environment variables:
+   *   pullToken: "env:POSTGRESDK_PULL_TOKEN"
+   */
+  ${getFieldLine("pullToken", existingFields, mergeStrategy, '"env:POSTGRESDK_PULL_TOKEN"', userChoices)}
+
   // ========== SDK DISTRIBUTION (Pull Configuration) ==========
   
   /**
@@ -493,9 +519,9 @@ function getDefaultComplexBlock(key: string): string {
     
     case "pull":
       return `// pull: {
-  //   from: "https://api.myapp.com",     // API URL to pull SDK from
-  //   output: "./src/sdk",                // Local directory for pulled SDK
-  //   token: process.env.API_TOKEN,       // Optional authentication token
+  //   from: "https://api.myapp.com",        // API URL to pull SDK from
+  //   output: "./src/sdk",                   // Local directory for pulled SDK
+  //   pullToken: "env:POSTGRESDK_PULL_TOKEN",  // Optional: if server has pullToken set
   // },`;
     
     default:

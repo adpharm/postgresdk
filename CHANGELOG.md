@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- feat: Add pullToken to interactive config merge workflow
+  - `postgresdk init` interactive merge now includes pullToken as an option
+  - Config extraction logic recognizes pullToken field for preservation during updates
+  - Generated configs include pullToken documentation and env var syntax examples
+- fix: Improve error messages for pull token authentication failures
+  - CLI now shows detailed error messages from server when pull fails due to auth
+  - Server returns helpful message when pullToken env var not set
+  - Includes environment variable name in error message for easier debugging
+
 ## [v0.16.7] - 2026-01-13
 
 - feat: Add pull token authentication for SDK distribution endpoints
