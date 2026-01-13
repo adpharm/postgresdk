@@ -163,6 +163,9 @@ export default {
     }
   },
 
+  // SDK endpoint protection (optional)
+  pullToken: "env:POSTGRESDK_PULL_TOKEN",  // Protect /_psdk/* endpoints (if not set, public)
+
   // Test generation (optional)
   tests: {
     generate: true,                      // Generate test files
@@ -515,7 +518,7 @@ export default {
   pull: {
     from: "https://api.myapp.com",
     output: "./src/sdk",
-    token: process.env.API_TOKEN  // Optional auth for protected APIs
+    pullToken: "env:POSTGRESDK_PULL_TOKEN"  // Optional: if server has pullToken set
   }
 };
 ```

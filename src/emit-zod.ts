@@ -21,6 +21,7 @@ export function emitZod(table: Table, opts: { numericMode: "string" | "number" }
       return opts.numericMode === "number" ? `z.number()` : `z.string()`;
     if (t === "jsonb" || t === "json") return `z.unknown()`;
     if (t === "date" || t.startsWith("timestamp")) return `z.string()`;
+    if (t === "vector" || t === "halfvec" || t === "sparsevec" || t === "bit") return `z.array(z.number())`;
     if (t.startsWith("_")) return `z.array(${zFor(t.slice(1))})`;
     return `z.string()`; // text/varchar/unknown
   };

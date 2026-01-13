@@ -24,6 +24,7 @@ export function emitHonoRoutes(
 
   // Check if table has any vector columns
   const hasVectorColumns = table.columns.some(c => isVectorType(c.pgType));
+  const vectorColumns = table.columns.filter(c => isVectorType(c.pgType)).map(c => c.name);
   
   // Normalize pk to an array and fallback to ["id"] if empty
   const rawPk = (table as any).pk;
@@ -97,7 +98,7 @@ export function register${Type}Routes(app: Hono, deps: { pg: { query: (text: str
     table: "${fileTableName}",
     pkColumns: ${JSON.stringify(safePkCols)},
     softDeleteColumn: ${softDel ? `"${softDel}"` : "null"},
-    includeMethodsDepth: ${opts.includeMethodsDepth}
+    includeMethodsDepth: ${opts.includeMethodsDepth}${vectorColumns.length > 0 ? `,\n    vectorColumns: ${JSON.stringify(vectorColumns)}` : ""}
   };
 ${hasAuth ? `
   // 🔐 Auth: protect all routes for this table

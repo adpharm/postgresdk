@@ -6,7 +6,7 @@ import { pathToFileURL } from "url";
 interface PullConfig {
   from?: string;
   output?: string;
-  token?: string;
+  pullToken?: string;
 }
 
 export async function pullCommand(args: string[]) {
@@ -41,7 +41,7 @@ export async function pullCommand(args: string[]) {
   const cliConfig: PullConfig = {
     from: args.find(a => a.startsWith("--from="))?.split("=")[1],
     output: args.find(a => a.startsWith("--output="))?.split("=")[1],
-    token: args.find(a => a.startsWith("--token="))?.split("=")[1],
+    pullToken: args.find(a => a.startsWith("--pullToken="))?.split("=")[1],
   };
   
   // 4. Merge configs (CLI overrides file)
@@ -63,14 +63,25 @@ export async function pullCommand(args: string[]) {
     process.exit(1);
   }
   
-  // 6. Execute pull
+  // 6. Resolve pullToken (support "env:VAR_NAME" syntax)
+  let resolvedToken: string | undefined = config.pullToken;
+  if (resolvedToken?.startsWith("env:")) {
+    const envVarName = resolvedToken.slice(4); // Remove "env:" prefix
+    resolvedToken = process.env[envVarName];
+    if (!resolvedToken) {
+      console.error(`❌ Environment variable "${envVarName}" not set (referenced in pullToken config)`);
+      process.exit(1);
+    }
+  }
+
+  // 7. Execute pull
   console.log(`🔄 Pulling SDK from ${config.from}`);
   console.log(`📁 Output directory: ${config.output}`);
-  
+
   try {
     // Fetch manifest first
-    const headers: Record<string, string> = config.token 
-      ? { Authorization: `Bearer ${config.token}` } 
+    const headers: Record<string, string> = resolvedToken
+      ? { Authorization: `Bearer ${resolvedToken}` }
       : {};
     
     const manifestRes = await fetch(`${config.from}/_psdk/sdk/manifest`, { headers });

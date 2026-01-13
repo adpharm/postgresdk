@@ -268,6 +268,23 @@ export default {
     },
   },
 
+  // ========== SDK ENDPOINT PROTECTION ==========
+
+  /**
+   * Authentication token for protecting /_psdk/* endpoints (SDK distribution and contract endpoints)
+   *
+   * When set, all /_psdk/* routes require this token via Authorization header.
+   * If not set, /_psdk/* endpoints are publicly accessible.
+   *
+   * Use "env:" prefix to read from environment variables:
+   *   pullToken: "env:POSTGRESDK_PULL_TOKEN"
+   *
+   * This is separate from the main auth strategy (JWT/API key) used for CRUD operations.
+   *
+   * @optional
+   */
+  pullToken: "env:POSTGRESDK_PULL_TOKEN",
+
   // ========== SDK DISTRIBUTION (Pull Configuration) ==========
 
   /**
@@ -294,10 +311,16 @@ export default {
 
     /**
      * Authentication token for pulling SDK from protected endpoints
-     * The token will be sent as 'Authorization: Bearer {token}' header
+     * The token will be sent as 'Authorization: Bearer {pullToken}' header
+     *
+     * Should match the server's root-level pullToken configuration.
+     *
+     * Use "env:" prefix to read from environment variables:
+     *   pullToken: "env:POSTGRESDK_PULL_TOKEN"
+     *
      * @optional
      */
-    token: process.env.API_TOKEN,
+    pullToken: "env:POSTGRESDK_PULL_TOKEN",
   },
 } satisfies Config;
 
@@ -368,7 +391,7 @@ export default {
  *   pull: {
  *     from: "https://api.myapp.com",
  *     output: "./src/sdk",
- *     token: process.env.API_TOKEN
+ *     pullToken: "env:POSTGRESDK_PULL_TOKEN"  // Use "env:" prefix for env vars
  *   }
  * };
  */

@@ -20,6 +20,7 @@ export interface OperationContext {
   pkColumns: string[];
   softDeleteColumn?: string | null;
   includeMethodsDepth: number;
+  vectorColumns?: string[];
 }
 
 const DEBUG = process.env.SDK_DEBUG === "1" || process.env.SDK_DEBUG === "true";
@@ -45,6 +46,30 @@ function prepareParams(params: any[]): any[] {
 }
 
 /**
+ * Parse vector columns in retrieved rows.
+ * pgvector returns vectors as strings (e.g., "[1.5,2.5,3.5]") which need to be
+ * parsed back to number[] to match TypeScript types.
+ */
+function parseVectorColumns(rows: any[], vectorColumns?: string[]): any[] {
+  if (!vectorColumns || vectorColumns.length === 0) return rows;
+
+  return rows.map(row => {
+    const parsed = { ...row };
+    for (const col of vectorColumns) {
+      if (parsed[col] !== null && parsed[col] !== undefined && typeof parsed[col] === 'string') {
+        try {
+          parsed[col] = JSON.parse(parsed[col]);
+        } catch (e) {
+          // If parsing fails, leave as string (shouldn't happen with valid vectors)
+          log.error(\`Failed to parse vector column "\${col}":, e\`);
+        }
+      }
+    }
+    return parsed;
+  });
+}
+
+/**
  * CREATE operation - Insert a new record
  */
 export async function createRecord(
@@ -66,8 +91,9 @@ export async function createRecord(
 
     log.debug("SQL:", text, "vals:", vals);
     const { rows } = await ctx.pg.query(text, prepareParams(vals));
+    const parsedRows = parseVectorColumns(rows, ctx.vectorColumns);
 
-    return { data: rows[0] ?? null, status: rows[0] ? 201 : 500 };
+    return { data: parsedRows[0] ?? null, status: parsedRows[0] ? 201 : 500 };
   } catch (e: any) {
     // Enhanced logging for JSON validation errors
     const errorMsg = e?.message ?? "";
@@ -106,12 +132,13 @@ export async function getByPk(
     log.debug(\`GET \${ctx.table} by PK:\`, pkValues, "SQL:", text);
 
     const { rows } = await ctx.pg.query(text, prepareParams(pkValues));
-    
-    if (!rows[0]) {
+    const parsedRows = parseVectorColumns(rows, ctx.vectorColumns);
+
+    if (!parsedRows[0]) {
       return { data: null, status: 404 };
     }
-    
-    return { data: rows[0], status: 200 };
+
+    return { data: parsedRows[0], status: 200 };
   } catch (e: any) {
     log.error(\`GET \${ctx.table} error:\`, e?.stack ?? e);
     return { 
@@ -497,12 +524,13 @@ export async function listRecords(
     log.debug(\`LIST \${ctx.table} SQL:\`, text, "params:", allParams);
 
     const { rows } = await ctx.pg.query(text, prepareParams(allParams));
+    const parsedRows = parseVectorColumns(rows, ctx.vectorColumns);
 
     // Calculate hasMore
     const hasMore = offset + limit < total;
 
     const metadata = {
-      data: rows,
+      data: parsedRows,
       total,
       limit,
       offset,
@@ -567,12 +595,13 @@ export async function updateRecord(
 
     log.debug(\`PATCH \${ctx.table} SQL:\`, text, "params:", params);
     const { rows } = await ctx.pg.query(text, prepareParams(params));
-    
-    if (!rows[0]) {
+    const parsedRows = parseVectorColumns(rows, ctx.vectorColumns);
+
+    if (!parsedRows[0]) {
       return { data: null, status: 404 };
     }
-    
-    return { data: rows[0], status: 200 };
+
+    return { data: parsedRows[0], status: 200 };
   } catch (e: any) {
     // Enhanced logging for JSON validation errors
     const errorMsg = e?.message ?? "";
@@ -616,12 +645,13 @@ export async function deleteRecord(
 
     log.debug(\`DELETE \${ctx.softDeleteColumn ? '(soft)' : ''} \${ctx.table} SQL:\`, text, "pk:", pkValues);
     const { rows } = await ctx.pg.query(text, prepareParams(pkValues));
-    
-    if (!rows[0]) {
+    const parsedRows = parseVectorColumns(rows, ctx.vectorColumns);
+
+    if (!parsedRows[0]) {
       return { data: null, status: 404 };
     }
-    
-    return { data: rows[0], status: 200 };
+
+    return { data: parsedRows[0], status: 200 };
   } catch (e: any) {
     log.error(\`DELETE \${ctx.table} error:\`, e?.stack ?? e);
     return { 

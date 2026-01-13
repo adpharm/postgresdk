@@ -17,6 +17,7 @@ function tsTypeFor(pgType: string, opts: { numericMode: "string" | "number" }, e
   }
   if (t === "date" || t.startsWith("timestamp")) return "string";
   if (t === "json" || t === "jsonb") return "unknown";
+  if (t === "vector" || t === "halfvec" || t === "sparsevec" || t === "bit") return "number[]";
   return "string";
 }
 

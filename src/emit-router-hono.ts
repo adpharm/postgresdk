@@ -4,9 +4,21 @@ import { pascal } from "./utils";
 /**
  * Emits the Hono server router file that exports helper functions for route registration
  */
-export function emitHonoRouter(tables: Table[], hasAuth: boolean, useJsExtensions?: boolean) {
+export function emitHonoRouter(tables: Table[], hasAuth: boolean, useJsExtensions?: boolean, pullToken?: string) {
   const tableNames = tables.map(t => t.name).sort();
   const ext = useJsExtensions ? ".js" : "";
+
+  // Resolve pullToken if it uses "env:" syntax
+  let resolvedPullToken: string | undefined;
+  if (pullToken) {
+    if (pullToken.startsWith("env:")) {
+      const envVarName = pullToken.slice(4);
+      resolvedPullToken = `process.env.${envVarName}`;
+    } else {
+      // Hardcoded token (not recommended, but support it)
+      resolvedPullToken = JSON.stringify(pullToken);
+    }
+  }
   
   const imports = tableNames
     .map(name => {
@@ -100,10 +112,33 @@ export function createRouter(
   }
 ): Hono {
   const router = new Hono();
-  
+
   // Register table routes
 ${registrations}
+${pullToken ? `
+  // 🔐 Protect /_psdk/* endpoints with pullToken
+  router.use("/_psdk/*", async (c, next) => {
+    const authHeader = c.req.header("Authorization");
+    const expectedToken = ${resolvedPullToken};
 
+    if (!expectedToken) {
+      // Token not configured in environment - reject request
+      return c.json({ error: "SDK endpoints are protected but token not configured" }, 500);
+    }
+
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return c.json({ error: "Missing or invalid Authorization header" }, 401);
+    }
+
+    const providedToken = authHeader.slice(7); // Remove "Bearer " prefix
+
+    if (providedToken !== expectedToken) {
+      return c.json({ error: "Invalid pull token" }, 401);
+    }
+
+    await next();
+  });
+` : ""}
   // SDK distribution endpoints
   router.get("/_psdk/sdk/manifest", (c) => {
     return c.json({

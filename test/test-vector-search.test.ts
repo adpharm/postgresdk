@@ -410,3 +410,56 @@ test("vector search - handles NULL embeddings", async () => {
     await pg.end();
   }
 });
+
+test("vector columns - returned as number[] arrays, not strings", async () => {
+  const pg = new Client({ connectionString: "postgres://user:pass@localhost:5432/testdb" });
+  await pg.connect();
+
+  try {
+    await pg.query("DELETE FROM video_sections");
+
+    // Insert test vectors
+    await pg.query(
+      "INSERT INTO video_sections (title, vision_embedding, text_embedding) VALUES ($1, $2, $3)",
+      ["Type Test", JSON.stringify(EMBEDDINGS.cat), JSON.stringify(TEXT_EMBEDDINGS.animal)]
+    );
+
+    const { registerVideoSectionsRoutes } = await import("./.results/server/routes/video_sections");
+    const app = new Hono();
+    registerVideoSectionsRoutes(app, { pg });
+    const server = serve({ fetch: app.fetch, port: 3486 });
+
+    const sdk = new SDK({ baseUrl: "http://localhost:3486" });
+
+    // Test via list()
+    const listResults = await sdk.video_sections.list({ where: { title: "Type Test" } });
+    const listItem = listResults.data[0]!;
+
+    // Verify vectors are arrays, not strings
+    expect(Array.isArray(listItem.vision_embedding)).toBe(true);
+    expect(Array.isArray(listItem.text_embedding)).toBe(true);
+    expect(typeof listItem.vision_embedding).toBe("object");
+    expect(typeof listItem.text_embedding).toBe("object");
+
+    // Verify array contents are numbers
+    expect(listItem.vision_embedding).toEqual(EMBEDDINGS.cat);
+    expect(listItem.text_embedding).toEqual(TEXT_EMBEDDINGS.animal);
+    expect(listItem.vision_embedding!.every((n: any) => typeof n === "number")).toBe(true);
+    expect(listItem.text_embedding!.every((n: any) => typeof n === "number")).toBe(true);
+
+    // Test via getByPk()
+    const pkResult = await sdk.video_sections.getByPk(listItem.id);
+    expect(pkResult).not.toBeNull();
+    expect(Array.isArray(pkResult!.vision_embedding)).toBe(true);
+    expect(Array.isArray(pkResult!.text_embedding)).toBe(true);
+
+    // Test array methods work (confirms it's a real array)
+    const firstValue = pkResult!.vision_embedding![0];
+    expect(typeof firstValue).toBe("number");
+    expect(pkResult!.vision_embedding!.length).toBe(3);
+
+    server.close();
+  } finally {
+    await pg.end();
+  }
+});

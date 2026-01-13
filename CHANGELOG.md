@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- feat: Add pull token authentication for SDK distribution endpoints
+  - New `pullToken` config option protects `/_psdk/*` endpoints (SDK manifest, download, files)
+  - Supports `"env:VAR_NAME"` syntax for reading token from environment variables
+  - When set, clients must provide matching token via Authorization header when running `postgresdk pull`
+  - Separate from main auth strategy (JWT/API key) used for CRUD operations
+  - Endpoints are public if pullToken not configured
+- fix: Vector columns now return as typed number arrays instead of strings
+  - pgvector columns (vector, halfvec, sparsevec, bit) now parsed from PostgreSQL string format to number[]
+  - Applies to all operations: create, getByPk, list, update, delete
+  - TypeScript types correctly reflect number[] for vector fields
+  - Fixes type mismatch where vectors returned as strings despite TypeScript expecting arrays
+- docs: Update configuration examples for pull token usage
+  - README and example.config.ts show pullToken configuration
+  - CLI init command includes POSTGRESDK_PULL_TOKEN in environment variable examples
+  - Renamed `pull.token` to `pull.pullToken` for consistency
+
 ## [v0.16.6] - 2026-01-12
 
 - fix: Explicitly stringify JSONB parameters for PostgreSQL queries

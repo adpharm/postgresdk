@@ -215,7 +215,7 @@ export async function generate(configPath: string) {
   if (serverFramework === "hono") {
     files.push({
       path: join(serverDir, "router.ts"),
-      content: emitHonoRouter(Object.values(model.tables), getAuthStrategy(normalizedAuth) !== "none", cfg.useJsExtensions),
+      content: emitHonoRouter(Object.values(model.tables), getAuthStrategy(normalizedAuth) !== "none", cfg.useJsExtensions, cfg.pullToken),
     });
   }
   // Future: Add emitExpressRouter, emitFastifyRouter, etc.

@@ -140,6 +140,21 @@ export default {
   //     audience: "my-api",                    // Optional: validate 'aud' claim
   //   }
   // },
+
+  // ========== SDK ENDPOINT PROTECTION ==========
+
+  /**
+   * Token for protecting /_psdk/* endpoints (SDK distribution and contract endpoints)
+   *
+   * When set, clients must provide this token via Authorization header when pulling SDK.
+   * If not set, /_psdk/* endpoints are publicly accessible.
+   *
+   * This is separate from the main auth strategy (JWT/API key) used for CRUD operations.
+   *
+   * Use "env:" prefix to read from environment variables:
+   *   pullToken: "env:POSTGRESDK_PULL_TOKEN"
+   */
+  // pullToken: "env:POSTGRESDK_PULL_TOKEN",
 };
 `;
 
@@ -167,9 +182,17 @@ export default {
    * Configuration for pulling SDK from a remote API
    */
   pull: {
-    from: "https://api.myapp.com",     // API URL to pull SDK from
-    output: "./src/sdk",                // Local directory for pulled SDK
-    // token: process.env.API_TOKEN,    // Optional authentication token
+    from: "https://api.myapp.com",        // API URL to pull SDK from
+    output: "./src/sdk",                   // Local directory for pulled SDK
+
+    /**
+     * Authentication token for protected /_psdk/* endpoints
+     * Should match the server's pullToken configuration
+     *
+     * Use "env:" prefix to read from environment variables:
+     *   pullToken: "env:POSTGRESDK_PULL_TOKEN"
+     */
+    // pullToken: "env:POSTGRESDK_PULL_TOKEN",
   },
 };
 `;
@@ -387,6 +410,7 @@ export async function initCommand(args: string[]): Promise<void> {
         console.log("      DATABASE_URL=postgres://user:pass@localhost:5432/mydb");
         console.log("      API_KEY=your-secret-key");
         console.log("      JWT_SECRET=your-jwt-secret");
+        console.log("      POSTGRESDK_PULL_TOKEN=your-pull-token");
       }
 
       console.log("   3. Run 'postgresdk generate' to create your SDK");
@@ -395,7 +419,7 @@ export async function initCommand(args: string[]): Promise<void> {
 
       if (!hasEnv) {
         console.log("   2. Consider creating a .env file if you need authentication:");
-        console.log("      API_TOKEN=your-api-token");
+        console.log("      POSTGRESDK_PULL_TOKEN=your-pull-token");
       }
 
       console.log("   3. Run 'postgresdk pull' to fetch your SDK");

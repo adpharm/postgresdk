@@ -50,7 +50,11 @@ export interface Config {
 
   // Auth
   auth?: AuthConfigInput;
-  
+
+  // Pull token for protecting /_psdk/* endpoints (optional - if not set, endpoints are public)
+  // Use "env:VAR_NAME" syntax to read from environment variables
+  pullToken?: string;
+
   // Pull configuration (for client repos)
   pull?: PullConfig;
   
@@ -74,7 +78,7 @@ export interface Config {
 export interface PullConfig {
   from: string;           // API URL to pull from
   output?: string;        // Output directory (default: ./src/sdk)
-  token?: string;         // Auth token if needed
+  pullToken?: string;     // Auth token for /_psdk/* endpoints (use "env:VAR_NAME" syntax)
 }
 
 // Normalize simplified auth syntax to full AuthConfig
