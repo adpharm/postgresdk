@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- fix: Handle empty arrays correctly in $in and $nin operators
+  - Empty $in array now returns no results (FALSE condition) instead of being ignored
+  - Empty $nin array is skipped (matches everything) instead of being ignored
+  - Prevents unexpected behavior when filtering with empty arrays
+- refactor: Remove unnecessary parameter preparation in list operations
+  - Simplified query execution by passing params directly to pg.query
+  - No behavior change, just cleaner code
+
 ## [v0.16.8] - 2026-01-13
 
 - feat: Add pullToken to interactive config merge workflow

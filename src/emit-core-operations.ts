@@ -211,17 +211,27 @@ function buildWhereClause(
             paramIndex++;
             break;
           case '$in':
-            if (Array.isArray(opValue) && opValue.length > 0) {
-              whereParts.push(\`"\${key}" = ANY($\${paramIndex})\`);
-              whereParams.push(opValue);
-              paramIndex++;
+            if (Array.isArray(opValue)) {
+              if (opValue.length > 0) {
+                whereParts.push(\`"\${key}" = ANY($\${paramIndex})\`);
+                whereParams.push(opValue);
+                paramIndex++;
+              } else {
+                // Empty $in is logically FALSE - matches nothing
+                whereParts.push('FALSE');
+              }
             }
             break;
           case '$nin':
-            if (Array.isArray(opValue) && opValue.length > 0) {
-              whereParts.push(\`"\${key}" != ALL($\${paramIndex})\`);
-              whereParams.push(opValue);
-              paramIndex++;
+            if (Array.isArray(opValue)) {
+              if (opValue.length > 0) {
+                whereParts.push(\`"\${key}" != ALL($\${paramIndex})\`);
+                whereParams.push(opValue);
+                paramIndex++;
+              } else {
+                // Empty $nin is logically TRUE - matches everything (but we still need a condition)
+                // This is handled by simply not adding a condition
+              }
             }
             break;
           case '$like':
@@ -516,14 +526,14 @@ export async function listRecords(
     // Get total count for pagination
     const countText = \`SELECT COUNT(*) FROM "\${ctx.table}" \${countWhereSQL}\`;
     log.debug(\`LIST \${ctx.table} COUNT SQL:\`, countText, "params:", countParams);
-    const countResult = await ctx.pg.query(countText, prepareParams(countParams));
+    const countResult = await ctx.pg.query(countText, countParams);
     const total = parseInt(countResult.rows[0].count, 10);
 
     // Get paginated data
     const text = \`SELECT \${selectClause} FROM "\${ctx.table}" \${whereSQL} \${orderBySQL} LIMIT \${limitParam} OFFSET \${offsetParam}\`;
     log.debug(\`LIST \${ctx.table} SQL:\`, text, "params:", allParams);
 
-    const { rows } = await ctx.pg.query(text, prepareParams(allParams));
+    const { rows } = await ctx.pg.query(text, allParams);
     const parsedRows = parseVectorColumns(rows, ctx.vectorColumns);
 
     // Calculate hasMore

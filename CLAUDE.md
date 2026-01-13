@@ -134,4 +134,4 @@ Before considering any task complete, ensure every item on this list is checked:
 
 We use Bun. Not NPM.
 
-We have tests defined in package.json. Use them.
+We have tests defined in package.json. Use them. Run `bun run test` to run them.
