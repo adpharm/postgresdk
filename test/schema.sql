@@ -14,6 +14,8 @@ DROP TABLE IF EXISTS book_tags CASCADE;
 DROP TABLE IF EXISTS books CASCADE;
 DROP TABLE IF EXISTS tags CASCADE;
 DROP TABLE IF EXISTS authors CASCADE;
+DROP TABLE IF EXISTS products CASCADE;
+DROP TABLE IF EXISTS users CASCADE;
 
 -- Authors (parent)
 CREATE TABLE authors (
@@ -54,6 +56,23 @@ CREATE TABLE video_sections (
   vision_embedding  vector(3),  -- Small dimension for testing
   text_embedding    vector(3),
   created_at        TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Products table for JSONB testing
+CREATE TABLE products (
+  id       UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name     TEXT NOT NULL,
+  metadata JSONB,
+  tags     JSONB,
+  settings JSONB
+);
+
+-- Users table for JSONB testing
+CREATE TABLE users (
+  id       UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  email    TEXT NOT NULL,
+  profile  JSONB,
+  preferences JSONB
 );
 
 -- Vector indexes for similarity search performance

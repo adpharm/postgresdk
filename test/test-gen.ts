@@ -191,6 +191,8 @@ async function main() {
   const { registerBooksRoutes } = await import(`../${SERVER_DIR}/routes/books.ts`);
   const { registerTagsRoutes } = await import(`../${SERVER_DIR}/routes/tags.ts`);
   const { registerBookTagsRoutes } = await import(`../${SERVER_DIR}/routes/book_tags.ts`);
+  const { registerProductsRoutes } = await import(`../${SERVER_DIR}/routes/products.ts`);
+  const { registerUsersRoutes } = await import(`../${SERVER_DIR}/routes/users.ts`);
 
   const pg = new Client({ connectionString: PG_URL });
   await pg.connect();
@@ -220,6 +222,8 @@ async function main() {
   registerBooksRoutes(app, { pg });
   registerTagsRoutes(app, { pg });
   registerBookTagsRoutes(app, { pg });
+  registerProductsRoutes(app, { pg });
+  registerUsersRoutes(app, { pg });
 
   const server = serve({ fetch: app.fetch, port: 3456 });
   console.log("   → Hono on http://localhost:3456");
@@ -540,6 +544,47 @@ async function main() {
     assert(beyondPage.hasMore === false, "Beyond total should have hasMore=false");
     console.log(`  ✓ Offset beyond total: returns empty data, correct metadata`);
 
+    // ===== TEST JSONB OPERATIONS =====
+    console.log("\n📦 Testing JSONB Operations:");
+
+    // Create product with JSONB fields (objects and arrays)
+    const product1 = await sdk.products.create({
+      name: "Test Product",
+      metadata: { category: "electronics", price: 99.99, inStock: true },
+      tags: ["new", "featured", "sale"],
+      settings: { notifications: { email: true, sms: false } }
+    });
+    console.log("  ✓ Created product with JSONB objects and arrays");
+
+    // Verify JSONB data was stored correctly
+    const fetchedProduct = await sdk.products.getByPk(product1.id);
+    assert(fetchedProduct, "Product should exist");
+    assert(fetchedProduct.metadata.category === "electronics", "JSONB object field should match");
+    assert(fetchedProduct.metadata.price === 99.99, "JSONB number field should match");
+    assert(Array.isArray(fetchedProduct.tags), "JSONB array should be array");
+    assert(fetchedProduct.tags.length === 3, "JSONB array length should match");
+    assert(fetchedProduct.settings.notifications.email === true, "Nested JSONB should match");
+    console.log("  ✓ JSONB data retrieved correctly");
+
+    // Update JSONB fields
+    const updatedProduct = await sdk.products.update(product1.id, {
+      metadata: { category: "computers", price: 89.99, clearance: true },
+      tags: ["clearance", "limited"]
+    });
+    assert(updatedProduct.metadata.category === "computers", "Updated JSONB should match");
+    assert(updatedProduct.tags.length === 2, "Updated JSONB array length should match");
+    console.log("  ✓ JSONB fields updated correctly");
+
+    // Test with null JSONB fields
+    const product2 = await sdk.products.create({
+      name: "Minimal Product",
+      metadata: null,
+      tags: null,
+      settings: null
+    });
+    assert(product2.metadata === null, "Null JSONB should be null");
+    console.log("  ✓ Null JSONB fields handled correctly");
+
     // ===== TEST DELETE =====
     console.log("\n🗑️  Testing Delete Operations:");
 
@@ -567,6 +612,7 @@ async function main() {
     console.log("  • Include patterns (simple & nested)");
     console.log("  • Sorting (single-col, multi-col, mixed directions)");
     console.log("  • Pagination metadata (total, hasMore, limit, offset)");
+    console.log("  • JSONB operations (objects, arrays, nested, null)");
     console.log("  • Error handling (404 on deleted resource)");
   } finally {
     server.close();

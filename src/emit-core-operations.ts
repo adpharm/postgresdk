@@ -29,6 +29,22 @@ const log = {
 };
 
 /**
+ * Prepare query parameters for PostgreSQL.
+ * The pg library should handle JSONB automatically, but there are edge cases
+ * where explicit stringification is needed (e.g., certain pg versions or when
+ * objects have been through serialization/deserialization).
+ */
+function prepareParams(params: any[]): any[] {
+  return params.map(p => {
+    if (p === null || p === undefined) return p;
+    // Stringify objects/arrays for JSONB - while pg should handle this automatically,
+    // we've observed cases where it fails without explicit stringification
+    if (typeof p === 'object') return JSON.stringify(p);
+    return p;
+  });
+}
+
+/**
  * CREATE operation - Insert a new record
  */
 export async function createRecord(
@@ -47,9 +63,9 @@ export async function createRecord(
     const text = \`INSERT INTO "\${ctx.table}" (\${cols.map(c => '"' + c + '"').join(", ")})
                    VALUES (\${placeholders})
                    RETURNING *\`;
-    
+
     log.debug("SQL:", text, "vals:", vals);
-    const { rows } = await ctx.pg.query(text, vals);
+    const { rows } = await ctx.pg.query(text, prepareParams(vals));
 
     return { data: rows[0] ?? null, status: rows[0] ? 201 : 500 };
   } catch (e: any) {
@@ -88,8 +104,8 @@ export async function getByPk(
     
     const text = \`SELECT * FROM "\${ctx.table}" WHERE \${wherePkSql} LIMIT 1\`;
     log.debug(\`GET \${ctx.table} by PK:\`, pkValues, "SQL:", text);
-    
-    const { rows } = await ctx.pg.query(text, pkValues);
+
+    const { rows } = await ctx.pg.query(text, prepareParams(pkValues));
     
     if (!rows[0]) {
       return { data: null, status: 404 };
@@ -473,14 +489,14 @@ export async function listRecords(
     // Get total count for pagination
     const countText = \`SELECT COUNT(*) FROM "\${ctx.table}" \${countWhereSQL}\`;
     log.debug(\`LIST \${ctx.table} COUNT SQL:\`, countText, "params:", countParams);
-    const countResult = await ctx.pg.query(countText, countParams);
+    const countResult = await ctx.pg.query(countText, prepareParams(countParams));
     const total = parseInt(countResult.rows[0].count, 10);
 
     // Get paginated data
     const text = \`SELECT \${selectClause} FROM "\${ctx.table}" \${whereSQL} \${orderBySQL} LIMIT \${limitParam} OFFSET \${offsetParam}\`;
     log.debug(\`LIST \${ctx.table} SQL:\`, text, "params:", allParams);
 
-    const { rows } = await ctx.pg.query(text, allParams);
+    const { rows } = await ctx.pg.query(text, prepareParams(allParams));
 
     // Calculate hasMore
     const hasMore = offset + limit < total;
@@ -545,12 +561,12 @@ export async function updateRecord(
     const setSql = Object.keys(filteredData)
       .map((k, i) => \`"\${k}" = $\${i + pkValues.length + 1}\`)
       .join(", ");
-    
+
     const text = \`UPDATE "\${ctx.table}" SET \${setSql} WHERE \${wherePkSql} RETURNING *\`;
     const params = [...pkValues, ...Object.values(filteredData)];
-    
+
     log.debug(\`PATCH \${ctx.table} SQL:\`, text, "params:", params);
-    const { rows } = await ctx.pg.query(text, params);
+    const { rows } = await ctx.pg.query(text, prepareParams(params));
     
     if (!rows[0]) {
       return { data: null, status: 404 };
@@ -597,9 +613,9 @@ export async function deleteRecord(
     const text = ctx.softDeleteColumn
       ? \`UPDATE "\${ctx.table}" SET "\${ctx.softDeleteColumn}" = NOW() WHERE \${wherePkSql} RETURNING *\`
       : \`DELETE FROM "\${ctx.table}" WHERE \${wherePkSql} RETURNING *\`;
-    
+
     log.debug(\`DELETE \${ctx.softDeleteColumn ? '(soft)' : ''} \${ctx.table} SQL:\`, text, "pk:", pkValues);
-    const { rows } = await ctx.pg.query(text, pkValues);
+    const { rows } = await ctx.pg.query(text, prepareParams(pkValues));
     
     if (!rows[0]) {
       return { data: null, status: 404 };

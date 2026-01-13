@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- fix: Explicitly stringify JSONB parameters for PostgreSQL queries
+  - All database operations now stringify objects/arrays before passing to pg library
+  - Fixes edge cases where pg fails to auto-stringify JSONB values
+  - Ensures consistent JSONB handling across create, update, list, getByPk, and delete operations
+- chore: Add JSONB integration tests to test suite
+  - Tests verify JSONB objects, arrays, nested structures, and null values work end-to-end
+  - Covers create, retrieve, update operations with various JSONB types
+  - Test schema includes products and users tables with multiple JSONB columns
+
 ## [v0.16.5] - 2026-01-12
 
 - chore: Add enhanced error logging for JSON validation failures
