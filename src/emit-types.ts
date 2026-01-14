@@ -87,7 +87,9 @@ ${baseSelectType}
  * @example Insert${Type}<{ metadata: MyMetadataType }>
  */
 export type Insert${Type}<TJsonb extends Partial<_Insert${Type}Base> = {}> =
-  Omit<_Insert${Type}Base, keyof TJsonb> & TJsonb;
+  {} extends TJsonb
+    ? _Insert${Type}Base
+    : Omit<_Insert${Type}Base, keyof TJsonb> & TJsonb;
 
 /**
  * Type for updating an existing ${table.name} record.
@@ -97,7 +99,9 @@ export type Insert${Type}<TJsonb extends Partial<_Insert${Type}Base> = {}> =
  * @example Update${Type}<{ metadata: MyMetadataType }>
  */
 export type Update${Type}<TJsonb extends Partial<_Select${Type}Base> = {}> =
-  Partial<Omit<_Insert${Type}Base, keyof TJsonb> & TJsonb>;
+  {} extends TJsonb
+    ? Partial<_Insert${Type}Base>
+    : Partial<Omit<_Insert${Type}Base, keyof TJsonb> & TJsonb>;
 
 /**
  * Type representing a ${table.name} record from the database.
@@ -107,7 +111,9 @@ export type Update${Type}<TJsonb extends Partial<_Select${Type}Base> = {}> =
  * @example Select${Type}<{ metadata: MyMetadataType }>
  */
 export type Select${Type}<TJsonb extends Partial<_Select${Type}Base> = {}> =
-  Omit<_Select${Type}Base, keyof TJsonb> & TJsonb;
+  {} extends TJsonb
+    ? _Select${Type}Base
+    : Omit<_Select${Type}Base, keyof TJsonb> & TJsonb;
 `;
   }
 

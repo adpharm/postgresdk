@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- fix: Improve TypeScript intellisense for JSONB generic types
+  - Generic types now display actual properties instead of index signatures in IDE hover
+  - When no generic provided, returns base type directly instead of `Omit<Base, never>`
+  - Fixes confusing `{ [x: string]: ...; }` display in autocomplete and type hints
+  - Applies to `Insert`, `Update`, and `Select` types for tables with JSONB columns
+
 ## [v0.16.9] - 2026-01-13
 
 - fix: Handle empty arrays correctly in $in and $nin operators
