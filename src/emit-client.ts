@@ -49,7 +49,7 @@ function analyzeIncludeSpec(includeSpec: Record<string, unknown>): {
 
   const value = includeSpec[key];
 
-  if (typeof value === 'object' && value !== null && value !== true) {
+  if (typeof value === 'object' && value !== null) {
     return { type: 'nested', keys: [key], nestedKey: key, nestedValue: value as Record<string, unknown> };
   }
 
