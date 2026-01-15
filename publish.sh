@@ -39,6 +39,22 @@ if [[ -n $(git status -s) ]]; then
     fi
 fi
 
+# Build the package first (tests need up-to-date dist files)
+echo -e "${BLUE}🔨 Building package...${NC}"
+bun run build || {
+    echo -e "${RED}❌ Build failed.${NC}"
+    exit 1
+}
+echo -e "${GREEN}✓ Build complete${NC}\n"
+
+# Run tests
+echo -e "${BLUE}🧪 Running tests...${NC}"
+bun test || {
+    echo -e "${RED}❌ Tests failed. Fix issues before publishing.${NC}"
+    exit 1
+}
+echo -e "${GREEN}✓ Tests passed${NC}\n"
+
 # Ask for version bump type
 echo "How would you like to bump the version?"
 echo "  1) Patch (0.1.0 → 0.1.1)"
@@ -80,22 +96,6 @@ esac
 
 echo -e "\n${GREEN}New version: ${NEW_VERSION}${NC}\n"
 
-# Build the package first (tests need up-to-date dist files)
-echo -e "${BLUE}🔨 Building package...${NC}"
-npm run build || {
-    echo -e "${RED}❌ Build failed.${NC}"
-    exit 1
-}
-echo -e "${GREEN}✓ Build complete${NC}\n"
-
-# Run tests
-echo -e "${BLUE}🧪 Running tests...${NC}"
-npm test || {
-    echo -e "${RED}❌ Tests failed. Fix issues before publishing.${NC}"
-    exit 1
-}
-echo -e "${GREEN}✓ Tests passed${NC}\n"
-
 # Dry run first
 echo -e "${BLUE}🔍 Running npm publish dry-run...${NC}"
 npm publish --dry-run || {
@@ -116,7 +116,7 @@ read -p "Do you want to publish to npm? (y/N) " -n 1 -r
 echo
 if [[ ! $REPLY =~ ^[Yy]$ ]]; then
     echo -e "${YELLOW}Aborted. Version was updated but not published.${NC}"
-    echo -e "To revert version: git checkout -- package.json src/cli.ts"
+    echo -e "To revert version: git checkout -- package.json"
     exit 0
 fi
 

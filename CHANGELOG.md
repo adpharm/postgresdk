@@ -19,6 +19,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - 8 new tests covering single, parallel, and nested include patterns
   - Tests verify orderBy, limit, offset, and combinations work correctly
   - All existing tests continue to pass
+- chore: Run build and tests before version bump in publish script
+  - Version only updated after successful build and test run
+  - Prevents package.json modification when build/test fails
+  - Switched to bun commands per project standards
 
 ## [v0.16.10] - 2026-01-14
 
