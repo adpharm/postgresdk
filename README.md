@@ -584,6 +584,58 @@ const nestedResult = await sdk.authors.list({
 const authorsWithBooksAndTags = nestedResult.data;
 ```
 
+**Typed Include Methods:**
+
+For convenience and better type safety, the SDK generates `listWith*` and `getByPkWith*` methods for common include patterns:
+
+```typescript
+// Typed methods provide full autocomplete and type safety
+const result = await sdk.authors.listWithBooks();
+// result.data[0].books is typed as SelectBooks[]
+
+// Control included relations with options
+const topAuthors = await sdk.authors.listWithBooks({
+  limit: 10,
+  booksInclude: {
+    orderBy: 'published_at',
+    order: 'desc',
+    limit: 5  // Only get top 5 books per author
+  }
+});
+
+// Parallel includes (multiple relations at once)
+const result2 = await sdk.books.listWithAuthorAndTags({
+  tagsInclude: {
+    orderBy: 'name',
+    limit: 3
+  }
+  // author is included automatically (one-to-one)
+});
+
+// Nested includes with control at each level
+const result3 = await sdk.authors.listWithBooksAndTags({
+  booksInclude: {
+    orderBy: 'title',
+    limit: 10,
+    include: {
+      tags: {
+        orderBy: 'name',
+        order: 'asc',
+        limit: 5
+      }
+    }
+  }
+});
+
+// Works with getByPk too
+const author = await sdk.authors.getByPkWithBooks('author-id', {
+  booksInclude: {
+    orderBy: 'published_at',
+    limit: 3
+  }
+});
+```
+
 #### Filtering & Pagination
 
 All `list()` methods return pagination metadata:

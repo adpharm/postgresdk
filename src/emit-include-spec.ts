@@ -22,7 +22,7 @@ export function emitIncludeSpec(graph: Graph) {
       if (edge.kind === "many") {
         out += `  ${relKey}?: boolean | { include?: ${toPascal(
           edge.target
-        )}IncludeSpec; limit?: number; offset?: number; };\n`;
+        )}IncludeSpec; limit?: number; offset?: number; orderBy?: string; order?: "asc" | "desc"; };\n`;
       } else {
         out += `  ${relKey}?: boolean | ${toPascal(edge.target)}IncludeSpec;\n`;
       }

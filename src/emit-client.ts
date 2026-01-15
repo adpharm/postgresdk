@@ -19,6 +19,43 @@ function isJsonbType(pgType: string): boolean {
   return t === "json" || t === "jsonb";
 }
 
+/**
+ * Convert relation name to include param name
+ * "books" → "booksInclude"
+ */
+function toIncludeParamName(relationKey: string): string {
+  return `${relationKey}Include`;
+}
+
+/**
+ * Analyze includeSpec to determine pattern type
+ */
+function analyzeIncludeSpec(includeSpec: Record<string, unknown>): {
+  type: 'single' | 'parallel' | 'nested';
+  keys: string[];
+  nestedKey?: string;
+  nestedValue?: Record<string, unknown>;
+} {
+  const keys = Object.keys(includeSpec);
+
+  if (keys.length > 1) {
+    return { type: 'parallel', keys };
+  }
+
+  const key = keys[0];
+  if (!key) {
+    return { type: 'single', keys: [] };
+  }
+
+  const value = includeSpec[key];
+
+  if (typeof value === 'object' && value !== null && value !== true) {
+    return { type: 'nested', keys: [key], nestedKey: key, nestedValue: value as Record<string, unknown> };
+  }
+
+  return { type: 'single', keys: [key] };
+}
+
 export function emitClient(
   table: Table,
   graph: Graph,
@@ -90,7 +127,7 @@ export function emitClient(
   let includeMethodsCode = "";
   for (const method of includeMethods) {
     const isGetByPk = method.name.startsWith("getByPk");
-    const baseParams = isGetByPk ? "" : `params?: Omit<{ limit?: number; offset?: number; where?: Where<Select${Type}>; orderBy?: string | string[]; order?: "asc" | "desc" | ("asc" | "desc")[]; }, "include">`;
+    const pattern = analyzeIncludeSpec(method.includeSpec);
 
     // Generate JSDoc description
     const relationshipDesc = method.path.map((p, i) => {
@@ -99,39 +136,165 @@ export function emitClient(
       return isLast ? p : `${p} -> `;
     }).join('');
 
+    // Build parameter type based on include pattern
+    let paramsType = "";
+    const includeParamNames: string[] = [];
+
+    if (pattern.type === 'single') {
+      const key = pattern.keys[0];
+      if (key) {
+        const paramName = toIncludeParamName(key);
+        includeParamNames.push(paramName);
+        paramsType = `{
+    limit?: number;
+    offset?: number;
+    where?: Where<Select${Type}>;
+    orderBy?: string | string[];
+    order?: "asc" | "desc" | ("asc" | "desc")[];
+    ${paramName}?: {
+      orderBy?: string | string[];
+      order?: "asc" | "desc";
+      limit?: number;
+      offset?: number;
+    };
+  }`;
+      }
+    } else if (pattern.type === 'parallel') {
+      const includeParams = pattern.keys.map(key => {
+        const paramName = toIncludeParamName(key);
+        includeParamNames.push(paramName);
+        return `${paramName}?: {
+      orderBy?: string | string[];
+      order?: "asc" | "desc";
+      limit?: number;
+      offset?: number;
+    }`;
+      }).join(';\n    ');
+
+      paramsType = `{
+    limit?: number;
+    offset?: number;
+    where?: Where<Select${Type}>;
+    orderBy?: string | string[];
+    order?: "asc" | "desc" | ("asc" | "desc")[];
+    ${includeParams};
+  }`;
+    } else if (pattern.type === 'nested' && pattern.nestedKey) {
+      const paramName = toIncludeParamName(pattern.nestedKey);
+      includeParamNames.push(paramName);
+      paramsType = `{
+    limit?: number;
+    offset?: number;
+    where?: Where<Select${Type}>;
+    orderBy?: string | string[];
+    order?: "asc" | "desc" | ("asc" | "desc")[];
+    ${paramName}?: {
+      orderBy?: string | string[];
+      order?: "asc" | "desc";
+      limit?: number;
+      offset?: number;
+      include?: any;
+    };
+  }`;
+    }
+
     if (isGetByPk) {
-      // For getByPk with includes, we use the list endpoint with a where clause
+      // For getByPk with includes
       const pkWhere = hasCompositePk
         ? `{ ${safePk.map(col => `${col}: pk.${col}`).join(", ")} }`
         : `{ ${safePk[0] || 'id'}: pk }`;
 
-      // Extract the base return type (without the "| null" part)
       const baseReturnType = method.returnType.replace(" | null", "");
+
+      // Generate param destructuring and include spec transformation
+      let transformCode = "";
+      if (includeParamNames.length > 0) {
+        const destructure = includeParamNames.map(name => name).join(", ");
+
+        if (pattern.type === 'single') {
+          const key = pattern.keys[0];
+          const paramName = includeParamNames[0];
+          transformCode = `
+    const { ${destructure} } = params ?? {};
+    const includeSpec = ${paramName} ? { ${key}: ${paramName} } : ${JSON.stringify(method.includeSpec)};`;
+        } else if (pattern.type === 'parallel') {
+          const includeSpecCode = pattern.keys.map((key, idx) => {
+            const paramName = includeParamNames[idx];
+            return `${key}: ${paramName} ?? true`;
+          }).join(', ');
+          transformCode = `
+    const { ${destructure} } = params ?? {};
+    const includeSpec = { ${includeSpecCode} };`;
+        } else if (pattern.type === 'nested' && pattern.nestedKey) {
+          const key = pattern.nestedKey;
+          const paramName = includeParamNames[0];
+          transformCode = `
+    const { ${destructure} } = params ?? {};
+    const includeSpec = ${paramName} ? { ${key}: ${paramName} } : ${JSON.stringify(method.includeSpec)};`;
+        }
+      } else {
+        transformCode = `
+    const includeSpec = ${JSON.stringify(method.includeSpec)};`;
+      }
 
       includeMethodsCode += `
   /**
    * Get a ${table.name} record by primary key with included related ${relationshipDesc}
    * @param pk - The primary key value${hasCompositePk ? 's' : ''}
+   * @param params - Optional include options
    * @returns The record with nested ${method.path.join(' and ')} if found, null otherwise
    */
-  async ${method.name}(pk: ${pkType}): Promise<${method.returnType}> {
+  async ${method.name}(pk: ${pkType}, params?: ${paramsType}): Promise<${method.returnType}> {${transformCode}
     const results = await this.post<PaginatedResponse<${baseReturnType}>>(\`\${this.resource}/list\`, {
       where: ${pkWhere},
-      include: ${JSON.stringify(method.includeSpec)},
+      include: includeSpec,
       limit: 1
     });
     return (results.data[0] as ${baseReturnType}) ?? null;
   }
 `;
     } else {
+      // For list methods
+      let transformCode = "";
+      if (includeParamNames.length > 0) {
+        const destructure = includeParamNames.map(name => name).join(", ");
+
+        if (pattern.type === 'single') {
+          const key = pattern.keys[0];
+          const paramName = includeParamNames[0];
+          transformCode = `
+    const { ${destructure}, ...baseParams } = params ?? {};
+    const includeSpec = ${paramName} ? { ${key}: ${paramName} } : ${JSON.stringify(method.includeSpec)};
+    return this.post<${method.returnType}>(\`\${this.resource}/list\`, { ...baseParams, include: includeSpec });`;
+        } else if (pattern.type === 'parallel') {
+          const includeSpecCode = pattern.keys.map((key, idx) => {
+            const paramName = includeParamNames[idx];
+            return `${key}: ${paramName} ?? true`;
+          }).join(', ');
+          transformCode = `
+    const { ${destructure}, ...baseParams } = params ?? {};
+    const includeSpec = { ${includeSpecCode} };
+    return this.post<${method.returnType}>(\`\${this.resource}/list\`, { ...baseParams, include: includeSpec });`;
+        } else if (pattern.type === 'nested' && pattern.nestedKey) {
+          const key = pattern.nestedKey;
+          const paramName = includeParamNames[0];
+          transformCode = `
+    const { ${destructure}, ...baseParams } = params ?? {};
+    const includeSpec = ${paramName} ? { ${key}: ${paramName} } : ${JSON.stringify(method.includeSpec)};
+    return this.post<${method.returnType}>(\`\${this.resource}/list\`, { ...baseParams, include: includeSpec });`;
+        }
+      } else {
+        transformCode = `
+    return this.post<${method.returnType}>(\`\${this.resource}/list\`, { ...params, include: ${JSON.stringify(method.includeSpec)} });`;
+      }
+
       includeMethodsCode += `
   /**
    * List ${table.name} records with included related ${relationshipDesc}
-   * @param params - Query parameters (where, orderBy, order, limit, offset)
+   * @param params - Query parameters (where, orderBy, order, limit, offset) and include options
    * @returns Paginated results with nested ${method.path.join(' and ')} included
    */
-  async ${method.name}(${baseParams}): Promise<${method.returnType}> {
-    return this.post<${method.returnType}>(\`\${this.resource}/list\`, { ...params, include: ${JSON.stringify(method.includeSpec)} });
+  async ${method.name}(params?: ${paramsType}): Promise<${method.returnType}> {${transformCode}
   }
 `;
     }
@@ -208,7 +371,7 @@ ${hasJsonbColumns ? `  /**
    * @param params.where - Filter conditions using operators like $eq, $gt, $in, $like, etc.
    * @param params.orderBy - Column(s) to sort by
    * @param params.order - Sort direction(s): "asc" or "desc"
-   * @param params.limit - Maximum number of records to return (default: 50, max: 100)
+   * @param params.limit - Maximum number of records to return (default: 50, max: 1000)
    * @param params.offset - Number of records to skip for pagination
    * @param params.include - Related records to include (see listWith* methods for typed includes)
    * @returns Paginated results with data, total count, and hasMore flag
@@ -237,7 +400,7 @@ ${hasJsonbColumns ? `  /**
    * @param params.where - Filter conditions using operators like $eq, $gt, $in, $like, etc.
    * @param params.orderBy - Column(s) to sort by
    * @param params.order - Sort direction(s): "asc" or "desc"
-   * @param params.limit - Maximum number of records to return (default: 50, max: 100)
+   * @param params.limit - Maximum number of records to return (default: 50, max: 1000)
    * @param params.offset - Number of records to skip for pagination
    * @param params.include - Related records to include (see listWith* methods for typed includes)
    * @returns Paginated results with data, total count, and hasMore flag

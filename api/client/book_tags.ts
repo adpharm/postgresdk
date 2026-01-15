@@ -43,7 +43,7 @@ export class BookTagsClient extends BaseClient {
    * @param params.where - Filter conditions using operators like $eq, $gt, $in, $like, etc.
    * @param params.orderBy - Column(s) to sort by
    * @param params.order - Sort direction(s): "asc" or "desc"
-   * @param params.limit - Maximum number of records to return (default: 50, max: 100)
+   * @param params.limit - Maximum number of records to return (default: 50, max: 1000)
    * @param params.offset - Number of records to skip for pagination
    * @param params.include - Related records to include (see listWith* methods for typed includes)
    * @returns Paginated results with data, total count, and hasMore flag

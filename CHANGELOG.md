@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- feat: Add include options to `listWith*` and `getByPkWith*` methods
+  - Generated include methods now accept optional parameters to control included relations
+  - Support for `orderBy`, `order`, `limit`, and `offset` on nested includes
+  - Works with single includes (`listWithBooks({ booksInclude: { orderBy, limit } })`)
+  - Works with parallel includes (`listWithAuthorAndTags({ tagsInclude: { ... } })`)
+  - Works with nested includes (`listWithBooksAndTags({ booksInclude: { include: { tags: { ... } } } })`)
+  - Backwards compatible - calling without options works as before
+  - All parameters fully typed with no loss of type safety
+- test: Add comprehensive tests for include method options
+  - 8 new tests covering single, parallel, and nested include patterns
+  - Tests verify orderBy, limit, offset, and combinations work correctly
+  - All existing tests continue to pass
+
 ## [v0.16.10] - 2026-01-14
 
 - fix: Improve TypeScript intellisense for JSONB generic types

@@ -39,6 +39,13 @@ type Graph = typeof RELATION_GRAPH;
 type TableName = keyof Graph;
 type IncludeSpec = any;
 
+type RelationOptions = {
+  limit?: number;
+  offset?: number;
+  orderBy?: string;
+  order?: "asc" | "desc";
+};
+
 // Debug helpers (enabled with SDK_DEBUG=1)
 const DEBUG = process.env.SDK_DEBUG === "1" || process.env.SDK_DEBUG === "true";
 const log = {
@@ -144,14 +151,43 @@ export async function loadIncludes(
       // Safely run each loader; never let one bad edge 500 the route
       if (rel.via) {
         // M:N via junction
+        const specValue = s[key];
+        const options: RelationOptions = {};
+        let childSpec: any = undefined;
+
+        if (specValue && typeof specValue === "object" && specValue !== true) {
+          // Extract options
+          if (specValue.limit !== undefined) options.limit = specValue.limit;
+          if (specValue.offset !== undefined) options.offset = specValue.offset;
+          if (specValue.orderBy !== undefined) options.orderBy = specValue.orderBy;
+          if (specValue.order !== undefined) options.order = specValue.order;
+
+          // Extract nested spec - support both formats:
+          // New: { limit: 3, include: { tags: true } }
+          // Old: { tags: true } (backward compatibility)
+          if (specValue.include !== undefined) {
+            childSpec = specValue.include;
+          } else {
+            // Build childSpec from non-option keys
+            const nonOptionKeys = Object.keys(specValue).filter(
+              k => k !== 'limit' && k !== 'offset' && k !== 'orderBy' && k !== 'order'
+            );
+            if (nonOptionKeys.length > 0) {
+              childSpec = {};
+              for (const k of nonOptionKeys) {
+                childSpec[k] = specValue[k];
+              }
+            }
+          }
+        }
+
         try {
-          await loadManyToMany(table, target, rel.via as string, rows, key);
+          await loadManyToMany(table, target, rel.via as string, rows, key, options);
         } catch (e: any) {
           log.error("loadManyToMany failed", { table, key, via: rel.via, target }, e?.message ?? e);
           for (const r of rows) r[key] = [];
         }
-        // Recurse if nested include specified
-        const childSpec = s[key] && typeof s[key] === "object" ? s[key] : undefined;
+
         if (childSpec) {
           const children = rows.flatMap(r => (r[key] ?? []));
           try {
@@ -165,13 +201,43 @@ export async function loadIncludes(
 
       if (rel.kind === "many") {
         // 1:N target has FK to current
+        const specValue = s[key];
+        const options: RelationOptions = {};
+        let childSpec: any = undefined;
+
+        if (specValue && typeof specValue === "object" && specValue !== true) {
+          // Extract options
+          if (specValue.limit !== undefined) options.limit = specValue.limit;
+          if (specValue.offset !== undefined) options.offset = specValue.offset;
+          if (specValue.orderBy !== undefined) options.orderBy = specValue.orderBy;
+          if (specValue.order !== undefined) options.order = specValue.order;
+
+          // Extract nested spec - support both formats:
+          // New: { limit: 3, include: { tags: true } }
+          // Old: { tags: true } (backward compatibility)
+          if (specValue.include !== undefined) {
+            childSpec = specValue.include;
+          } else {
+            // Build childSpec from non-option keys
+            const nonOptionKeys = Object.keys(specValue).filter(
+              k => k !== 'limit' && k !== 'offset' && k !== 'orderBy' && k !== 'order'
+            );
+            if (nonOptionKeys.length > 0) {
+              childSpec = {};
+              for (const k of nonOptionKeys) {
+                childSpec[k] = specValue[k];
+              }
+            }
+          }
+        }
+
         try {
-          await loadOneToMany(table, target, rows, key);
+          await loadOneToMany(table, target, rows, key, options);
         } catch (e: any) {
           log.error("loadOneToMany failed", { table, key, target }, e?.message ?? e);
           for (const r of rows) r[key] = [];
         }
-        const childSpec = s[key] && typeof s[key] === "object" ? s[key] : undefined;
+
         if (childSpec) {
           const children = rows.flatMap(r => (r[key] ?? []));
           try {
@@ -259,7 +325,7 @@ export async function loadIncludes(
     }
   }
 
-  async function loadOneToMany(curr: TableName, target: TableName, rows: any[], key: string) {
+  async function loadOneToMany(curr: TableName, target: TableName, rows: any[], key: string, options: RelationOptions = {}) {
     // target has FK cols referencing current PK
     const fk = (FK_INDEX as any)[target].find((f: any) => f.toTable === curr);
     if (!fk) { for (const r of rows) r[key] = []; return; }
@@ -270,18 +336,50 @@ export async function loadIncludes(
 
     const where = buildOrAndPredicate(fk.from, tuples.length, 1);
     const params = tuples.flat();
-    const sql = \`SELECT * FROM "\${target}" WHERE \${where}\`;
-    log.debug("oneToMany SQL", { curr, target, key, sql, paramsCount: params.length });
+
+    // Build SQL with optional ORDER BY, LIMIT, OFFSET
+    let sql = \`SELECT * FROM "\${target}" WHERE \${where}\`;
+
+    // If limit/offset are needed, use window functions to limit per parent
+    if (options.limit !== undefined || options.offset !== undefined) {
+      const orderByClause = options.orderBy
+        ? \`ORDER BY "\${options.orderBy}" \${options.order === 'desc' ? 'DESC' : 'ASC'}\`
+        : 'ORDER BY (SELECT NULL)';
+
+      const partitionCols = fk.from.map((c: string) => \`"\${c}"\`).join(', ');
+      const offset = options.offset ?? 0;
+      const limit = options.limit ?? 999999999;
+
+      sql = \`
+        SELECT * FROM (
+          SELECT *, ROW_NUMBER() OVER (PARTITION BY \${partitionCols} \${orderByClause}) as __rn
+          FROM "\${target}"
+          WHERE \${where}
+        ) __sub
+        WHERE __rn > \${offset} AND __rn <= \${offset + limit}
+      \`;
+    } else if (options.orderBy) {
+      // Just ORDER BY without limit/offset
+      sql += \` ORDER BY "\${options.orderBy}" \${options.order === 'desc' ? 'DESC' : 'ASC'}\`;
+    }
+
+    log.debug("oneToMany SQL", { curr, target, key, sql, paramsCount: params.length, options });
     const { rows: children } = await pg.query(sql, params);
 
-    const groups = groupByTuple(children, fk.from);
+    // Remove __rn column if it exists
+    const cleanChildren = children.map((row: any) => {
+      const { __rn, ...rest } = row;
+      return rest;
+    });
+
+    const groups = groupByTuple(cleanChildren, fk.from);
     for (const r of rows) {
       const keyStr = JSON.stringify(pkCols.map((c: string) => r[c]));
       r[key] = groups.get(keyStr) ?? [];
     }
   }
 
-  async function loadManyToMany(curr: TableName, target: TableName, via: string, rows: any[], key: string) {
+  async function loadManyToMany(curr: TableName, target: TableName, via: string, rows: any[], key: string, options: RelationOptions = {}) {
     // via has two FKs: one to curr, one to target
     const toCurr = (FK_INDEX as any)[via].find((f: any) => f.toTable === curr);
     const toTarget = (FK_INDEX as any)[via].find((f: any) => f.toTable === target);
@@ -291,31 +389,83 @@ export async function loadIncludes(
     const tuples = distinctTuples(rows, pkCols).filter(t => t.every((v: any) => v != null));
     if (!tuples.length) { for (const r of rows) r[key] = []; return; }
 
-    // 1) Load junction rows for current parents
     const whereVia = buildOrAndPredicate(toCurr.from, tuples.length, 1);
-    const sqlVia = \`SELECT * FROM "\${via}" WHERE \${whereVia}\`;
-    const paramsVia = tuples.flat();
-    log.debug("manyToMany junction SQL", { curr, target, via, key, sql: sqlVia, paramsCount: paramsVia.length });
-    const { rows: jrows } = await pg.query(sqlVia, paramsVia);
+    const params = tuples.flat();
 
-    if (!jrows.length) { for (const r of rows) r[key] = []; return; }
+    // If we have limit/offset/orderBy, use a JOIN with window functions
+    if (options.limit !== undefined || options.offset !== undefined || options.orderBy) {
+      const orderByClause = options.orderBy
+        ? \`ORDER BY t."\${options.orderBy}" \${options.order === 'desc' ? 'DESC' : 'ASC'}\`
+        : 'ORDER BY (SELECT NULL)';
 
-    // 2) Load targets by distinct target fk tuples in junction
-    const tTuples = distinctTuples(jrows, toTarget.from);
-    const whereT = buildOrAndPredicate((PKS as any)[target], tTuples.length, 1);
-    const sqlT = \`SELECT * FROM "\${target}" WHERE \${whereT}\`;
-    const paramsT = tTuples.flat();
-    log.debug("manyToMany target SQL", { curr, target, via, key, sql: sqlT, paramsCount: paramsT.length });
-    const { rows: targets } = await pg.query(sqlT, paramsT);
+      const partitionCols = toCurr.from.map((c: string) => \`j."\${c}"\`).join(', ');
+      const offset = options.offset ?? 0;
+      const limit = options.limit ?? 999999999;
 
-    const tIdx = indexByTuple(targets, (PKS as any)[target]);
+      const targetPkCols = (PKS as any)[target] as string[];
+      const joinConditions = toTarget.from.map((jCol: string, i: number) => {
+        return \`j."\${jCol}" = t."\${targetPkCols[i]}"\`;
+      }).join(' AND ');
 
-    // 3) Group junction rows by current pk tuple, map to target rows
-    const byCurr = groupByTuple(jrows, toCurr.from);
-    for (const r of rows) {
-      const currKey = JSON.stringify(pkCols.map((c: string) => r[c]));
-      const j = byCurr.get(currKey) ?? [];
-      r[key] = j.map(jr => tIdx.get(JSON.stringify(toTarget.from.map((c: string) => jr[c])))).filter(Boolean);
+      const sql = \`
+        SELECT __numbered.*
+        FROM (
+          SELECT t.*,
+                 ROW_NUMBER() OVER (PARTITION BY \${partitionCols} \${orderByClause}) as __rn,
+                 \${toCurr.from.map((c: string) => \`j."\${c}"\`).join(' || \\',\\' || ')} as __parent_fk
+          FROM "\${via}" j
+          INNER JOIN "\${target}" t ON \${joinConditions}
+          WHERE \${whereVia}
+        ) __numbered
+        WHERE __numbered.__rn > \${offset} AND __numbered.__rn <= \${offset + limit}
+      \`;
+
+      log.debug("manyToMany SQL with options", { curr, target, via, key, sql, paramsCount: params.length, options });
+      const { rows: results } = await pg.query(sql, params);
+
+      // Clean and group results
+      const cleanResults = results.map((row: any) => {
+        const { __rn, __parent_fk, ...rest } = row;
+        return { ...rest, __parent_fk };
+      });
+
+      const grouped = new Map<string, any[]>();
+      for (const row of cleanResults) {
+        const { __parent_fk, ...cleanRow } = row;
+        const arr = grouped.get(__parent_fk) ?? [];
+        arr.push(cleanRow);
+        grouped.set(__parent_fk, arr);
+      }
+
+      for (const r of rows) {
+        const currKey = pkCols.map((c: string) => r[c]).join(',');
+        r[key] = grouped.get(currKey) ?? [];
+      }
+    } else {
+      // Original logic without options
+      const sqlVia = \`SELECT * FROM "\${via}" WHERE \${whereVia}\`;
+      log.debug("manyToMany junction SQL", { curr, target, via, key, sql: sqlVia, paramsCount: params.length });
+      const { rows: jrows } = await pg.query(sqlVia, params);
+
+      if (!jrows.length) { for (const r of rows) r[key] = []; return; }
+
+      // 2) Load targets by distinct target fk tuples in junction
+      const tTuples = distinctTuples(jrows, toTarget.from);
+      const whereT = buildOrAndPredicate((PKS as any)[target], tTuples.length, 1);
+      const sqlT = \`SELECT * FROM "\${target}" WHERE \${whereT}\`;
+      const paramsT = tTuples.flat();
+      log.debug("manyToMany target SQL", { curr, target, via, key, sql: sqlT, paramsCount: paramsT.length });
+      const { rows: targets } = await pg.query(sqlT, paramsT);
+
+      const tIdx = indexByTuple(targets, (PKS as any)[target]);
+
+      // 3) Group junction rows by current pk tuple, map to target rows
+      const byCurr = groupByTuple(jrows, toCurr.from);
+      for (const r of rows) {
+        const currKey = JSON.stringify(pkCols.map((c: string) => r[c]));
+        const j = byCurr.get(currKey) ?? [];
+        r[key] = j.map(jr => tIdx.get(JSON.stringify(toTarget.from.map((c: string) => jr[c])))).filter(Boolean);
+      }
     }
   }
 }
