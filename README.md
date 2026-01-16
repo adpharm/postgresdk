@@ -146,6 +146,7 @@ export default {
   schema: "public",                    // Database schema to introspect
   outDir: "./api",                     // Output directory (or { client: "./sdk", server: "./api" })
   softDeleteColumn: null,              // Column name for soft deletes (e.g., "deleted_at")
+  numericMode: "auto",                 // "auto" | "number" | "string" - How to type numeric columns
   includeMethodsDepth: 2,              // Max depth for nested includes
   dateType: "date",                    // "date" | "string" - How to handle timestamps
   serverFramework: "hono",             // Currently only hono is supported
@@ -174,6 +175,14 @@ export default {
   }
 };
 ```
+
+#### Type Mapping (numericMode)
+
+Controls how PostgreSQL numeric types map to TypeScript:
+
+- **`"auto"` (default)**: `int2`/`int4`/floats → `number`, `int8`/`numeric` → `string`
+- **`"number"`**: All numeric → `number` (⚠️ unsafe for bigint - JS can't handle values > 2^53)
+- **`"string"`**: All numeric → `string` (safe but requires parsing)
 
 ### Database Drivers
 

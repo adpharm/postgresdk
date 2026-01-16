@@ -100,7 +100,18 @@ export function extractConfigFields(configContent: string): ConfigField[] {
       isCommented: !!depthMatch[1],
     });
   }
-  
+
+  // Extract numericMode
+  const numericModeMatch = configContent.match(/^\s*(\/\/)?\s*numericMode:\s*"(.+)"/m);
+  if (numericModeMatch) {
+    fields.push({
+      key: "numericMode",
+      value: numericModeMatch[2],
+      description: "How to type numeric columns in TypeScript",
+      isCommented: !!numericModeMatch[1],
+    });
+  }
+
   // Extract serverFramework
   const frameworkMatch = configContent.match(/^\s*(\/\/)?\s*serverFramework:\s*"(.+)"/m);
   if (frameworkMatch) {
@@ -307,7 +318,16 @@ export default {
    * @example "deleted_at"
    */
   ${getFieldLine("softDeleteColumn", existingFields, mergeStrategy, 'null', userChoices)}
-  
+
+  /**
+   * How to type numeric columns in TypeScript
+   * - "auto": int2/int4/float → number, int8/numeric → string (recommended)
+   * - "number": All numeric types become TypeScript number (unsafe for bigint)
+   * - "string": All numeric types become TypeScript string (legacy)
+   * @default "auto"
+   */
+  ${getFieldLine("numericMode", existingFields, mergeStrategy, '"auto"', userChoices)}
+
   /**
    * Maximum depth for nested relationship includes to prevent infinite loops
    * @default 2

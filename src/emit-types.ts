@@ -1,7 +1,7 @@
 /* Emits TypeScript types (Insert/Update/Select) for each table. */
 import type { Table } from "./introspect";
 
-function tsTypeFor(pgType: string, opts: { numericMode: "string" | "number" }, enums: Record<string, string[]>): string {
+function tsTypeFor(pgType: string, opts: { numericMode: "string" | "number" | "auto" }, enums: Record<string, string[]>): string {
   const t = pgType.toLowerCase();
 
   // Check if this is an enum type
@@ -13,7 +13,10 @@ function tsTypeFor(pgType: string, opts: { numericMode: "string" | "number" }, e
   if (t === "uuid") return "string";
   if (t === "bool" || t === "boolean") return "boolean";
   if (t === "int2" || t === "int4" || t === "int8" || t === "float4" || t === "float8" || t === "numeric") {
-    return opts.numericMode === "number" ? "number" : "string";
+    if (opts.numericMode === "number") return "number";
+    if (opts.numericMode === "string") return "string";
+    // auto mode: int2/int4/floats → number, int8/numeric → string (for precision safety)
+    return (t === "int2" || t === "int4" || t === "float4" || t === "float8") ? "number" : "string";
   }
   if (t === "date" || t.startsWith("timestamp")) return "string";
   if (t === "json" || t === "jsonb") return "unknown";
@@ -32,7 +35,7 @@ const pascal = (s: string) =>
     .map((w) => (w?.[0] ? w[0].toUpperCase() + w.slice(1) : ""))
     .join("");
 
-export function emitTypes(table: Table, opts: { numericMode: "string" | "number" }, enums: Record<string, string[]>) {
+export function emitTypes(table: Table, opts: { numericMode: "string" | "number" | "auto" }, enums: Record<string, string[]>) {
   const Type = pascal(table.name);
 
   // Check if table has any JSONB columns

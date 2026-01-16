@@ -161,12 +161,13 @@ export async function generate(configPath: string) {
   }
   for (const table of Object.values(model.tables)) {
     // types (server + client)
-    const typesSrc = emitTypes(table, { numericMode: "string" }, model.enums);
+    const numericMode = cfg.numericMode ?? "auto";
+    const typesSrc = emitTypes(table, { numericMode }, model.enums);
     files.push({ path: join(serverDir, "types", `${table.name}.ts`), content: typesSrc });
     files.push({ path: join(clientDir, "types", `${table.name}.ts`), content: typesSrc });
 
     // zod (server + client)
-    const zodSrc = emitZod(table, { numericMode: "string" }, model.enums);
+    const zodSrc = emitZod(table, { numericMode }, model.enums);
     files.push({ path: join(serverDir, "zod", `${table.name}.ts`), content: zodSrc });
     files.push({ path: join(clientDir, "zod", `${table.name}.ts`), content: zodSrc });
 

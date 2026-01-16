@@ -67,6 +67,20 @@ export default {
   // softDeleteColumn: null,
 
   /**
+   * How to type numeric columns in TypeScript
+   * Options:
+   *   - "auto": int2/int4/float → number, int8/numeric → string (recommended, default)
+   *   - "number": All numeric types become TypeScript number (unsafe for bigint)
+   *   - "string": All numeric types become TypeScript string (legacy behavior)
+   *
+   * Auto mode is safest - keeps JavaScript-safe integers as numbers,
+   * but preserves precision for bigint/numeric by using strings.
+   *
+   * Default: "auto"
+   */
+  // numericMode: "auto",
+
+  /**
    * Maximum depth for nested relationship includes to prevent infinite loops
    * Default: 2
    */

@@ -1,7 +1,7 @@
 import type { Table } from "./introspect";
 import { pascal } from "./utils";
 
-export function emitZod(table: Table, opts: { numericMode: "string" | "number" }, enums: Record<string, string[]>) {
+export function emitZod(table: Table, opts: { numericMode: "string" | "number" | "auto" }, enums: Record<string, string[]>) {
   const Type = pascal(table.name);
 
   const zFor = (pg: string): string => {
@@ -15,10 +15,18 @@ export function emitZod(table: Table, opts: { numericMode: "string" | "number" }
 
     if (t === "uuid") return `z.string()`;
     if (t === "bool" || t === "boolean") return `z.boolean()`;
-    if (t === "int2" || t === "int4" || t === "int8")
-      return opts.numericMode === "number" ? `z.number()` : `z.string()`;
-    if (t === "numeric" || t === "float4" || t === "float8")
-      return opts.numericMode === "number" ? `z.number()` : `z.string()`;
+    if (t === "int2" || t === "int4" || t === "int8") {
+      if (opts.numericMode === "number") return `z.number()`;
+      if (opts.numericMode === "string") return `z.string()`;
+      // auto mode: int2/int4 → number, int8 → string (for precision safety)
+      return (t === "int2" || t === "int4") ? `z.number()` : `z.string()`;
+    }
+    if (t === "numeric" || t === "float4" || t === "float8") {
+      if (opts.numericMode === "number") return `z.number()`;
+      if (opts.numericMode === "string") return `z.string()`;
+      // auto mode: floats → number, numeric (arbitrary precision) → string
+      return (t === "float4" || t === "float8") ? `z.number()` : `z.string()`;
+    }
     if (t === "jsonb" || t === "json") return `z.unknown()`;
     if (t === "date" || t.startsWith("timestamp")) return `z.string()`;
     if (t === "vector" || t === "halfvec" || t === "sparsevec" || t === "bit") return `z.array(z.number())`;

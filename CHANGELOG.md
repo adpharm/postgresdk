@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- feat: Add `numericMode` config option for flexible numeric type mapping
+  - New option controls how PostgreSQL numeric types map to TypeScript
+  - `"auto"` mode (default): int2/int4/floats → `number`, int8/numeric → `string` for precision safety
+  - `"number"` mode: All numeric types → `number` (unsafe for values > 2^53)
+  - `"string"` mode: All numeric types → `string` (legacy behavior, safe but requires parsing)
+  - Auto mode provides JavaScript-safe integers as numbers while preserving bigint/arbitrary precision as strings
+  - Applied to both TypeScript types and Zod validation schemas
+  - Fully documented in config templates, README, and CLI init output
+
 ## [v0.16.12] - 2026-01-15
 
 - feat: Add include options to `listWith*` and `getByPkWith*` methods

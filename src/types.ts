@@ -37,6 +37,7 @@ export interface Config {
   outDir?: string | { client: string; server: string };
   softDeleteColumn?: string | null;
   dateType?: "date" | "string";
+  numericMode?: "string" | "number" | "auto";  // How to type numeric columns (default: "auto" - int2/int4→number, int8/numeric→string)
   
   // Include methods generation
   includeMethodsDepth?: number;  // How deep to generate include methods (default: 2)
