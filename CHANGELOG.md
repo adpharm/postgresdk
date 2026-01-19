@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.16.14] - 2026-01-19
+
+- fix: Add NoInfer to prevent type inference bugs with optional fields in JSONB tables
+  - Generic parameters on `create()` and `update()` methods now use `NoInfer<>` to prevent TypeScript from inferring types from data parameters
+  - Fixes critical bug where wrong field names (e.g., `status` instead of `job_status`) would pass type checking when optional fields exist
+  - TypeScript now correctly rejects objects with incorrect field names even when JSONB columns are present
+  - Example: `client.create({ status: "queued" })` now fails at compile time with proper error message
+  - Requires TypeScript 5.4+ (NoInfer utility type)
+- refactor: Replace `any` with `unknown` for BaseClient HTTP method body parameters
+  - Changed `body?: any` to `body?: unknown` in `post()` and `patch()` methods
+  - Improves type safety and follows project coding standards
+  - No breaking changes - all existing code continues to work
+- test: Add NoInfer type safety test to verify fix prevents wrong field name inference
+
 ## [v0.16.13] - 2026-01-16
 
 - feat: Add `numericMode` config option for flexible numeric type mapping

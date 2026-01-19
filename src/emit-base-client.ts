@@ -80,18 +80,18 @@ export abstract class BaseClient {
   /**
    * Make a POST request
    */
-  protected async post<T>(path: string, body?: any): Promise<T> {
+  protected async post<T>(path: string, body?: unknown): Promise<T> {
     const res = await this.fetchFn(\`\${this.baseUrl}\${path}\`, {
       method: "POST",
       headers: await this.headers(true),
       body: JSON.stringify(body),
     });
-    
+
     // Handle 404 specially for operations that might return null
     if (res.status === 404) {
       return null as T;
     }
-    
+
     await this.okOrThrow(res, "POST", path);
     return (await res.json()) as T;
   }
@@ -115,17 +115,17 @@ export abstract class BaseClient {
   /**
    * Make a PATCH request
    */
-  protected async patch<T>(path: string, body?: any): Promise<T> {
+  protected async patch<T>(path: string, body?: unknown): Promise<T> {
     const res = await this.fetchFn(\`\${this.baseUrl}\${path}\`, {
       method: "PATCH",
       headers: await this.headers(true),
       body: JSON.stringify(body),
     });
-    
+
     if (res.status === 404) {
       return null as T;
     }
-    
+
     await this.okOrThrow(res, "PATCH", path);
     return (await res.json()) as T;
   }

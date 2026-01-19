@@ -330,7 +330,7 @@ ${hasJsonbColumns ? `  /**
    * const user = await client.create<{ metadata: Metadata }>({ name: 'Alice', metadata: { tags: [], prefs: { theme: 'light' } } });
    */
   async create<TJsonb extends Partial<Select${Type}> = {}>(
-    data: Insert${Type}<TJsonb>
+    data: NoInfer<Insert${Type}<TJsonb>>
   ): Promise<Select${Type}<TJsonb>> {
     return this.post<Select${Type}<TJsonb>>(this.resource, data);
   }` : `  /**
@@ -433,7 +433,7 @@ ${hasJsonbColumns ? `  /**
    */
   async update<TJsonb extends Partial<Select${Type}> = {}>(
     pk: ${pkType},
-    patch: Update${Type}<TJsonb>
+    patch: NoInfer<Update${Type}<TJsonb>>
   ): Promise<Select${Type}<TJsonb> | null> {
     const path = ${pkPathExpr};
     return this.patch<Select${Type}<TJsonb> | null>(\`\${this.resource}/\${path}\`, patch);
