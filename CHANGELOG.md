@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- feat: Add idempotent generation and pull operations
+  - `postgresdk generate` now skips regeneration when schema unchanged
+  - `postgresdk pull` only writes files that changed
+  - Schema hash computed from database schema and config settings
+  - Cache stored in `.postgresdk/` directory (auto-added to .gitignore)
+  - History log tracks all generation and pull operations with timestamps
+  - Files written only if content differs from existing files
+  - Reduces unnecessary file writes and git churn
+- refactor: Remove timestamps from SDK manifest and contract
+  - Removed `generated` field from SDK manifest for deterministic builds
+  - Removed `generatedAt` field from unified contract
+  - Enables idempotent generation - same schema produces identical output
+  - Improves caching and build reproducibility
+- chore: Update devcontainer to use official Claude CLI installer
+  - Switched from bun global install to curl-based installer
+  - Uses official install script from claude.ai
+
 ## [v0.16.14] - 2026-01-19
 
 - fix: Add NoInfer to prevent type inference bugs with optional fields in JSONB tables

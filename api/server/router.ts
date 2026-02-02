@@ -75,7 +75,6 @@ export function createRouter(
   router.get("/_psdk/sdk/manifest", (c) => {
     return c.json({
       version: SDK_MANIFEST.version,
-      generated: SDK_MANIFEST.generated,
       files: Object.keys(SDK_MANIFEST.files)
     });
   });

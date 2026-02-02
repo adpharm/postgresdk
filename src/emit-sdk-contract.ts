@@ -18,7 +18,6 @@ type JsonValue =
 
 export interface UnifiedContract {
   version: string;
-  generatedAt: string;
   description: string;
   sdk: {
     initialization: SDKInitExample[];
@@ -118,7 +117,6 @@ export function generateUnifiedContract(model: Model, config: Config & { auth?: 
   // Build the complete contract
   const contract: UnifiedContract = {
     version: "2.0.0",
-    generatedAt: new Date().toISOString(),
     description: "Unified API and SDK contract - your one-stop reference for all operations",
     sdk: {
       initialization: generateSDKInitExamples(),
@@ -127,7 +125,7 @@ export function generateUnifiedContract(model: Model, config: Config & { auth?: 
     resources,
     relationships
   };
-  
+
   return contract;
 }
 
@@ -726,7 +724,6 @@ export function generateUnifiedContractMarkdown(contract: UnifiedContract): stri
   lines.push(contract.description);
   lines.push("");
   lines.push(`**Version:** ${contract.version}`);
-  lines.push(`**Generated:** ${new Date(contract.generatedAt).toLocaleString()}`);
   lines.push("");
   
   // SDK Initialization

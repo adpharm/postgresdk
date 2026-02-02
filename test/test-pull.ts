@@ -152,11 +152,9 @@ async function main() {
     const metadata = JSON.parse(
       await readFile(join(PULL_OUTPUT_CONFIG, ".postgresdk.json"), "utf-8")
     );
-    
+
     if (!metadata.version) throw new Error("Missing version in metadata");
-    if (!metadata.generated) throw new Error("Missing generated timestamp");
     if (!metadata.pulledFrom) throw new Error("Missing pulledFrom URL");
-    if (!metadata.pulledAt) throw new Error("Missing pulledAt timestamp");
     console.log("✅ SDK metadata valid");
 
     // Step 6: Compare pulled SDK with original

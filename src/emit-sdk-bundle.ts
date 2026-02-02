@@ -22,7 +22,6 @@ export function emitSdkBundle(clientFiles: { path: string; content: string }[], 
   }
   
   const version = `1.0.0`; // TODO: Could get from config later
-  const generated = new Date().toISOString();
 
   return `/**
  * AUTO-GENERATED FILE - DO NOT EDIT
@@ -35,7 +34,6 @@ export function emitSdkBundle(clientFiles: { path: string; content: string }[], 
 
 export const SDK_MANIFEST = {
   version: "${version}",
-  generated: "${generated}",
   files: ${JSON.stringify(files, null, 2)}
 };
 `;

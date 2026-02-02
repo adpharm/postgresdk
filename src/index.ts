@@ -28,6 +28,7 @@ import { emitUnifiedContract } from "./emit-sdk-contract";
 import { ensureDirs, writeFiles } from "./utils";
 import type { Config } from "./types";
 import { normalizeAuthConfig, getAuthStrategy } from "./types";
+import { computeSchemaHash, readCache, writeCache, appendToHistory } from "./cache";
 
 export async function generate(configPath: string) {
   // Check if config file exists
@@ -51,24 +52,54 @@ export async function generate(configPath: string) {
   console.log("🔍 Introspecting database...");
   const model = await introspect(cfg.connectionString, cfg.schema || "public");
 
+  // Compute schema hash for idempotency check
+  const schemaHash = computeSchemaHash(model, cfg);
+  const cache = await readCache();
+
+  // Handle outDir to determine where files should be
+  let serverDir: string;
+  if (typeof cfg.outDir === "string") {
+    serverDir = cfg.outDir;
+  } else if (cfg.outDir && typeof cfg.outDir === "object") {
+    serverDir = cfg.outDir.server;
+  } else {
+    serverDir = "./api/server";
+  }
+
+  // Only skip generation if hash matches AND files exist in the current output directory
+  // Also check if the output directory matches the cached one
+  const currentOutDir = typeof cfg.outDir === "string" ? cfg.outDir : `${serverDir}`;
+  const cachedOutDir = typeof cache?.config.outDir === "string"
+    ? cache.config.outDir
+    : (cache?.config.outDir as any)?.server;
+
+  if (
+    cache &&
+    cache.schemaHash === schemaHash &&
+    existsSync(serverDir) &&
+    currentOutDir === cachedOutDir
+  ) {
+    console.log("✅ Schema unchanged, skipping generation");
+    await appendToHistory(
+      `Generate\n✅ Schema unchanged, skipped generation\n- Schema hash: ${schemaHash.substring(0, 12)}...`
+    );
+    return;
+  }
+
   console.log("🔗 Building relationship graph...");
   const graph = buildGraph(model);
 
-  // Handle outDir configuration
-  let serverDir: string;
+  // Handle outDir configuration (serverDir already computed above for cache check)
   let originalClientDir: string;
 
   if (typeof cfg.outDir === "string") {
     // Single string: use for both
-    serverDir = cfg.outDir;
     originalClientDir = cfg.outDir;
   } else if (cfg.outDir && typeof cfg.outDir === "object") {
     // Object with client/server paths
-    serverDir = cfg.outDir.server;
     originalClientDir = cfg.outDir.client;
   } else {
     // Defaults
-    serverDir = "./api/server";
     originalClientDir = "./api/client";
   }
 
@@ -305,6 +336,23 @@ export async function generate(configPath: string) {
 
   console.log("✍️  Writing files...");
   await writeFiles(files);
+
+  // Update cache after successful generation
+  const outDirStr = typeof cfg.outDir === "string" ? cfg.outDir : `${cfg.outDir?.server || "./api/server"}`;
+  await writeCache({
+    schemaHash,
+    lastRun: new Date().toISOString(),
+    filesGenerated: files.length,
+    config: {
+      outDir: cfg.outDir || "./api",
+      schema: cfg.schema || "public",
+    },
+  });
+
+  // Log to history
+  await appendToHistory(
+    `Generate\n✅ Generated ${files.length} files\n- Schema hash: ${schemaHash.substring(0, 12)}...`
+  );
 
   console.log(`✅ Generated ${files.length} files`);
   console.log(`  Server: ${serverDir}`);

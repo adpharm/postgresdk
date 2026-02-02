@@ -1,7 +1,8 @@
-import { writeFile, mkdir } from "fs/promises";
+import { writeFile, mkdir, readFile } from "fs/promises";
 import { join, dirname, resolve } from "path";
 import { existsSync } from "fs";
 import { pathToFileURL } from "url";
+import { appendToHistory } from "./cache";
 
 interface PullConfig {
   from?: string;
@@ -99,9 +100,8 @@ export async function pullCommand(args: string[]) {
       throw new Error(`Failed to fetch SDK manifest: ${errorMsg}`);
     }
     
-    const manifest = await manifestRes.json() as { version: string; generated: string; files: string[] };
+    const manifest = await manifestRes.json() as { version: string; files: string[] };
     console.log(`📦 SDK version: ${manifest.version}`);
-    console.log(`📅 Generated: ${manifest.generated}`);
     console.log(`📄 Files: ${manifest.files.length}`);
     
     // Fetch full SDK
@@ -120,28 +120,74 @@ export async function pullCommand(args: string[]) {
       throw new Error(`Failed to download SDK: ${errorMsg}`);
     }
     
-    const sdk = await sdkRes.json() as { files: Record<string, string>; version: string; generated: string };
-    
-    // Write all files
+    const sdk = await sdkRes.json() as { files: Record<string, string>; version: string; generated?: string };
+
+    // Write files only if changed
+    let filesWritten = 0;
+    let filesUnchanged = 0;
+    const changedFiles: string[] = [];
+
     for (const [path, content] of Object.entries(sdk.files)) {
       const fullPath = join(config.output!, path);
       await mkdir(dirname(fullPath), { recursive: true });
-      await writeFile(fullPath, content, "utf-8");
-      console.log(`  ✓ ${path}`);
+
+      // Check if file exists and content is the same
+      let shouldWrite = true;
+      if (existsSync(fullPath)) {
+        const existing = await readFile(fullPath, "utf-8");
+        if (existing === content) {
+          shouldWrite = false;
+          filesUnchanged++;
+        }
+      }
+
+      if (shouldWrite) {
+        await writeFile(fullPath, content, "utf-8");
+        filesWritten++;
+        changedFiles.push(path);
+        console.log(`  ✓ ${path}`);
+      }
     }
-    
-    // Write metadata file
-    await writeFile(
-      join(config.output!, ".postgresdk.json"),
-      JSON.stringify({
-        version: sdk.version,
-        generated: sdk.generated,
-        pulledFrom: config.from,
-        pulledAt: new Date().toISOString()
-      }, null, 2)
-    );
-    
-    console.log(`✅ SDK pulled successfully to ${config.output}`);
+
+    // Write metadata file (without timestamp for idempotency)
+    const metadataPath = join(config.output!, ".postgresdk.json");
+    const metadata = {
+      version: sdk.version,
+      pulledFrom: config.from,
+    };
+
+    // Only write metadata if it changed
+    let metadataChanged = true;
+    if (existsSync(metadataPath)) {
+      const existing = await readFile(metadataPath, "utf-8");
+      if (existing === JSON.stringify(metadata, null, 2)) {
+        metadataChanged = false;
+      }
+    }
+
+    if (metadataChanged) {
+      await writeFile(metadataPath, JSON.stringify(metadata, null, 2));
+    }
+
+    // Log results
+    if (filesWritten === 0 && !metadataChanged) {
+      console.log(`✅ SDK up-to-date (${filesUnchanged} files unchanged)`);
+      await appendToHistory(
+        `Pull\n✅ SDK up-to-date\n- Pulled from: ${config.from}\n- Files checked: ${filesUnchanged}`
+      );
+    } else {
+      console.log(`✅ SDK pulled successfully to ${config.output}`);
+      console.log(`   Updated: ${filesWritten} files, Unchanged: ${filesUnchanged} files`);
+
+      let logEntry = `Pull\n✅ Updated ${filesWritten} files from ${config.from}\n- SDK version: ${sdk.version}\n- Files unchanged: ${filesUnchanged}`;
+      if (changedFiles.length > 0 && changedFiles.length <= 10) {
+        logEntry += `\n- Modified: ${changedFiles.join(", ")}`;
+      } else if (changedFiles.length > 10) {
+        logEntry += `\n- Modified: ${changedFiles.slice(0, 10).join(", ")} and ${changedFiles.length - 10} more...`;
+      }
+
+      await appendToHistory(logEntry);
+    }
   } catch (err) {
     console.error(`❌ Pull failed:`, err);
     process.exit(1);
