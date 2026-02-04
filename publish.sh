@@ -41,6 +41,8 @@ fi
 
 # Build the package first (tests need up-to-date dist files)
 echo -e "${BLUE}🔨 Building package...${NC}"
+echo -e "  Cleaning dist/ to remove stale files..."
+rm -rf dist
 bun run build || {
     echo -e "${RED}❌ Build failed.${NC}"
     exit 1
