@@ -335,15 +335,29 @@ export class ${Type}Client extends BaseClient {
   private readonly resource = "/v1/${table.name}";
 
 ${hasJsonbColumns ? `  /**
+   * Create a new ${table.name} record with field selection
+   * @param data - The data to insert
+   * @param options - Select specific fields to return
+   * @returns The created record with only selected fields
+   */
+  async create<TJsonb extends Partial<Select${Type}> = {}>(data: NoInfer<Insert${Type}<TJsonb>>, options: { select: string[] }): Promise<Partial<Select${Type}<TJsonb>>>;
+  /**
+   * Create a new ${table.name} record with field exclusion
+   * @param data - The data to insert
+   * @param options - Exclude specific fields from return
+   * @returns The created record without excluded fields
+   */
+  async create<TJsonb extends Partial<Select${Type}> = {}>(data: NoInfer<Insert${Type}<TJsonb>>, options: { exclude: string[] }): Promise<Partial<Select${Type}<TJsonb>>>;
+  /**
    * Create a new ${table.name} record
    * @param data - The data to insert
-   * @param options - Optional select/exclude for returned fields
-   * @returns The created record
+   * @returns The created record with all fields
    * @example
    * // With JSONB type override:
    * type Metadata = { tags: string[]; prefs: { theme: 'light' | 'dark' } };
    * const user = await client.create<{ metadata: Metadata }>({ name: 'Alice', metadata: { tags: [], prefs: { theme: 'light' } } });
    */
+  async create<TJsonb extends Partial<Select${Type}> = {}>(data: NoInfer<Insert${Type}<TJsonb>>, options?: Omit<{ select?: string[]; exclude?: string[] }, 'select' | 'exclude'>): Promise<Select${Type}<TJsonb>>;
   async create<TJsonb extends Partial<Select${Type}> = {}>(
     data: NoInfer<Insert${Type}<TJsonb>>,
     options?: { select?: string[]; exclude?: string[] }
@@ -387,14 +401,28 @@ ${hasJsonbColumns ? `  /**
   }`}
 
 ${hasJsonbColumns ? `  /**
+   * Get a ${table.name} record by primary key with field selection
+   * @param pk - The primary key value${hasCompositePk ? 's' : ''}
+   * @param options - Select specific fields to return
+   * @returns The record with only selected fields if found, null otherwise
+   */
+  async getByPk<TJsonb extends Partial<Select${Type}> = {}>(pk: ${pkType}, options: { select: string[] }): Promise<Partial<Select${Type}<TJsonb>> | null>;
+  /**
+   * Get a ${table.name} record by primary key with field exclusion
+   * @param pk - The primary key value${hasCompositePk ? 's' : ''}
+   * @param options - Exclude specific fields from return
+   * @returns The record without excluded fields if found, null otherwise
+   */
+  async getByPk<TJsonb extends Partial<Select${Type}> = {}>(pk: ${pkType}, options: { exclude: string[] }): Promise<Partial<Select${Type}<TJsonb>> | null>;
+  /**
    * Get a ${table.name} record by primary key
    * @param pk - The primary key value${hasCompositePk ? 's' : ''}
-   * @param options - Optional select/exclude for returned fields
-   * @returns The record if found, null otherwise
+   * @returns The record with all fields if found, null otherwise
    * @example
    * // With JSONB type override:
    * const user = await client.getByPk<{ metadata: Metadata }>('user-id');
    */
+  async getByPk<TJsonb extends Partial<Select${Type}> = {}>(pk: ${pkType}, options?: Omit<{ select?: string[]; exclude?: string[] }, 'select' | 'exclude'>): Promise<Select${Type}<TJsonb> | null>;
   async getByPk<TJsonb extends Partial<Select${Type}> = {}>(
     pk: ${pkType},
     options?: { select?: string[]; exclude?: string[] }
@@ -440,24 +468,73 @@ ${hasJsonbColumns ? `  /**
   }`}
 
 ${hasJsonbColumns ? `  /**
+   * List ${table.name} records with field selection
+   * @param params - Query parameters with select
+   * @returns Paginated results with only selected fields
+   */
+  async list<TJsonb extends Partial<Select${Type}> = {}>(params: {
+    select: string[];
+    include?: any;
+    limit?: number;
+    offset?: number;
+    where?: Where<Select${Type}<TJsonb>>;${hasVectorColumns ? `
+    vector?: {
+      field: string;
+      query: number[];
+      metric?: "cosine" | "l2" | "inner";
+      maxDistance?: number;
+    };` : ""}
+    orderBy?: string | string[];
+    order?: "asc" | "desc" | ("asc" | "desc")[];
+  }): Promise<PaginatedResponse<Partial<Select${Type}<TJsonb>>${hasVectorColumns ? ' & { _distance?: number }' : ''}>>;
+  /**
+   * List ${table.name} records with field exclusion
+   * @param params - Query parameters with exclude
+   * @returns Paginated results without excluded fields
+   */
+  async list<TJsonb extends Partial<Select${Type}> = {}>(params: {
+    exclude: string[];
+    include?: any;
+    limit?: number;
+    offset?: number;
+    where?: Where<Select${Type}<TJsonb>>;${hasVectorColumns ? `
+    vector?: {
+      field: string;
+      query: number[];
+      metric?: "cosine" | "l2" | "inner";
+      maxDistance?: number;
+    };` : ""}
+    orderBy?: string | string[];
+    order?: "asc" | "desc" | ("asc" | "desc")[];
+  }): Promise<PaginatedResponse<Partial<Select${Type}<TJsonb>>${hasVectorColumns ? ' & { _distance?: number }' : ''}>>;
+  /**
    * List ${table.name} records with pagination and filtering
    * @param params - Query parameters
    * @param params.where - Filter conditions using operators like $eq, $gt, $in, $like, etc.
-   * @param params.select - Array of field names to include in response
-   * @param params.exclude - Array of field names to exclude from response (mutually exclusive with select)
    * @param params.orderBy - Column(s) to sort by
    * @param params.order - Sort direction(s): "asc" or "desc"
    * @param params.limit - Maximum number of records to return (default: 50, max: 1000)
    * @param params.offset - Number of records to skip for pagination
    * @param params.include - Related records to include (see listWith* methods for typed includes)
-   * @returns Paginated results with data, total count, and hasMore flag
+   * @returns Paginated results with all fields
    * @example
    * // With JSONB type override:
    * const users = await client.list<{ metadata: Metadata }>({ where: { status: 'active' } });
-   * @example
-   * // With select:
-   * const users = await client.list({ select: ['id', 'email'] });
    */
+  async list<TJsonb extends Partial<Select${Type}> = {}>(params?: {
+    include?: any;
+    limit?: number;
+    offset?: number;
+    where?: Where<Select${Type}<TJsonb>>;${hasVectorColumns ? `
+    vector?: {
+      field: string;
+      query: number[];
+      metric?: "cosine" | "l2" | "inner";
+      maxDistance?: number;
+    };` : ""}
+    orderBy?: string | string[];
+    order?: "asc" | "desc" | ("asc" | "desc")[];
+  }): Promise<PaginatedResponse<Select${Type}<TJsonb>${hasVectorColumns ? ' & { _distance?: number }' : ''}>>;
   async list<TJsonb extends Partial<Select${Type}> = {}>(params?: {
     include?: any;
     select?: string[];
@@ -473,7 +550,7 @@ ${hasJsonbColumns ? `  /**
     };` : ""}
     orderBy?: string | string[];
     order?: "asc" | "desc" | ("asc" | "desc")[];
-  }): Promise<PaginatedResponse<(Select${Type}<TJsonb> | Partial<Select${Type}<TJsonb>>)${hasVectorColumns ? ' & { _distance?: number }' : ''}>> {
+  }): Promise<PaginatedResponse<Select${Type}<TJsonb> | Partial<Select${Type}<TJsonb>>>> {
     return this.post<PaginatedResponse<Select${Type}<TJsonb>${hasVectorColumns ? ' & { _distance?: number }' : ''}>>(\`\${this.resource}/list\`, params ?? {});
   }` : `  /**
    * List ${table.name} records with field selection
@@ -560,15 +637,31 @@ ${hasJsonbColumns ? `  /**
   }`}
 
 ${hasJsonbColumns ? `  /**
+   * Update a ${table.name} record by primary key with field selection
+   * @param pk - The primary key value${hasCompositePk ? 's' : ''}
+   * @param patch - Partial data to update
+   * @param options - Select specific fields to return
+   * @returns The updated record with only selected fields if found, null otherwise
+   */
+  async update<TJsonb extends Partial<Select${Type}> = {}>(pk: ${pkType}, patch: NoInfer<Update${Type}<TJsonb>>, options: { select: string[] }): Promise<Partial<Select${Type}<TJsonb>> | null>;
+  /**
+   * Update a ${table.name} record by primary key with field exclusion
+   * @param pk - The primary key value${hasCompositePk ? 's' : ''}
+   * @param patch - Partial data to update
+   * @param options - Exclude specific fields from return
+   * @returns The updated record without excluded fields if found, null otherwise
+   */
+  async update<TJsonb extends Partial<Select${Type}> = {}>(pk: ${pkType}, patch: NoInfer<Update${Type}<TJsonb>>, options: { exclude: string[] }): Promise<Partial<Select${Type}<TJsonb>> | null>;
+  /**
    * Update a ${table.name} record by primary key
    * @param pk - The primary key value${hasCompositePk ? 's' : ''}
    * @param patch - Partial data to update
-   * @param options - Optional select/exclude for returned fields
-   * @returns The updated record if found, null otherwise
+   * @returns The updated record with all fields if found, null otherwise
    * @example
    * // With JSONB type override:
    * const user = await client.update<{ metadata: Metadata }>('user-id', { metadata: { tags: ['new'] } });
    */
+  async update<TJsonb extends Partial<Select${Type}> = {}>(pk: ${pkType}, patch: NoInfer<Update${Type}<TJsonb>>, options?: Omit<{ select?: string[]; exclude?: string[] }, 'select' | 'exclude'>): Promise<Select${Type}<TJsonb> | null>;
   async update<TJsonb extends Partial<Select${Type}> = {}>(
     pk: ${pkType},
     patch: NoInfer<Update${Type}<TJsonb>>,
@@ -619,14 +712,28 @@ ${hasJsonbColumns ? `  /**
   }`}
 
 ${hasJsonbColumns ? `  /**
+   * Delete a ${table.name} record by primary key with field selection
+   * @param pk - The primary key value${hasCompositePk ? 's' : ''}
+   * @param options - Select specific fields to return
+   * @returns The deleted record with only selected fields if found, null otherwise
+   */
+  async delete<TJsonb extends Partial<Select${Type}> = {}>(pk: ${pkType}, options: { select: string[] }): Promise<Partial<Select${Type}<TJsonb>> | null>;
+  /**
+   * Delete a ${table.name} record by primary key with field exclusion
+   * @param pk - The primary key value${hasCompositePk ? 's' : ''}
+   * @param options - Exclude specific fields from return
+   * @returns The deleted record without excluded fields if found, null otherwise
+   */
+  async delete<TJsonb extends Partial<Select${Type}> = {}>(pk: ${pkType}, options: { exclude: string[] }): Promise<Partial<Select${Type}<TJsonb>> | null>;
+  /**
    * Delete a ${table.name} record by primary key
    * @param pk - The primary key value${hasCompositePk ? 's' : ''}
-   * @param options - Optional select/exclude for returned fields
-   * @returns The deleted record if found, null otherwise
+   * @returns The deleted record with all fields if found, null otherwise
    * @example
    * // With JSONB type override:
    * const user = await client.delete<{ metadata: Metadata }>('user-id');
    */
+  async delete<TJsonb extends Partial<Select${Type}> = {}>(pk: ${pkType}, options?: Omit<{ select?: string[]; exclude?: string[] }, 'select' | 'exclude'>): Promise<Select${Type}<TJsonb> | null>;
   async delete<TJsonb extends Partial<Select${Type}> = {}>(
     pk: ${pkType},
     options?: { select?: string[]; exclude?: string[] }
