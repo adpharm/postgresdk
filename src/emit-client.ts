@@ -146,12 +146,16 @@ export function emitClient(
         const paramName = toIncludeParamName(key);
         includeParamNames.push(paramName);
         paramsType = `{
+    select?: string[];
+    exclude?: string[];
     limit?: number;
     offset?: number;
     where?: Where<Select${Type}>;
     orderBy?: string | string[];
     order?: "asc" | "desc" | ("asc" | "desc")[];
     ${paramName}?: {
+      select?: string[];
+      exclude?: string[];
       orderBy?: string | string[];
       order?: "asc" | "desc";
       limit?: number;
@@ -164,6 +168,8 @@ export function emitClient(
         const paramName = toIncludeParamName(key);
         includeParamNames.push(paramName);
         return `${paramName}?: {
+      select?: string[];
+      exclude?: string[];
       orderBy?: string | string[];
       order?: "asc" | "desc";
       limit?: number;
@@ -172,6 +178,8 @@ export function emitClient(
       }).join(';\n    ');
 
       paramsType = `{
+    select?: string[];
+    exclude?: string[];
     limit?: number;
     offset?: number;
     where?: Where<Select${Type}>;
@@ -183,12 +191,16 @@ export function emitClient(
       const paramName = toIncludeParamName(pattern.nestedKey);
       includeParamNames.push(paramName);
       paramsType = `{
+    select?: string[];
+    exclude?: string[];
     limit?: number;
     offset?: number;
     where?: Where<Select${Type}>;
     orderBy?: string | string[];
     order?: "asc" | "desc" | ("asc" | "desc")[];
     ${paramName}?: {
+      select?: string[];
+      exclude?: string[];
       orderBy?: string | string[];
       order?: "asc" | "desc";
       limit?: number;
@@ -241,12 +253,14 @@ export function emitClient(
   /**
    * Get a ${table.name} record by primary key with included related ${relationshipDesc}
    * @param pk - The primary key value${hasCompositePk ? 's' : ''}
-   * @param params - Optional include options
+   * @param params - Optional include options (including select/exclude for base and nested tables)
    * @returns The record with nested ${method.path.join(' and ')} if found, null otherwise
    */
   async ${method.name}(pk: ${pkType}, params?: ${paramsType}): Promise<${method.returnType}> {${transformCode}
     const results = await this.post<PaginatedResponse<${baseReturnType}>>(\`\${this.resource}/list\`, {
       where: ${pkWhere},
+      select: params?.select,
+      exclude: params?.exclude,
       include: includeSpec,
       limit: 1
     });
