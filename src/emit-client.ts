@@ -355,11 +355,25 @@ ${hasJsonbColumns ? `  /**
     const url = query ? \`\${this.resource}?\${query}\` : this.resource;
     return this.post<Select${Type}<TJsonb>>(url, data);
   }` : `  /**
+   * Create a new ${table.name} record with field selection
+   * @param data - The data to insert
+   * @param options - Select specific fields to return
+   * @returns The created record with only selected fields
+   */
+  async create(data: Insert${Type}, options: { select: string[] }): Promise<Partial<Select${Type}>>;
+  /**
+   * Create a new ${table.name} record with field exclusion
+   * @param data - The data to insert
+   * @param options - Exclude specific fields from return
+   * @returns The created record without excluded fields
+   */
+  async create(data: Insert${Type}, options: { exclude: string[] }): Promise<Partial<Select${Type}>>;
+  /**
    * Create a new ${table.name} record
    * @param data - The data to insert
-   * @param options - Optional select/exclude for returned fields
-   * @returns The created record
+   * @returns The created record with all fields
    */
+  async create(data: Insert${Type}, options?: Omit<{ select?: string[]; exclude?: string[] }, 'select' | 'exclude'>): Promise<Select${Type}>;
   async create(
     data: Insert${Type},
     options?: { select?: string[]; exclude?: string[] }
@@ -393,11 +407,25 @@ ${hasJsonbColumns ? `  /**
     const url = query ? \`\${this.resource}/\${path}?\${query}\` : \`\${this.resource}/\${path}\`;
     return this.get<Select${Type}<TJsonb> | null>(url);
   }` : `  /**
+   * Get a ${table.name} record by primary key with field selection
+   * @param pk - The primary key value${hasCompositePk ? 's' : ''}
+   * @param options - Select specific fields to return
+   * @returns The record with only selected fields if found, null otherwise
+   */
+  async getByPk(pk: ${pkType}, options: { select: string[] }): Promise<Partial<Select${Type}> | null>;
+  /**
+   * Get a ${table.name} record by primary key with field exclusion
+   * @param pk - The primary key value${hasCompositePk ? 's' : ''}
+   * @param options - Exclude specific fields from return
+   * @returns The record without excluded fields if found, null otherwise
+   */
+  async getByPk(pk: ${pkType}, options: { exclude: string[] }): Promise<Partial<Select${Type}> | null>;
+  /**
    * Get a ${table.name} record by primary key
    * @param pk - The primary key value${hasCompositePk ? 's' : ''}
-   * @param options - Optional select/exclude for returned fields
-   * @returns The record if found, null otherwise
+   * @returns The record with all fields if found, null otherwise
    */
+  async getByPk(pk: ${pkType}, options?: Omit<{ select?: string[]; exclude?: string[] }, 'select' | 'exclude'>): Promise<Select${Type} | null>;
   async getByPk(
     pk: ${pkType},
     options?: { select?: string[]; exclude?: string[] }
@@ -448,21 +476,70 @@ ${hasJsonbColumns ? `  /**
   }): Promise<PaginatedResponse<(Select${Type}<TJsonb> | Partial<Select${Type}<TJsonb>>)${hasVectorColumns ? ' & { _distance?: number }' : ''}>> {
     return this.post<PaginatedResponse<Select${Type}<TJsonb>${hasVectorColumns ? ' & { _distance?: number }' : ''}>>(\`\${this.resource}/list\`, params ?? {});
   }` : `  /**
+   * List ${table.name} records with field selection
+   * @param params - Query parameters with select
+   * @returns Paginated results with only selected fields
+   */
+  async list(params: {
+    select: string[];
+    include?: any;
+    limit?: number;
+    offset?: number;
+    where?: Where<Select${Type}>;${hasVectorColumns ? `
+    vector?: {
+      field: string;
+      query: number[];
+      metric?: "cosine" | "l2" | "inner";
+      maxDistance?: number;
+    };` : ""}
+    orderBy?: string | string[];
+    order?: "asc" | "desc" | ("asc" | "desc")[];
+  }): Promise<PaginatedResponse<Partial<Select${Type}>${hasVectorColumns ? ' & { _distance?: number }' : ''}>>;
+  /**
+   * List ${table.name} records with field exclusion
+   * @param params - Query parameters with exclude
+   * @returns Paginated results without excluded fields
+   */
+  async list(params: {
+    exclude: string[];
+    include?: any;
+    limit?: number;
+    offset?: number;
+    where?: Where<Select${Type}>;${hasVectorColumns ? `
+    vector?: {
+      field: string;
+      query: number[];
+      metric?: "cosine" | "l2" | "inner";
+      maxDistance?: number;
+    };` : ""}
+    orderBy?: string | string[];
+    order?: "asc" | "desc" | ("asc" | "desc")[];
+  }): Promise<PaginatedResponse<Partial<Select${Type}>${hasVectorColumns ? ' & { _distance?: number }' : ''}>>;
+  /**
    * List ${table.name} records with pagination and filtering
    * @param params - Query parameters
    * @param params.where - Filter conditions using operators like $eq, $gt, $in, $like, etc.
-   * @param params.select - Array of field names to include in response
-   * @param params.exclude - Array of field names to exclude from response (mutually exclusive with select)
    * @param params.orderBy - Column(s) to sort by
    * @param params.order - Sort direction(s): "asc" or "desc"
    * @param params.limit - Maximum number of records to return (default: 50, max: 1000)
    * @param params.offset - Number of records to skip for pagination
    * @param params.include - Related records to include (see listWith* methods for typed includes)
-   * @returns Paginated results with data, total count, and hasMore flag
-   * @example
-   * // With select:
-   * const users = await client.list({ select: ['id', 'email'] });
+   * @returns Paginated results with all fields
    */
+  async list(params?: {
+    include?: any;
+    limit?: number;
+    offset?: number;
+    where?: Where<Select${Type}>;${hasVectorColumns ? `
+    vector?: {
+      field: string;
+      query: number[];
+      metric?: "cosine" | "l2" | "inner";
+      maxDistance?: number;
+    };` : ""}
+    orderBy?: string | string[];
+    order?: "asc" | "desc" | ("asc" | "desc")[];
+  }): Promise<PaginatedResponse<Select${Type}${hasVectorColumns ? ' & { _distance?: number }' : ''}>>;
   async list(params?: {
     include?: any;
     select?: string[];
@@ -478,7 +555,7 @@ ${hasJsonbColumns ? `  /**
     };` : ""}
     orderBy?: string | string[];
     order?: "asc" | "desc" | ("asc" | "desc")[];
-  }): Promise<PaginatedResponse<(Select${Type} | Partial<Select${Type}>)${hasVectorColumns ? ' & { _distance?: number }' : ''}>> {
+  }): Promise<PaginatedResponse<Select${Type} | Partial<Select${Type}>>> {
     return this.post<PaginatedResponse<Select${Type}${hasVectorColumns ? ' & { _distance?: number }' : ''}>>(\`\${this.resource}/list\`, params ?? {});
   }`}
 
@@ -505,12 +582,28 @@ ${hasJsonbColumns ? `  /**
     const url = query ? \`\${this.resource}/\${path}?\${query}\` : \`\${this.resource}/\${path}\`;
     return this.patch<Select${Type}<TJsonb> | null>(url, patch);
   }` : `  /**
+   * Update a ${table.name} record by primary key with field selection
+   * @param pk - The primary key value${hasCompositePk ? 's' : ''}
+   * @param patch - Partial data to update
+   * @param options - Select specific fields to return
+   * @returns The updated record with only selected fields if found, null otherwise
+   */
+  async update(pk: ${pkType}, patch: Update${Type}, options: { select: string[] }): Promise<Partial<Select${Type}> | null>;
+  /**
+   * Update a ${table.name} record by primary key with field exclusion
+   * @param pk - The primary key value${hasCompositePk ? 's' : ''}
+   * @param patch - Partial data to update
+   * @param options - Exclude specific fields from return
+   * @returns The updated record without excluded fields if found, null otherwise
+   */
+  async update(pk: ${pkType}, patch: Update${Type}, options: { exclude: string[] }): Promise<Partial<Select${Type}> | null>;
+  /**
    * Update a ${table.name} record by primary key
    * @param pk - The primary key value${hasCompositePk ? 's' : ''}
    * @param patch - Partial data to update
-   * @param options - Optional select/exclude for returned fields
-   * @returns The updated record if found, null otherwise
+   * @returns The updated record with all fields if found, null otherwise
    */
+  async update(pk: ${pkType}, patch: Update${Type}, options?: Omit<{ select?: string[]; exclude?: string[] }, 'select' | 'exclude'>): Promise<Select${Type} | null>;
   async update(
     pk: ${pkType},
     patch: Update${Type},
@@ -546,11 +639,25 @@ ${hasJsonbColumns ? `  /**
     const url = query ? \`\${this.resource}/\${path}?\${query}\` : \`\${this.resource}/\${path}\`;
     return this.del<Select${Type}<TJsonb> | null>(url);
   }` : `  /**
+   * Delete a ${table.name} record by primary key with field selection
+   * @param pk - The primary key value${hasCompositePk ? 's' : ''}
+   * @param options - Select specific fields to return
+   * @returns The deleted record with only selected fields if found, null otherwise
+   */
+  async delete(pk: ${pkType}, options: { select: string[] }): Promise<Partial<Select${Type}> | null>;
+  /**
+   * Delete a ${table.name} record by primary key with field exclusion
+   * @param pk - The primary key value${hasCompositePk ? 's' : ''}
+   * @param options - Exclude specific fields from return
+   * @returns The deleted record without excluded fields if found, null otherwise
+   */
+  async delete(pk: ${pkType}, options: { exclude: string[] }): Promise<Partial<Select${Type}> | null>;
+  /**
    * Delete a ${table.name} record by primary key
    * @param pk - The primary key value${hasCompositePk ? 's' : ''}
-   * @param options - Optional select/exclude for returned fields
-   * @returns The deleted record if found, null otherwise
+   * @returns The deleted record with all fields if found, null otherwise
    */
+  async delete(pk: ${pkType}, options?: Omit<{ select?: string[]; exclude?: string[] }, 'select' | 'exclude'>): Promise<Select${Type} | null>;
   async delete(
     pk: ${pkType},
     options?: { select?: string[]; exclude?: string[] }
