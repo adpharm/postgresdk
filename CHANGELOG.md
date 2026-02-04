@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- feat: Add select/exclude field filtering to all CRUD operations
+  - `select` option returns only specified fields from database queries
+  - `exclude` option returns all fields except specified ones
+  - Works on all operations: create, getByPk, update, delete, list
+  - Supported in nested includes for filtering related records
+  - Mutually exclusive - cannot use both select and exclude together
+  - Applied at SQL level for optimal performance (RETURNING clause)
+  - Client methods accept optional `{ select?: string[], exclude?: string[] }` parameter
+  - Route handlers parse from query params for GET/DELETE, validate with Zod schemas
+- test: Add comprehensive select/exclude test coverage
+  - Tests for all CRUD operations with select/exclude
+  - Nested include filtering tests
+  - Error handling for conflicting select+exclude
+  - Validates fields are properly included/excluded
+
 ## [v0.17.0] - 2026-02-02
 
 - feat: Add idempotent generation and pull operations

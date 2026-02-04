@@ -21,6 +21,9 @@ export interface OperationContext {
   softDeleteColumn?: string | null;
   includeMethodsDepth: number;
   vectorColumns?: string[];
+  allColumnNames?: string[];
+  select?: string[];
+  exclude?: string[];
 }
 
 const DEBUG = process.env.SDK_DEBUG === "1" || process.env.SDK_DEBUG === "true";
@@ -28,6 +31,49 @@ const log = {
   debug: (...args: any[]) => { if (DEBUG) console.debug("[sdk]", ...args); },
   error: (...args: any[]) => console.error("[sdk]", ...args),
 };
+
+/**
+ * Builds SQL column list from select/exclude parameters
+ * @param select - Columns to include (mutually exclusive with exclude)
+ * @param exclude - Columns to exclude (mutually exclusive with select)
+ * @param allColumns - All available columns for the table
+ * @param alwaysInclude - Columns to always include (e.g., vector distance)
+ * @returns SQL column list string (e.g., "id", "name", "email")
+ */
+function buildColumnList(
+  select: string[] | undefined,
+  exclude: string[] | undefined,
+  allColumns: string[] | undefined,
+  alwaysInclude: string[] = []
+): string {
+  if (select && exclude) {
+    throw new Error("Cannot specify both 'select' and 'exclude' parameters");
+  }
+
+  // If no allColumns provided, fallback to *
+  if (!allColumns || allColumns.length === 0) {
+    return "*";
+  }
+
+  let columns: string[];
+
+  if (select) {
+    // Use only selected columns
+    columns = select;
+  } else if (exclude) {
+    // Use all except excluded
+    columns = allColumns.filter(col => !exclude.includes(col));
+  } else {
+    // Use all columns (default behavior)
+    return "*";
+  }
+
+  // Add always-include columns (e.g., _distance for vector search)
+  const finalColumns = [...new Set([...columns, ...alwaysInclude])];
+
+  // Quote column names and join
+  return finalColumns.map(col => \`"\${col}"\`).join(", ");
+}
 
 /**
  * Prepare query parameters for PostgreSQL.
@@ -85,9 +131,10 @@ export async function createRecord(
     }
 
     const placeholders = cols.map((_, i) => '$' + (i + 1)).join(", ");
+    const returningClause = buildColumnList(ctx.select, ctx.exclude, ctx.allColumnNames);
     const text = \`INSERT INTO "\${ctx.table}" (\${cols.map(c => '"' + c + '"').join(", ")})
                    VALUES (\${placeholders})
-                   RETURNING *\`;
+                   RETURNING \${returningClause}\`;
 
     log.debug("SQL:", text, "vals:", vals);
     const { rows } = await ctx.pg.query(text, prepareParams(vals));
@@ -127,8 +174,9 @@ export async function getByPk(
     const wherePkSql = hasCompositePk
       ? ctx.pkColumns.map((c, i) => \`"\${c}" = $\${i + 1}\`).join(" AND ")
       : \`"\${ctx.pkColumns[0]}" = $1\`;
-    
-    const text = \`SELECT * FROM "\${ctx.table}" WHERE \${wherePkSql} LIMIT 1\`;
+
+    const columns = buildColumnList(ctx.select, ctx.exclude, ctx.allColumnNames);
+    const text = \`SELECT \${columns} FROM "\${ctx.table}" WHERE \${wherePkSql} LIMIT 1\`;
     log.debug(\`GET \${ctx.table} by PK:\`, pkValues, "SQL:", text);
 
     const { rows } = await ctx.pg.query(text, prepareParams(pkValues));
@@ -497,9 +545,10 @@ export async function listRecords(
     }
 
     // Build SELECT clause
+    const baseColumns = buildColumnList(ctx.select, ctx.exclude, ctx.allColumnNames);
     const selectClause = vector
-      ? \`*, ("\${vector.field}" \${distanceOp} ($1)::vector) AS _distance\`
-      : "*";
+      ? \`\${baseColumns}, ("\${vector.field}" \${distanceOp} ($1)::vector) AS _distance\`
+      : baseColumns;
 
     // Build ORDER BY clause
     let orderBySQL = "";
@@ -600,7 +649,8 @@ export async function updateRecord(
       .map((k, i) => \`"\${k}" = $\${i + pkValues.length + 1}\`)
       .join(", ");
 
-    const text = \`UPDATE "\${ctx.table}" SET \${setSql} WHERE \${wherePkSql} RETURNING *\`;
+    const returningClause = buildColumnList(ctx.select, ctx.exclude, ctx.allColumnNames);
+    const text = \`UPDATE "\${ctx.table}" SET \${setSql} WHERE \${wherePkSql} RETURNING \${returningClause}\`;
     const params = [...pkValues, ...Object.values(filteredData)];
 
     log.debug(\`PATCH \${ctx.table} SQL:\`, text, "params:", params);
@@ -648,10 +698,11 @@ export async function deleteRecord(
     const wherePkSql = hasCompositePk
       ? ctx.pkColumns.map((c, i) => \`"\${c}" = $\${i + 1}\`).join(" AND ")
       : \`"\${ctx.pkColumns[0]}" = $1\`;
-    
+
+    const returningClause = buildColumnList(ctx.select, ctx.exclude, ctx.allColumnNames);
     const text = ctx.softDeleteColumn
-      ? \`UPDATE "\${ctx.table}" SET "\${ctx.softDeleteColumn}" = NOW() WHERE \${wherePkSql} RETURNING *\`
-      : \`DELETE FROM "\${ctx.table}" WHERE \${wherePkSql} RETURNING *\`;
+      ? \`UPDATE "\${ctx.table}" SET "\${ctx.softDeleteColumn}" = NOW() WHERE \${wherePkSql} RETURNING \${returningClause}\`
+      : \`DELETE FROM "\${ctx.table}" WHERE \${wherePkSql} RETURNING \${returningClause}\`;
 
     log.debug(\`DELETE \${ctx.softDeleteColumn ? '(soft)' : ''} \${ctx.table} SQL:\`, text, "pk:", pkValues);
     const { rows } = await ctx.pg.query(text, prepareParams(pkValues));

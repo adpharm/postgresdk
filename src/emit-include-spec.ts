@@ -20,11 +20,11 @@ export function emitIncludeSpec(graph: Graph) {
     out += `export type ${toPascal(table)}IncludeSpec = {\n`;
     for (const [relKey, edge] of entries) {
       if (edge.kind === "many") {
-        out += `  ${relKey}?: boolean | { include?: ${toPascal(
+        out += `  ${relKey}?: boolean | { select?: string[]; exclude?: string[]; include?: ${toPascal(
           edge.target
         )}IncludeSpec; limit?: number; offset?: number; orderBy?: string; order?: "asc" | "desc"; };\n`;
       } else {
-        out += `  ${relKey}?: boolean | ${toPascal(edge.target)}IncludeSpec;\n`;
+        out += `  ${relKey}?: boolean | { select?: string[]; exclude?: string[]; } | ${toPascal(edge.target)}IncludeSpec;\n`;
       }
     }
     out += `};\n\n`;

@@ -323,6 +323,7 @@ export class ${Type}Client extends BaseClient {
 ${hasJsonbColumns ? `  /**
    * Create a new ${table.name} record
    * @param data - The data to insert
+   * @param options - Optional select/exclude for returned fields
    * @returns The created record
    * @example
    * // With JSONB type override:
@@ -330,45 +331,78 @@ ${hasJsonbColumns ? `  /**
    * const user = await client.create<{ metadata: Metadata }>({ name: 'Alice', metadata: { tags: [], prefs: { theme: 'light' } } });
    */
   async create<TJsonb extends Partial<Select${Type}> = {}>(
-    data: NoInfer<Insert${Type}<TJsonb>>
-  ): Promise<Select${Type}<TJsonb>> {
-    return this.post<Select${Type}<TJsonb>>(this.resource, data);
+    data: NoInfer<Insert${Type}<TJsonb>>,
+    options?: { select?: string[]; exclude?: string[] }
+  ): Promise<Select${Type}<TJsonb> | Partial<Select${Type}<TJsonb>>> {
+    const queryParams = new URLSearchParams();
+    if (options?.select) queryParams.set('select', options.select.join(','));
+    if (options?.exclude) queryParams.set('exclude', options.exclude.join(','));
+    const query = queryParams.toString();
+    const url = query ? \`\${this.resource}?\${query}\` : this.resource;
+    return this.post<Select${Type}<TJsonb>>(url, data);
   }` : `  /**
    * Create a new ${table.name} record
    * @param data - The data to insert
+   * @param options - Optional select/exclude for returned fields
    * @returns The created record
    */
-  async create(data: Insert${Type}): Promise<Select${Type}> {
-    return this.post<Select${Type}>(this.resource, data);
+  async create(
+    data: Insert${Type},
+    options?: { select?: string[]; exclude?: string[] }
+  ): Promise<Select${Type} | Partial<Select${Type}>> {
+    const queryParams = new URLSearchParams();
+    if (options?.select) queryParams.set('select', options.select.join(','));
+    if (options?.exclude) queryParams.set('exclude', options.exclude.join(','));
+    const query = queryParams.toString();
+    const url = query ? \`\${this.resource}?\${query}\` : this.resource;
+    return this.post<Select${Type}>(url, data);
   }`}
 
 ${hasJsonbColumns ? `  /**
    * Get a ${table.name} record by primary key
    * @param pk - The primary key value${hasCompositePk ? 's' : ''}
+   * @param options - Optional select/exclude for returned fields
    * @returns The record if found, null otherwise
    * @example
    * // With JSONB type override:
    * const user = await client.getByPk<{ metadata: Metadata }>('user-id');
    */
   async getByPk<TJsonb extends Partial<Select${Type}> = {}>(
-    pk: ${pkType}
-  ): Promise<Select${Type}<TJsonb> | null> {
+    pk: ${pkType},
+    options?: { select?: string[]; exclude?: string[] }
+  ): Promise<Select${Type}<TJsonb> | Partial<Select${Type}<TJsonb>> | null> {
     const path = ${pkPathExpr};
-    return this.get<Select${Type}<TJsonb> | null>(\`\${this.resource}/\${path}\`);
+    const queryParams = new URLSearchParams();
+    if (options?.select) queryParams.set('select', options.select.join(','));
+    if (options?.exclude) queryParams.set('exclude', options.exclude.join(','));
+    const query = queryParams.toString();
+    const url = query ? \`\${this.resource}/\${path}?\${query}\` : \`\${this.resource}/\${path}\`;
+    return this.get<Select${Type}<TJsonb> | null>(url);
   }` : `  /**
    * Get a ${table.name} record by primary key
    * @param pk - The primary key value${hasCompositePk ? 's' : ''}
+   * @param options - Optional select/exclude for returned fields
    * @returns The record if found, null otherwise
    */
-  async getByPk(pk: ${pkType}): Promise<Select${Type} | null> {
+  async getByPk(
+    pk: ${pkType},
+    options?: { select?: string[]; exclude?: string[] }
+  ): Promise<Select${Type} | Partial<Select${Type}> | null> {
     const path = ${pkPathExpr};
-    return this.get<Select${Type} | null>(\`\${this.resource}/\${path}\`);
+    const queryParams = new URLSearchParams();
+    if (options?.select) queryParams.set('select', options.select.join(','));
+    if (options?.exclude) queryParams.set('exclude', options.exclude.join(','));
+    const query = queryParams.toString();
+    const url = query ? \`\${this.resource}/\${path}?\${query}\` : \`\${this.resource}/\${path}\`;
+    return this.get<Select${Type} | null>(url);
   }`}
 
 ${hasJsonbColumns ? `  /**
    * List ${table.name} records with pagination and filtering
    * @param params - Query parameters
    * @param params.where - Filter conditions using operators like $eq, $gt, $in, $like, etc.
+   * @param params.select - Array of field names to include in response
+   * @param params.exclude - Array of field names to exclude from response (mutually exclusive with select)
    * @param params.orderBy - Column(s) to sort by
    * @param params.order - Sort direction(s): "asc" or "desc"
    * @param params.limit - Maximum number of records to return (default: 50, max: 1000)
@@ -378,9 +412,14 @@ ${hasJsonbColumns ? `  /**
    * @example
    * // With JSONB type override:
    * const users = await client.list<{ metadata: Metadata }>({ where: { status: 'active' } });
+   * @example
+   * // With select:
+   * const users = await client.list({ select: ['id', 'email'] });
    */
   async list<TJsonb extends Partial<Select${Type}> = {}>(params?: {
     include?: any;
+    select?: string[];
+    exclude?: string[];
     limit?: number;
     offset?: number;
     where?: Where<Select${Type}<TJsonb>>;${hasVectorColumns ? `
@@ -392,21 +431,28 @@ ${hasJsonbColumns ? `  /**
     };` : ""}
     orderBy?: string | string[];
     order?: "asc" | "desc" | ("asc" | "desc")[];
-  }): Promise<PaginatedResponse<Select${Type}<TJsonb>${hasVectorColumns ? ' & { _distance?: number }' : ''}>> {
+  }): Promise<PaginatedResponse<(Select${Type}<TJsonb> | Partial<Select${Type}<TJsonb>>)${hasVectorColumns ? ' & { _distance?: number }' : ''}>> {
     return this.post<PaginatedResponse<Select${Type}<TJsonb>${hasVectorColumns ? ' & { _distance?: number }' : ''}>>(\`\${this.resource}/list\`, params ?? {});
   }` : `  /**
    * List ${table.name} records with pagination and filtering
    * @param params - Query parameters
    * @param params.where - Filter conditions using operators like $eq, $gt, $in, $like, etc.
+   * @param params.select - Array of field names to include in response
+   * @param params.exclude - Array of field names to exclude from response (mutually exclusive with select)
    * @param params.orderBy - Column(s) to sort by
    * @param params.order - Sort direction(s): "asc" or "desc"
    * @param params.limit - Maximum number of records to return (default: 50, max: 1000)
    * @param params.offset - Number of records to skip for pagination
    * @param params.include - Related records to include (see listWith* methods for typed includes)
    * @returns Paginated results with data, total count, and hasMore flag
+   * @example
+   * // With select:
+   * const users = await client.list({ select: ['id', 'email'] });
    */
   async list(params?: {
     include?: any;
+    select?: string[];
+    exclude?: string[];
     limit?: number;
     offset?: number;
     where?: Where<Select${Type}>;${hasVectorColumns ? `
@@ -418,7 +464,7 @@ ${hasJsonbColumns ? `  /**
     };` : ""}
     orderBy?: string | string[];
     order?: "asc" | "desc" | ("asc" | "desc")[];
-  }): Promise<PaginatedResponse<Select${Type}${hasVectorColumns ? ' & { _distance?: number }' : ''}>> {
+  }): Promise<PaginatedResponse<(Select${Type} | Partial<Select${Type}>)${hasVectorColumns ? ' & { _distance?: number }' : ''}>> {
     return this.post<PaginatedResponse<Select${Type}${hasVectorColumns ? ' & { _distance?: number }' : ''}>>(\`\${this.resource}/list\`, params ?? {});
   }`}
 
@@ -426,6 +472,7 @@ ${hasJsonbColumns ? `  /**
    * Update a ${table.name} record by primary key
    * @param pk - The primary key value${hasCompositePk ? 's' : ''}
    * @param patch - Partial data to update
+   * @param options - Optional select/exclude for returned fields
    * @returns The updated record if found, null otherwise
    * @example
    * // With JSONB type override:
@@ -433,42 +480,74 @@ ${hasJsonbColumns ? `  /**
    */
   async update<TJsonb extends Partial<Select${Type}> = {}>(
     pk: ${pkType},
-    patch: NoInfer<Update${Type}<TJsonb>>
-  ): Promise<Select${Type}<TJsonb> | null> {
+    patch: NoInfer<Update${Type}<TJsonb>>,
+    options?: { select?: string[]; exclude?: string[] }
+  ): Promise<Select${Type}<TJsonb> | Partial<Select${Type}<TJsonb>> | null> {
     const path = ${pkPathExpr};
-    return this.patch<Select${Type}<TJsonb> | null>(\`\${this.resource}/\${path}\`, patch);
+    const queryParams = new URLSearchParams();
+    if (options?.select) queryParams.set('select', options.select.join(','));
+    if (options?.exclude) queryParams.set('exclude', options.exclude.join(','));
+    const query = queryParams.toString();
+    const url = query ? \`\${this.resource}/\${path}?\${query}\` : \`\${this.resource}/\${path}\`;
+    return this.patch<Select${Type}<TJsonb> | null>(url, patch);
   }` : `  /**
    * Update a ${table.name} record by primary key
    * @param pk - The primary key value${hasCompositePk ? 's' : ''}
    * @param patch - Partial data to update
+   * @param options - Optional select/exclude for returned fields
    * @returns The updated record if found, null otherwise
    */
-  async update(pk: ${pkType}, patch: Update${Type}): Promise<Select${Type} | null> {
+  async update(
+    pk: ${pkType},
+    patch: Update${Type},
+    options?: { select?: string[]; exclude?: string[] }
+  ): Promise<Select${Type} | Partial<Select${Type}> | null> {
     const path = ${pkPathExpr};
-    return this.patch<Select${Type} | null>(\`\${this.resource}/\${path}\`, patch);
+    const queryParams = new URLSearchParams();
+    if (options?.select) queryParams.set('select', options.select.join(','));
+    if (options?.exclude) queryParams.set('exclude', options.exclude.join(','));
+    const query = queryParams.toString();
+    const url = query ? \`\${this.resource}/\${path}?\${query}\` : \`\${this.resource}/\${path}\`;
+    return this.patch<Select${Type} | null>(url, patch);
   }`}
 
 ${hasJsonbColumns ? `  /**
    * Delete a ${table.name} record by primary key
    * @param pk - The primary key value${hasCompositePk ? 's' : ''}
+   * @param options - Optional select/exclude for returned fields
    * @returns The deleted record if found, null otherwise
    * @example
    * // With JSONB type override:
    * const user = await client.delete<{ metadata: Metadata }>('user-id');
    */
   async delete<TJsonb extends Partial<Select${Type}> = {}>(
-    pk: ${pkType}
-  ): Promise<Select${Type}<TJsonb> | null> {
+    pk: ${pkType},
+    options?: { select?: string[]; exclude?: string[] }
+  ): Promise<Select${Type}<TJsonb> | Partial<Select${Type}<TJsonb>> | null> {
     const path = ${pkPathExpr};
-    return this.del<Select${Type}<TJsonb> | null>(\`\${this.resource}/\${path}\`);
+    const queryParams = new URLSearchParams();
+    if (options?.select) queryParams.set('select', options.select.join(','));
+    if (options?.exclude) queryParams.set('exclude', options.exclude.join(','));
+    const query = queryParams.toString();
+    const url = query ? \`\${this.resource}/\${path}?\${query}\` : \`\${this.resource}/\${path}\`;
+    return this.del<Select${Type}<TJsonb> | null>(url);
   }` : `  /**
    * Delete a ${table.name} record by primary key
    * @param pk - The primary key value${hasCompositePk ? 's' : ''}
+   * @param options - Optional select/exclude for returned fields
    * @returns The deleted record if found, null otherwise
    */
-  async delete(pk: ${pkType}): Promise<Select${Type} | null> {
+  async delete(
+    pk: ${pkType},
+    options?: { select?: string[]; exclude?: string[] }
+  ): Promise<Select${Type} | Partial<Select${Type}> | null> {
     const path = ${pkPathExpr};
-    return this.del<Select${Type} | null>(\`\${this.resource}/\${path}\`);
+    const queryParams = new URLSearchParams();
+    if (options?.select) queryParams.set('select', options.select.join(','));
+    if (options?.exclude) queryParams.set('exclude', options.exclude.join(','));
+    const query = queryParams.toString();
+    const url = query ? \`\${this.resource}/\${path}?\${query}\` : \`\${this.resource}/\${path}\`;
+    return this.del<Select${Type} | null>(url);
   }`}
 ${includeMethodsCode}}
 `;

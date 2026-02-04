@@ -585,6 +585,106 @@ async function main() {
     assert(product2.metadata === null, "Null JSONB should be null");
     console.log("  ✓ Null JSONB fields handled correctly");
 
+    // ===== TEST SELECT/EXCLUDE =====
+    console.log("\n🔍 Testing Select/Exclude Field Filtering:");
+
+    // Test list with select
+    const listWithSelect = await sdk.authors.list({ select: ["id", "name"], limit: 1 });
+    assert(listWithSelect.data.length > 0, "Should have authors");
+    const selectedAuthor: any = listWithSelect.data[0];
+    assert(selectedAuthor.id !== undefined, "Should have id");
+    assert(selectedAuthor.name !== undefined, "Should have name");
+    assert(selectedAuthor.bio === undefined, "Should NOT have bio");
+    console.log("  ✓ List with select: returns only selected fields");
+
+    // Test list with exclude
+    const listWithExclude = await sdk.authors.list({ exclude: ["bio", "created_at"], limit: 1 });
+    assert(listWithExclude.data.length > 0, "Should have authors");
+    const excludedAuthor: any = listWithExclude.data[0];
+    assert(excludedAuthor.id !== undefined, "Should have id");
+    assert(excludedAuthor.name !== undefined, "Should have name");
+    assert(excludedAuthor.bio === undefined, "Should NOT have bio");
+    console.log("  ✓ List with exclude: excludes specified fields");
+
+    // Test create with select
+    const createdWithSelect = await sdk.authors.create(
+      { name: "Select Test Author", bio: "Test bio" },
+      { select: ["id", "name"] }
+    );
+    assert(createdWithSelect.id !== undefined, "Should have id");
+    assert(createdWithSelect.name === "Select Test Author", "Should have name");
+    assert((createdWithSelect as any).bio === undefined, "Should NOT have bio");
+    console.log("  ✓ Create with select: returns only selected fields");
+
+    // Test update with select
+    const updatedWithSelect = await sdk.authors.update(
+      createdWithSelect.id,
+      { name: "Updated Name" },
+      { select: ["id", "name"] }
+    );
+    assert(updatedWithSelect?.id !== undefined, "Should have id");
+    assert(updatedWithSelect?.name === "Updated Name", "Should have updated name");
+    assert((updatedWithSelect as any)?.bio === undefined, "Should NOT have bio");
+    console.log("  ✓ Update with select: returns only selected fields");
+
+    // Test getByPk with select
+    const fetchedWithSelect = await sdk.authors.getByPk(
+      createdWithSelect.id,
+      { select: ["id", "name"] }
+    );
+    assert(fetchedWithSelect?.id !== undefined, "Should have id");
+    assert(fetchedWithSelect?.name !== undefined, "Should have name");
+    assert((fetchedWithSelect as any)?.bio === undefined, "Should NOT have bio");
+    console.log("  ✓ GetByPk with select: returns only selected fields");
+
+    // Test delete with select
+    const deletedWithSelect = await sdk.authors.delete(
+      createdWithSelect.id,
+      { select: ["id", "name"] }
+    );
+    assert(deletedWithSelect?.id !== undefined, "Should have id");
+    assert(deletedWithSelect?.name !== undefined, "Should have name");
+    assert((deletedWithSelect as any)?.bio === undefined, "Should NOT have bio");
+    console.log("  ✓ Delete with select: returns only selected fields");
+
+    // Test nested select in includes
+    const withNestedSelect: any = await sdk.authors.list({
+      select: ["id", "name"],
+      include: {
+        books: {
+          select: ["id", "title"]
+        }
+      },
+      limit: 1
+    });
+    if (withNestedSelect.data.length > 0 && withNestedSelect.data[0].books?.length > 0) {
+      const author = withNestedSelect.data[0];
+      assert(author.id !== undefined, "Author should have id");
+      assert(author.name !== undefined, "Author should have name");
+      assert(author.bio === undefined, "Author should NOT have bio");
+
+      const book = author.books[0];
+      assert(book.id !== undefined, "Book should have id");
+      assert(book.title !== undefined, "Book should have title");
+      assert(book.description === undefined, "Book should NOT have description");
+      console.log("  ✓ Nested select in includes: filters both parent and child fields");
+    }
+
+    // Test error handling - both select and exclude
+    try {
+      await sdk.authors.list({
+        select: ["id"],
+        exclude: ["bio"]
+      } as any);
+      assert(false, "Should have thrown an error for both select and exclude");
+    } catch (e: any) {
+      const errorMessage = e.message || JSON.stringify(e);
+      // The validation happens on the server, so we'll get a 400 error
+      const hasError = errorMessage.includes("Cannot specify both") || errorMessage.includes("400");
+      assert(hasError, "Error should mention both select and exclude or be a 400 error");
+      console.log("  ✓ Error handling: rejects both select and exclude");
+    }
+
     // ===== TEST DELETE =====
     console.log("\n🗑️  Testing Delete Operations:");
 

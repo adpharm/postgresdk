@@ -736,6 +736,48 @@ do {
   if (!page.hasMore) break;
 } while (true);
 
+// Field filtering with select/exclude
+const withSelect = await sdk.users.list({
+  select: ['id', 'email', 'name'],  // Only return these fields
+  limit: 10
+});
+// Result: { data: [{ id, email, name }], total, ... }
+
+const withExclude = await sdk.users.list({
+  exclude: ['password_hash', 'secret_token'],  // Return all fields except these
+  where: { status: 'active' }
+});
+// Result: All fields except password_hash and secret_token
+
+// Select/exclude on single record operations
+const created = await sdk.users.create(
+  { email: 'user@example.com', name: 'Alice' },
+  { select: ['id', 'email'] }  // Only return id and email
+);
+
+const updated = await sdk.users.update(
+  userId,
+  { name: 'Bob' },
+  { exclude: ['created_at', 'updated_at'] }
+);
+
+const fetched = await sdk.users.getByPk(userId, { select: ['id', 'name'] });
+const deleted = await sdk.users.delete(userId, { select: ['id', 'email'] });
+
+// Nested select/exclude in includes
+const withNestedSelect = await sdk.authors.list({
+  select: ['id', 'name'],
+  include: {
+    books: {
+      select: ['id', 'title'],  // Filter included books too
+      orderBy: 'published_at',
+      order: 'desc',
+      limit: 5
+    }
+  }
+});
+// Result: authors with only id/name, books with only id/title
+
 // JSONB queries
 const products = await sdk.products.list({
   where: {

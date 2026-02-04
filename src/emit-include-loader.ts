@@ -40,6 +40,8 @@ type TableName = keyof Graph;
 type IncludeSpec = any;
 
 type RelationOptions = {
+  select?: string[];
+  exclude?: string[];
   limit?: number;
   offset?: number;
   orderBy?: string;
@@ -112,6 +114,44 @@ function groupByTuple(rows: any[], cols: string[]) {
   return map;
 }
 
+/**
+ * Filters row fields based on select/exclude
+ * @param rows - Rows to filter
+ * @param select - Fields to keep
+ * @param exclude - Fields to remove
+ * @returns Filtered rows
+ */
+function filterFields<T extends Record<string, any>>(
+  rows: T[],
+  select?: string[],
+  exclude?: string[]
+): T[] {
+  if (!select && !exclude) return rows;
+
+  if (select && exclude) {
+    throw new Error("Cannot specify both select and exclude");
+  }
+
+  return rows.map(row => {
+    if (select) {
+      // Keep only selected fields
+      const filtered: any = {};
+      for (const key of select) {
+        if (key in row) filtered[key] = row[key];
+      }
+      return filtered as T;
+    } else if (exclude) {
+      // Remove excluded fields
+      const filtered = { ...row };
+      for (const key of exclude) {
+        delete filtered[key];
+      }
+      return filtered as T;
+    }
+    return row;
+  });
+}
+
 // Public entry
 export async function loadIncludes(
   root: TableName,
@@ -157,6 +197,8 @@ export async function loadIncludes(
 
         if (specValue && typeof specValue === "object" && specValue !== true) {
           // Extract options
+          if (specValue.select !== undefined) options.select = specValue.select;
+          if (specValue.exclude !== undefined) options.exclude = specValue.exclude;
           if (specValue.limit !== undefined) options.limit = specValue.limit;
           if (specValue.offset !== undefined) options.offset = specValue.offset;
           if (specValue.orderBy !== undefined) options.orderBy = specValue.orderBy;
@@ -170,7 +212,7 @@ export async function loadIncludes(
           } else {
             // Build childSpec from non-option keys
             const nonOptionKeys = Object.keys(specValue).filter(
-              k => k !== 'limit' && k !== 'offset' && k !== 'orderBy' && k !== 'order'
+              k => k !== 'select' && k !== 'exclude' && k !== 'limit' && k !== 'offset' && k !== 'orderBy' && k !== 'order'
             );
             if (nonOptionKeys.length > 0) {
               childSpec = {};
@@ -207,6 +249,8 @@ export async function loadIncludes(
 
         if (specValue && typeof specValue === "object" && specValue !== true) {
           // Extract options
+          if (specValue.select !== undefined) options.select = specValue.select;
+          if (specValue.exclude !== undefined) options.exclude = specValue.exclude;
           if (specValue.limit !== undefined) options.limit = specValue.limit;
           if (specValue.offset !== undefined) options.offset = specValue.offset;
           if (specValue.orderBy !== undefined) options.orderBy = specValue.orderBy;
@@ -220,7 +264,7 @@ export async function loadIncludes(
           } else {
             // Build childSpec from non-option keys
             const nonOptionKeys = Object.keys(specValue).filter(
-              k => k !== 'limit' && k !== 'offset' && k !== 'orderBy' && k !== 'order'
+              k => k !== 'select' && k !== 'exclude' && k !== 'limit' && k !== 'offset' && k !== 'orderBy' && k !== 'order'
             );
             if (nonOptionKeys.length > 0) {
               childSpec = {};
@@ -249,18 +293,25 @@ export async function loadIncludes(
       } else {
         // kind === "one"
         // Could be belongs-to (current has FK to target) OR has-one (target unique-FK to current)
+        const specValue = s[key];
+        const options: RelationOptions = {};
+        if (specValue && typeof specValue === "object" && specValue !== true) {
+          if (specValue.select !== undefined) options.select = specValue.select;
+          if (specValue.exclude !== undefined) options.exclude = specValue.exclude;
+        }
+
         const currFks = (FK_INDEX as any)[table] as Array<{from:string[];toTable:string;to:string[]}>;
         const toTarget = currFks.find(f => f.toTable === target);
         if (toTarget) {
           try {
-            await loadBelongsTo(table, target, rows, key);
+            await loadBelongsTo(table, target, rows, key, options);
           } catch (e: any) {
             log.error("loadBelongsTo failed", { table, key, target }, e?.message ?? e);
             for (const r of rows) r[key] = null;
           }
         } else {
           try {
-            await loadHasOne(table, target, rows, key);
+            await loadHasOne(table, target, rows, key, options);
           } catch (e: any) {
             log.error("loadHasOne failed", { table, key, target }, e?.message ?? e);
             for (const r of rows) r[key] = null;
@@ -279,7 +330,7 @@ export async function loadIncludes(
     }
   }
 
-  async function loadBelongsTo(curr: TableName, target: TableName, rows: any[], key: string) {
+  async function loadBelongsTo(curr: TableName, target: TableName, rows: any[], key: string, options: RelationOptions = {}) {
     // current has FK cols referencing target PK
     const fk = (FK_INDEX as any)[curr].find((f: any) => f.toTable === target);
     if (!fk) { for (const r of rows) r[key] = null; return; }
@@ -294,7 +345,10 @@ export async function loadIncludes(
     log.debug("belongsTo SQL", { curr, target, key, sql, paramsCount: params.length });
     const { rows: targets } = await pg.query(sql, params);
 
-    const idx = indexByTuple(targets, pkCols);
+    // Apply select/exclude filtering
+    const filteredTargets = filterFields(targets, options.select, options.exclude);
+
+    const idx = indexByTuple(filteredTargets, pkCols);
     for (const r of rows) {
       const tup = fk.from.map((c: string) => r[c]);
       const keyStr = JSON.stringify(tup);
@@ -302,7 +356,7 @@ export async function loadIncludes(
     }
   }
 
-  async function loadHasOne(curr: TableName, target: TableName, rows: any[], key: string) {
+  async function loadHasOne(curr: TableName, target: TableName, rows: any[], key: string, options: RelationOptions = {}) {
     // target has FK cols referencing current PK (unique)
     const fk = (FK_INDEX as any)[target].find((f: any) => f.toTable === curr);
     if (!fk) { for (const r of rows) r[key] = null; return; }
@@ -318,7 +372,10 @@ export async function loadIncludes(
     log.debug("hasOne SQL", { curr, target, key, sql, paramsCount: params.length });
     const { rows: targets } = await pg.query(sql, params);
 
-    const idx = indexByTuple(targets, fk.from);
+    // Apply select/exclude filtering
+    const filteredTargets = filterFields(targets, options.select, options.exclude);
+
+    const idx = indexByTuple(filteredTargets, fk.from);
     for (const r of rows) {
       const keyStr = JSON.stringify(pkCols.map((c: string) => r[c]));
       r[key] = idx.get(keyStr) ?? null;
@@ -372,7 +429,10 @@ export async function loadIncludes(
       return rest;
     });
 
-    const groups = groupByTuple(cleanChildren, fk.from);
+    // Apply select/exclude filtering
+    const filteredChildren = filterFields(cleanChildren, options.select, options.exclude);
+
+    const groups = groupByTuple(filteredChildren, fk.from);
     for (const r of rows) {
       const keyStr = JSON.stringify(pkCols.map((c: string) => r[c]));
       r[key] = groups.get(keyStr) ?? [];
@@ -429,8 +489,15 @@ export async function loadIncludes(
         return { ...rest, __parent_fk };
       });
 
+      // Apply select/exclude filtering (preserve __parent_fk for grouping)
+      const filteredResults = cleanResults.map((row: any) => {
+        const { __parent_fk, ...rest } = row;
+        const filtered = filterFields([rest], options.select, options.exclude)[0] ?? rest;
+        return { ...filtered, __parent_fk };
+      });
+
       const grouped = new Map<string, any[]>();
-      for (const row of cleanResults) {
+      for (const row of filteredResults) {
         const { __parent_fk, ...cleanRow } = row;
         const arr = grouped.get(__parent_fk) ?? [];
         arr.push(cleanRow);
@@ -457,7 +524,10 @@ export async function loadIncludes(
       log.debug("manyToMany target SQL", { curr, target, via, key, sql: sqlT, paramsCount: paramsT.length });
       const { rows: targets } = await pg.query(sqlT, paramsT);
 
-      const tIdx = indexByTuple(targets, (PKS as any)[target]);
+      // Apply select/exclude filtering
+      const filteredTargets = filterFields(targets, options.select, options.exclude);
+
+      const tIdx = indexByTuple(filteredTargets, (PKS as any)[target]);
 
       // 3) Group junction rows by current pk tuple, map to target rows
       const byCurr = groupByTuple(jrows, toCurr.from);

@@ -67,9 +67,30 @@ ${authImport}
 
 const columnEnum = z.enum([${columnNames}]);
 
+const createSchema = Insert${Type}Schema;
+const updateSchema = Update${Type}Schema;
+
+const deleteSchema = z.object({
+  select: z.array(z.string()).min(1).optional(),
+  exclude: z.array(z.string()).min(1).optional()
+}).strict().refine(
+  (data) => !(data.select && data.exclude),
+  { message: "Cannot specify both 'select' and 'exclude' parameters" }
+);
+
+const getByPkQuerySchema = z.object({
+  select: z.array(z.string()).min(1).optional(),
+  exclude: z.array(z.string()).min(1).optional()
+}).strict().refine(
+  (data) => !(data.select && data.exclude),
+  { message: "Cannot specify both 'select' and 'exclude' parameters" }
+);
+
 const listSchema = z.object({
   where: z.any().optional(),
   include: z.any().optional(),
+  select: z.array(z.string()).min(1).optional(),
+  exclude: z.array(z.string()).min(1).optional(),
   limit: z.number().int().positive().max(1000).optional(),
   offset: z.number().int().min(0).optional(),
   orderBy: z.union([columnEnum, z.array(columnEnum)]).optional(),
@@ -80,7 +101,10 @@ const listSchema = z.object({
     metric: z.enum(["cosine", "l2", "inner"]).optional(),
     maxDistance: z.number().optional()
   }).optional()` : ""}
-});
+}).strict().refine(
+  (data) => !(data.select && data.exclude),
+  { message: "Cannot specify both 'select' and 'exclude' parameters" }
+);
 
 /**
  * Register all CRUD routes for the ${fileTableName} table
@@ -93,12 +117,13 @@ export function register${Type}Routes(app: Hono, deps: { pg: { query: (text: str
   const base = "${opts.apiPathPrefix}/${fileTableName}";
   
   // Create operation context
-  const ctx: coreOps.OperationContext = {
+  const baseCtx: coreOps.OperationContext = {
     pg: deps.pg,
     table: "${fileTableName}",
     pkColumns: ${JSON.stringify(safePkCols)},
     softDeleteColumn: ${softDel ? `"${softDel}"` : "null"},
-    includeMethodsDepth: ${opts.includeMethodsDepth}${vectorColumns.length > 0 ? `,\n    vectorColumns: ${JSON.stringify(vectorColumns)}` : ""}
+    includeMethodsDepth: ${opts.includeMethodsDepth},
+    allColumnNames: [${table.columns.map(c => `"${c.name}"`).join(", ")}]${vectorColumns.length > 0 ? `,\n    vectorColumns: ${JSON.stringify(vectorColumns)}` : ""}
   };
 ${hasAuth ? `
   // 🔐 Auth: protect all routes for this table
@@ -108,23 +133,34 @@ ${hasAuth ? `
   // CREATE
   app.post(base, async (c) => {
     const body = await c.req.json().catch(() => ({}));
-    const parsed = Insert${Type}Schema.safeParse(body);
+    const parsed = createSchema.safeParse(body);
 
     if (!parsed.success) {
       const issues = parsed.error.flatten();
       return c.json({ error: "Invalid body", issues }, 400);
     }
 
+    // Get select/exclude from query params
+    const selectParam = c.req.query("select");
+    const excludeParam = c.req.query("exclude");
+    const select = selectParam ? selectParam.split(",") : undefined;
+    const exclude = excludeParam ? excludeParam.split(",") : undefined;
+
+    if (select && exclude) {
+      return c.json({ error: "Cannot specify both 'select' and 'exclude' parameters" }, 400);
+    }
+
     if (deps.onRequest) {
       await deps.onRequest(c, deps.pg);
     }
 
+    const ctx = { ...baseCtx, select, exclude };
     const result = await coreOps.createRecord(ctx, parsed.data);
-    
+
     if (result.error) {
       return c.json({ error: result.error }, result.status as any);
     }
-    
+
     return c.json(result.data, result.status as any);
   });
 
@@ -132,16 +168,30 @@ ${hasAuth ? `
   app.get(\`\${base}/${pkPath}\`, async (c) => {
     ${getPkParams}
 
+    // Parse query params for select/exclude
+    const selectParam = c.req.query("select");
+    const excludeParam = c.req.query("exclude");
+    const queryData: any = {};
+    if (selectParam) queryData.select = selectParam.split(",");
+    if (excludeParam) queryData.exclude = excludeParam.split(",");
+
+    const queryParsed = getByPkQuerySchema.safeParse(queryData);
+    if (!queryParsed.success) {
+      const issues = queryParsed.error.flatten();
+      return c.json({ error: "Invalid query parameters", issues }, 400);
+    }
+
     if (deps.onRequest) {
       await deps.onRequest(c, deps.pg);
     }
 
+    const ctx = { ...baseCtx, select: queryParsed.data.select, exclude: queryParsed.data.exclude };
     const result = await coreOps.getByPk(ctx, pkValues);
-    
+
     if (result.error) {
       return c.json({ error: result.error }, result.status as any);
     }
-    
+
     return c.json(result.data, result.status as any);
   });
 
@@ -158,6 +208,7 @@ ${hasAuth ? `
       await deps.onRequest(c, deps.pg);
     }
 
+    const ctx = { ...baseCtx, select: body.data.select, exclude: body.data.exclude };
     const result = await coreOps.listRecords(ctx, body.data);
     
     if (result.error) {
@@ -218,23 +269,34 @@ ${hasAuth ? `
   app.patch(\`\${base}/${pkPath}\`, async (c) => {
     ${getPkParams}
     const body = await c.req.json().catch(() => ({}));
-    const parsed = Update${Type}Schema.safeParse(body);
+    const parsed = updateSchema.safeParse(body);
 
     if (!parsed.success) {
       const issues = parsed.error.flatten();
       return c.json({ error: "Invalid body", issues }, 400);
     }
 
+    // Get select/exclude from query params
+    const selectParam = c.req.query("select");
+    const excludeParam = c.req.query("exclude");
+    const select = selectParam ? selectParam.split(",") : undefined;
+    const exclude = excludeParam ? excludeParam.split(",") : undefined;
+
+    if (select && exclude) {
+      return c.json({ error: "Cannot specify both 'select' and 'exclude' parameters" }, 400);
+    }
+
     if (deps.onRequest) {
       await deps.onRequest(c, deps.pg);
     }
 
+    const ctx = { ...baseCtx, select, exclude };
     const result = await coreOps.updateRecord(ctx, pkValues, parsed.data);
-    
+
     if (result.error) {
       return c.json({ error: result.error }, result.status as any);
     }
-    
+
     return c.json(result.data, result.status as any);
   });
 
@@ -242,16 +304,30 @@ ${hasAuth ? `
   app.delete(\`\${base}/${pkPath}\`, async (c) => {
     ${getPkParams}
 
+    // Parse query params for select/exclude
+    const selectParam = c.req.query("select");
+    const excludeParam = c.req.query("exclude");
+    const queryData: any = {};
+    if (selectParam) queryData.select = selectParam.split(",");
+    if (excludeParam) queryData.exclude = excludeParam.split(",");
+
+    const queryParsed = deleteSchema.safeParse(queryData);
+    if (!queryParsed.success) {
+      const issues = queryParsed.error.flatten();
+      return c.json({ error: "Invalid query parameters", issues }, 400);
+    }
+
     if (deps.onRequest) {
       await deps.onRequest(c, deps.pg);
     }
 
+    const ctx = { ...baseCtx, select: queryParsed.data.select, exclude: queryParsed.data.exclude };
     const result = await coreOps.deleteRecord(ctx, pkValues);
-    
+
     if (result.error) {
       return c.json({ error: result.error }, result.status as any);
     }
-    
+
     return c.json(result.data, result.status as any);
   });
 }

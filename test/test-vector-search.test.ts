@@ -448,7 +448,7 @@ test("vector columns - returned as number[] arrays, not strings", async () => {
     expect(listItem.text_embedding!.every((n: any) => typeof n === "number")).toBe(true);
 
     // Test via getByPk()
-    const pkResult = await sdk.video_sections.getByPk(listItem.id);
+    const pkResult = await sdk.video_sections.getByPk(listItem.id!);
     expect(pkResult).not.toBeNull();
     expect(Array.isArray(pkResult!.vision_embedding)).toBe(true);
     expect(Array.isArray(pkResult!.text_embedding)).toBe(true);
