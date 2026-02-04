@@ -1,9 +1,13 @@
 import { createHash } from "crypto";
 import { readFile, writeFile, mkdir, appendFile } from "fs/promises";
-import { existsSync } from "fs";
+import { existsSync, readFileSync } from "fs";
 import { join, dirname } from "path";
 import type { Model } from "./introspect";
 import type { Config } from "./types";
+
+// Get package version for cache invalidation
+const packageJson = JSON.parse(readFileSync(join(__dirname, "../package.json"), "utf-8"));
+const POSTGRESDK_VERSION = packageJson.version as string;
 
 export interface CacheData {
   schemaHash: string;
@@ -17,10 +21,12 @@ export interface CacheData {
 
 /**
  * Compute a deterministic hash of the schema and config
+ * Includes postgresdk version to trigger regeneration on upgrades
  */
 export function computeSchemaHash(model: Model, config: Config): string {
   // Serialize the parts that affect code generation
   const payload = {
+    version: POSTGRESDK_VERSION, // Include package version for cache invalidation on upgrades
     schema: model.schema,
     tables: model.tables,
     enums: model.enums,
