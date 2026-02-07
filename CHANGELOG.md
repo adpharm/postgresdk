@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- refactor: Replace cache system with file-level change detection
+  - Removed `.postgresdk/` cache directory and history log
+  - Removed schema hash computation and cache validation
+  - Replaced `writeFiles` with `writeFilesIfChanged` for idempotent file writes
+  - Generation now compares file content and only writes changed files
+  - Pull command only writes changed files (same as before)
+  - Simpler implementation without persistent cache state
+  - No more version-based cache invalidation logic needed
+
 ## [v0.18.5] - 2026-02-04
 
 - feat: Extend TypeScript overloads to JSONB tables

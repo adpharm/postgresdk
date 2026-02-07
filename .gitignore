@@ -82,9 +82,6 @@ web_modules/
 .cache
 .parcel-cache
 
-# PostgreSDK cache and history
-.postgresdk/
-
 # Next.js build output
 .next
 out

@@ -2,7 +2,6 @@ import { writeFile, mkdir, readFile } from "fs/promises";
 import { join, dirname, resolve } from "path";
 import { existsSync } from "fs";
 import { pathToFileURL } from "url";
-import { appendToHistory } from "./cache";
 
 interface PullConfig {
   from?: string;
@@ -172,21 +171,9 @@ export async function pullCommand(args: string[]) {
     // Log results
     if (filesWritten === 0 && !metadataChanged) {
       console.log(`✅ SDK up-to-date (${filesUnchanged} files unchanged)`);
-      await appendToHistory(
-        `Pull\n✅ SDK up-to-date\n- Pulled from: ${config.from}\n- Files checked: ${filesUnchanged}`
-      );
     } else {
       console.log(`✅ SDK pulled successfully to ${config.output}`);
       console.log(`   Updated: ${filesWritten} files, Unchanged: ${filesUnchanged} files`);
-
-      let logEntry = `Pull\n✅ Updated ${filesWritten} files from ${config.from}\n- SDK version: ${sdk.version}\n- Files unchanged: ${filesUnchanged}`;
-      if (changedFiles.length > 0 && changedFiles.length <= 10) {
-        logEntry += `\n- Modified: ${changedFiles.join(", ")}`;
-      } else if (changedFiles.length > 10) {
-        logEntry += `\n- Modified: ${changedFiles.slice(0, 10).join(", ")} and ${changedFiles.length - 10} more...`;
-      }
-
-      await appendToHistory(logEntry);
     }
   } catch (err) {
     console.error(`❌ Pull failed:`, err);
