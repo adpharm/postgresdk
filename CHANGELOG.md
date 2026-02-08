@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- feat: Add TypeScript type safety to include parameters
+  - Replaced `include?: any` with `include?: ${Type}IncludeSpec` in all generated client methods
+  - IDE autocomplete now suggests valid relation names when typing include specifications
+  - Compile-time validation prevents typos and invalid relation references
+  - Type safety applies to nested includes and include options (limit, offset, orderBy, etc.)
+  - No breaking changes - existing code continues to work
+  - Runtime Zod validation remains unchanged (uses z.any() to avoid circular schema complexity)
+  - Improves developer experience with immediate feedback on invalid includes
+
 ## [v0.18.6] - 2026-02-07
 
 - refactor: Replace cache system with file-level change detection

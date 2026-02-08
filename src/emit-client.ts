@@ -114,7 +114,10 @@ export function emitClient(
 
   // Generate type imports - base types for this table
   const typeImports = `import type { Insert${Type}, Update${Type}, Select${Type} } from "./types/${table.name}${ext}";`;
-  
+
+  // Import IncludeSpec type for type-safe includes
+  const includeSpecImport = `import type { ${Type}IncludeSpec } from "./include-spec${ext}";`;
+
   // If we have includes from other tables, we need those types too
   const otherTableImports: string[] = [];
   for (const target of Array.from(importedTypes)) {
@@ -205,7 +208,7 @@ export function emitClient(
       order?: "asc" | "desc";
       limit?: number;
       offset?: number;
-      include?: any;
+      include?: ${Type}IncludeSpec;
     };
   }`;
     }
@@ -326,6 +329,7 @@ import { BaseClient } from "./base-client${ext}";
 import type { Where } from "./where-types${ext}";
 import type { PaginatedResponse } from "./types/shared${ext}";
 ${typeImports}
+${includeSpecImport}
 ${otherTableImports.join("\n")}
 
 /**
@@ -474,7 +478,7 @@ ${hasJsonbColumns ? `  /**
    */
   async list<TJsonb extends Partial<Select${Type}> = {}>(params: {
     select: string[];
-    include?: any;
+    include?: ${Type}IncludeSpec;
     limit?: number;
     offset?: number;
     where?: Where<Select${Type}<TJsonb>>;${hasVectorColumns ? `
@@ -494,7 +498,7 @@ ${hasJsonbColumns ? `  /**
    */
   async list<TJsonb extends Partial<Select${Type}> = {}>(params: {
     exclude: string[];
-    include?: any;
+    include?: ${Type}IncludeSpec;
     limit?: number;
     offset?: number;
     where?: Where<Select${Type}<TJsonb>>;${hasVectorColumns ? `
@@ -522,7 +526,7 @@ ${hasJsonbColumns ? `  /**
    * const users = await client.list<{ metadata: Metadata }>({ where: { status: 'active' } });
    */
   async list<TJsonb extends Partial<Select${Type}> = {}>(params?: {
-    include?: any;
+    include?: ${Type}IncludeSpec;
     limit?: number;
     offset?: number;
     where?: Where<Select${Type}<TJsonb>>;${hasVectorColumns ? `
@@ -536,7 +540,7 @@ ${hasJsonbColumns ? `  /**
     order?: "asc" | "desc" | ("asc" | "desc")[];
   }): Promise<PaginatedResponse<Select${Type}<TJsonb>${hasVectorColumns ? ' & { _distance?: number }' : ''}>>;
   async list<TJsonb extends Partial<Select${Type}> = {}>(params?: {
-    include?: any;
+    include?: ${Type}IncludeSpec;
     select?: string[];
     exclude?: string[];
     limit?: number;
@@ -559,7 +563,7 @@ ${hasJsonbColumns ? `  /**
    */
   async list(params: {
     select: string[];
-    include?: any;
+    include?: ${Type}IncludeSpec;
     limit?: number;
     offset?: number;
     where?: Where<Select${Type}>;${hasVectorColumns ? `
@@ -579,7 +583,7 @@ ${hasJsonbColumns ? `  /**
    */
   async list(params: {
     exclude: string[];
-    include?: any;
+    include?: ${Type}IncludeSpec;
     limit?: number;
     offset?: number;
     where?: Where<Select${Type}>;${hasVectorColumns ? `
@@ -604,7 +608,7 @@ ${hasJsonbColumns ? `  /**
    * @returns Paginated results with all fields
    */
   async list(params?: {
-    include?: any;
+    include?: ${Type}IncludeSpec;
     limit?: number;
     offset?: number;
     where?: Where<Select${Type}>;${hasVectorColumns ? `
@@ -618,7 +622,7 @@ ${hasJsonbColumns ? `  /**
     order?: "asc" | "desc" | ("asc" | "desc")[];
   }): Promise<PaginatedResponse<Select${Type}${hasVectorColumns ? ' & { _distance?: number }' : ''}>>;
   async list(params?: {
-    include?: any;
+    include?: ${Type}IncludeSpec;
     select?: string[];
     exclude?: string[];
     limit?: number;

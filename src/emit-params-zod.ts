@@ -17,8 +17,8 @@ export function emitParamsZod(table: Table, graph: Graph) {
   const safePk = pkCols.length ? pkCols : ["id"];
   const hasCompositePk = safePk.length > 1;
   
-  // Use a simple include schema that matches the existing type structure
-  // For now, keep it simple and use z.any() for includes to avoid circular refs
+  // Use z.any() for includes to avoid Zod recursive schema complexity.
+  // TypeScript types (${Type}IncludeSpec) provide compile-time type safety.
   const includeSpecSchema = `z.any()`;
 
   // Generate PK schema
