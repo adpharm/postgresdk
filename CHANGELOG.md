@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- fix: Generate pair combination methods for tables with 4-6 relationships
+  - Tables with 4-6 direct relationships now generate all pair combinations (e.g., `listWithXAndY`)
+  - Previously only generated combinations for tables with 2-3 relationships
+  - Fixes missing convenience methods like `listWithWebsiteAndVideoSections` for tables with many relations
+  - Generates C(n,2) pair methods where n is the number of relationships (max 15 pairs for 6 relations)
+  - Includes test to verify combination generation for tables with 4+ relationships
+
 ## [v0.18.7] - 2026-02-08
 
 - feat: Add TypeScript type safety to include parameters

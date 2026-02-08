@@ -193,8 +193,8 @@ export function generateIncludeMethods(
     }
     
     // Generate combinations for current depth level
-    if (depth === 1 && Object.keys(currentEdges).length > 1 && Object.keys(currentEdges).length <= 3) {
-      // Only generate combinations for 2-3 relationships at depth 1
+    if (depth === 1 && Object.keys(currentEdges).length > 1 && Object.keys(currentEdges).length <= 6) {
+      // Only generate combinations for 2-6 relationships at depth 1
       const edgeEntries = Object.entries(currentEdges);
       
       // Generate pairs
