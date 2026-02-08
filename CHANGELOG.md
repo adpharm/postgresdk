@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- feat: Add automatic type inference for included relations
+  - `list()` method now automatically infers return type based on `include` parameter
+  - No manual type definitions or casts needed when including relations
+  - TypeScript automatically knows which properties exist based on includes
+  - Works with nested includes recursively (e.g., `{ books: { include: { tags: true } } }`)
+  - Autocomplete shows only included relations in returned objects
+  - Refactoring-safe: change includes and types update automatically
+  - Generated `${Table}WithIncludes<T>` types transform IncludeSpec into actual shapes
+  - Handles both 1:1 relations (single object) and 1:N relations (arrays)
+  - Zero runtime overhead - all type magic happens at compile time
+
 ## [v0.18.9] - 2026-02-08
 
 - fix: Use target table IncludeSpec for nested include parameters

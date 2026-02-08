@@ -119,6 +119,9 @@ export function emitClient(
   const includeSpecTypes = [table.name, ...Array.from(importedTypes).filter(t => t !== table.name)];
   const includeSpecImport = `import type { ${includeSpecTypes.map(t => `${pascal(t)}IncludeSpec`).join(', ')} } from "./include-spec${ext}";`;
 
+  // Import WithIncludes type for automatic type inference
+  const includeResolverImport = `import type { ${Type}WithIncludes } from "./include-resolver${ext}";`;
+
   // If we have includes from other tables, we need those types too
   const otherTableImports: string[] = [];
   for (const target of Array.from(importedTypes)) {
@@ -334,6 +337,7 @@ import type { Where } from "./where-types${ext}";
 import type { PaginatedResponse } from "./types/shared${ext}";
 ${typeImports}
 ${includeSpecImport}
+${includeResolverImport}
 ${otherTableImports.join("\n")}
 
 /**
@@ -523,14 +527,17 @@ ${hasJsonbColumns ? `  /**
    * @param params.order - Sort direction(s): "asc" or "desc"
    * @param params.limit - Maximum number of records to return (default: 50, max: 1000)
    * @param params.offset - Number of records to skip for pagination
-   * @param params.include - Related records to include (see listWith* methods for typed includes)
-   * @returns Paginated results with all fields
+   * @param params.include - Related records to include (return type automatically infers included relations)
+   * @returns Paginated results with all fields (and included relations if specified)
    * @example
    * // With JSONB type override:
    * const users = await client.list<{ metadata: Metadata }>({ where: { status: 'active' } });
+   * // With automatic include inference:
+   * const users = await client.list({ include: { posts: true } });
+   * // users[0].posts is automatically typed
    */
-  async list<TJsonb extends Partial<Select${Type}> = {}>(params?: {
-    include?: ${Type}IncludeSpec;
+  async list<TJsonb extends Partial<Select${Type}> = {}, TInclude extends ${Type}IncludeSpec = {}>(params?: {
+    include?: TInclude;
     limit?: number;
     offset?: number;
     where?: Where<Select${Type}<TJsonb>>;${hasVectorColumns ? `
@@ -542,7 +549,7 @@ ${hasJsonbColumns ? `  /**
     };` : ""}
     orderBy?: string | string[];
     order?: "asc" | "desc" | ("asc" | "desc")[];
-  }): Promise<PaginatedResponse<Select${Type}<TJsonb>${hasVectorColumns ? ' & { _distance?: number }' : ''}>>;
+  }): Promise<PaginatedResponse<${Type}WithIncludes<TInclude>${hasVectorColumns ? ' & { _distance?: number }' : ''}>>;
   async list<TJsonb extends Partial<Select${Type}> = {}>(params?: {
     include?: ${Type}IncludeSpec;
     select?: string[];
@@ -608,11 +615,11 @@ ${hasJsonbColumns ? `  /**
    * @param params.order - Sort direction(s): "asc" or "desc"
    * @param params.limit - Maximum number of records to return (default: 50, max: 1000)
    * @param params.offset - Number of records to skip for pagination
-   * @param params.include - Related records to include (see listWith* methods for typed includes)
-   * @returns Paginated results with all fields
+   * @param params.include - Related records to include (return type automatically infers included relations)
+   * @returns Paginated results with all fields (and included relations if specified)
    */
-  async list(params?: {
-    include?: ${Type}IncludeSpec;
+  async list<TInclude extends ${Type}IncludeSpec = {}>(params?: {
+    include?: TInclude;
     limit?: number;
     offset?: number;
     where?: Where<Select${Type}>;${hasVectorColumns ? `
@@ -624,7 +631,7 @@ ${hasJsonbColumns ? `  /**
     };` : ""}
     orderBy?: string | string[];
     order?: "asc" | "desc" | ("asc" | "desc")[];
-  }): Promise<PaginatedResponse<Select${Type}${hasVectorColumns ? ' & { _distance?: number }' : ''}>>;
+  }): Promise<PaginatedResponse<${Type}WithIncludes<TInclude>${hasVectorColumns ? ' & { _distance?: number }' : ''}>>;
   async list(params?: {
     include?: ${Type}IncludeSpec;
     select?: string[];

@@ -7,6 +7,7 @@ import { existsSync } from "node:fs";
 import { introspect } from "./introspect";
 import { buildGraph } from "./rel-classify";
 import { emitIncludeSpec } from "./emit-include-spec";
+import { emitIncludeResolver } from "./emit-include-resolver";
 import { emitIncludeBuilder } from "./emit-include-builder";
 import { emitZod } from "./emit-zod";
 import { emitParamsZod } from "./emit-params-zod";
@@ -116,6 +117,10 @@ export async function generate(configPath: string) {
   const includeSpec = emitIncludeSpec(graph);
   files.push({ path: join(serverDir, "include-spec.ts"), content: includeSpec });
   files.push({ path: join(clientDir, "include-spec.ts"), content: includeSpec });
+
+  // include-resolver (client only - for automatic type inference)
+  const includeResolver = emitIncludeResolver(graph, cfg.useJsExtensions);
+  files.push({ path: join(clientDir, "include-resolver.ts"), content: includeResolver });
 
   // shared params zod (client only)
   files.push({ path: join(clientDir, "params", "shared.ts"), content: emitSharedParamsZod() });

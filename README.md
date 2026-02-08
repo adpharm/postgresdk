@@ -567,7 +567,7 @@ const deleted = await sdk.users.delete(123);
 
 #### Relationships & Eager Loading
 
-Automatically handles relationships with the `include` parameter:
+Automatically handles relationships with the `include` parameter. **Type inference works automatically** - no manual casts needed:
 
 ```typescript
 // 1:N relationship - Get authors with their books
@@ -575,12 +575,14 @@ const authorsResult = await sdk.authors.list({
   include: { books: true }
 });
 const authors = authorsResult.data;
+// ✅ authors[0].books is automatically typed as SelectBooks[]
 
 // M:N relationship - Get books with their tags
 const booksResult = await sdk.books.list({
   include: { tags: true }
 });
 const books = booksResult.data;
+// ✅ books[0].tags is automatically typed as SelectTags[]
 
 // Nested includes - Get authors with books and their tags
 const nestedResult = await sdk.authors.list({
@@ -591,6 +593,7 @@ const nestedResult = await sdk.authors.list({
   }
 });
 const authorsWithBooksAndTags = nestedResult.data;
+// ✅ TypeScript knows: data[0].books[0].tags exists and is SelectTags[]
 ```
 
 **Typed Include Methods:**
