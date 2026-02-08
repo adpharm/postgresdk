@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- fix: Use target table IncludeSpec for nested include parameters
+  - Nested include parameters now use target table's IncludeSpec instead of parent table's
+  - Example: `capturesInclude: { include?: CapturesIncludeSpec }` instead of incorrect `WebsitesIncludeSpec`
+  - Enables proper autocomplete for nested relations (e.g., `{ video_sections: true }` within captures)
+  - Generated clients now import all required IncludeSpec types for related tables
+  - Fixes TypeScript errors when configuring deep nested includes
+  - Maintains type safety throughout the entire include tree
+
 ## [v0.18.8] - 2026-02-08
 
 - fix: Generate pair combination methods for tables with 4-6 relationships

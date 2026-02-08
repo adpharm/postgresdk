@@ -105,7 +105,7 @@ export function emitClient(
   // Build import for types needed by include methods
   const importedTypes = new Set<string>();
   importedTypes.add(table.name); // Always need base type
-  
+
   for (const method of includeMethods) {
     for (const target of method.targets) {
       importedTypes.add(target);
@@ -115,8 +115,9 @@ export function emitClient(
   // Generate type imports - base types for this table
   const typeImports = `import type { Insert${Type}, Update${Type}, Select${Type} } from "./types/${table.name}${ext}";`;
 
-  // Import IncludeSpec type for type-safe includes
-  const includeSpecImport = `import type { ${Type}IncludeSpec } from "./include-spec${ext}";`;
+  // Import IncludeSpec types for type-safe includes (base table + all targets)
+  const includeSpecTypes = [table.name, ...Array.from(importedTypes).filter(t => t !== table.name)];
+  const includeSpecImport = `import type { ${includeSpecTypes.map(t => `${pascal(t)}IncludeSpec`).join(', ')} } from "./include-spec${ext}";`;
 
   // If we have includes from other tables, we need those types too
   const otherTableImports: string[] = [];
@@ -193,6 +194,9 @@ export function emitClient(
     } else if (pattern.type === 'nested' && pattern.nestedKey) {
       const paramName = toIncludeParamName(pattern.nestedKey);
       includeParamNames.push(paramName);
+      // Get the target table for the nested relation (e.g., "captures" -> "Captures")
+      const targetTable = method.targets[0];
+      const targetType = targetTable ? pascal(targetTable) : Type;
       paramsType = `{
     select?: string[];
     exclude?: string[];
@@ -208,7 +212,7 @@ export function emitClient(
       order?: "asc" | "desc";
       limit?: number;
       offset?: number;
-      include?: ${Type}IncludeSpec;
+      include?: ${targetType}IncludeSpec;
     };
   }`;
     }
