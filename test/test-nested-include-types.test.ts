@@ -61,8 +61,8 @@ test("Parent table IncludeSpec is different from child", () => {
 
 // Compile-time verification that wrong types fail
 function testWrongNestedInclude() {
-  // @ts-expect-error - Authors don't have a 'tags' relation (only books do)
   const invalid: AuthorsIncludeSpec = {
+    // @ts-expect-error - Authors don't have a 'tags' relation (only books do)
     tags: true
   };
 

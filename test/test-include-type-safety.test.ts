@@ -96,9 +96,9 @@ test("Include with all options is valid", () => {
 function testInvalidRelation() {
   const sdk = new SDK({ baseUrl: "http://localhost:3000" });
 
-  // @ts-expect-error - nonExistentRelation is not a valid relation
   sdk.authors.list({
     include: {
+      // @ts-expect-error - nonExistentRelation is not a valid relation
       nonExistentRelation: true
     }
   });
@@ -108,10 +108,10 @@ function testInvalidRelation() {
 function testInvalidOptions() {
   const sdk = new SDK({ baseUrl: "http://localhost:3000" });
 
-  // @ts-expect-error - invalidOption is not a valid include option
   sdk.authors.list({
     include: {
       books: {
+        // @ts-expect-error - invalidOption is not a valid include option
         invalidOption: 123
       }
     }
@@ -122,11 +122,11 @@ function testInvalidOptions() {
 function testInvalidNestedRelation() {
   const sdk = new SDK({ baseUrl: "http://localhost:3000" });
 
-  // @ts-expect-error - authors don't have a 'chapters' relation
   sdk.authors.list({
     include: {
       books: {
         include: {
+          // @ts-expect-error - authors don't have a 'chapters' relation
           chapters: true
         }
       }
@@ -138,10 +138,10 @@ function testInvalidNestedRelation() {
 function testWrongTypeForLimit() {
   const sdk = new SDK({ baseUrl: "http://localhost:3000" });
 
-  // @ts-expect-error - limit must be a number, not a string
   sdk.authors.list({
     include: {
       books: {
+        // @ts-expect-error - limit must be a number, not a string
         limit: "5"
       }
     }

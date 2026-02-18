@@ -13,29 +13,29 @@ import { SDK } from "./.results/client";
 const sdk = new SDK({ baseUrl: "http://localhost:3000" });
 
 // ❌ Test: Invalid relation name should fail
-// @ts-expect-error - nonExistentRelation is not a valid relation
 sdk.authors.list({
   include: {
+    // @ts-expect-error - nonExistentRelation is not a valid relation
     nonExistentRelation: true
   }
 });
 
 // ❌ Test: Invalid options should fail
-// @ts-expect-error - invalidOption is not a valid include option
 sdk.authors.list({
   include: {
     books: {
+      // @ts-expect-error - invalidOption is not a valid include option
       invalidOption: 123
     }
   }
 });
 
 // ❌ Test: Invalid nested relation should fail
-// @ts-expect-error - authors don't have a 'chapters' relation
 sdk.authors.list({
   include: {
     books: {
       include: {
+        // @ts-expect-error - authors don't have a 'chapters' relation
         chapters: true
       }
     }
@@ -43,30 +43,30 @@ sdk.authors.list({
 });
 
 // ❌ Test: Wrong type for limit should fail
-// @ts-expect-error - limit must be a number, not a string
 sdk.authors.list({
   include: {
     books: {
+      // @ts-expect-error - limit must be a number, not a string
       limit: "5"
     }
   }
 });
 
 // ❌ Test: Invalid order value should fail
-// @ts-expect-error - order must be "asc" or "desc"
 sdk.authors.list({
   include: {
     books: {
+      // @ts-expect-error - order must be "asc" or "desc"
       order: "ascending"
     }
   }
 });
 
 // ❌ Test: Invalid orderBy value type should fail
-// @ts-expect-error - orderBy must be a string, not a number
 sdk.authors.list({
   include: {
     books: {
+      // @ts-expect-error - orderBy must be a string, not a number
       orderBy: 123
     }
   }

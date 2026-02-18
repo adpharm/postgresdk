@@ -23,7 +23,6 @@ test("list() without include returns base type", () => {
   const mockAuthor: AuthorType = {
     id: "1",
     name: "Test",
-    created_at: new Date()
   };
 
   // Verify it matches SelectAuthors
@@ -42,7 +41,6 @@ test("list() with empty params returns base type", () => {
   const mockAuthor: AuthorType = {
     id: "1",
     name: "Test",
-    created_at: new Date()
   };
 
   const selectAuthor: SelectAuthors = mockAuthor;
@@ -60,7 +58,6 @@ test("list() with where/orderBy but no include returns base type", () => {
   const mockAuthor: AuthorType = {
     id: "1",
     name: "Test",
-    created_at: new Date()
   };
 
   const selectAuthor: SelectAuthors = mockAuthor;

@@ -39,11 +39,11 @@ async function testWriteNewFiles() {
   assert(result.written === 2, `Expected 2 files written, got ${result.written}`);
   assert(result.unchanged === 0, `Expected 0 unchanged, got ${result.unchanged}`);
   assert(result.filesWritten.length === 2, `Expected 2 files in filesWritten array`);
-  assert(existsSync(files[0].path), "file1.txt should exist");
-  assert(existsSync(files[1].path), "file2.txt should exist");
+  assert(existsSync(files[0]!.path), "file1.txt should exist");
+  assert(existsSync(files[1]!.path), "file2.txt should exist");
 
-  const content1 = await readFile(files[0].path, "utf-8");
-  const content2 = await readFile(files[1].path, "utf-8");
+  const content1 = await readFile(files[0]!.path, "utf-8");
+  const content2 = await readFile(files[1]!.path, "utf-8");
   assert(content1 === "hello world", "file1.txt should have correct content");
   assert(content2 === "foo bar", "file2.txt should have correct content");
 
@@ -59,8 +59,8 @@ async function testSkipUnchangedFiles() {
   ];
 
   // Get original modification times
-  const mtime1Before = statSync(files[0].path).mtimeMs;
-  const mtime2Before = statSync(files[1].path).mtimeMs;
+  const mtime1Before = statSync(files[0]!.path).mtimeMs;
+  const mtime2Before = statSync(files[1]!.path).mtimeMs;
 
   // Wait a bit to ensure mtime would change if file is written
   await new Promise(resolve => setTimeout(resolve, 10));
@@ -72,8 +72,8 @@ async function testSkipUnchangedFiles() {
   assert(result.filesWritten.length === 0, `Expected 0 files in filesWritten array`);
 
   // Verify files weren't touched
-  const mtime1After = statSync(files[0].path).mtimeMs;
-  const mtime2After = statSync(files[1].path).mtimeMs;
+  const mtime1After = statSync(files[0]!.path).mtimeMs;
+  const mtime2After = statSync(files[1]!.path).mtimeMs;
   assert(mtime1Before === mtime1After, "file1.txt should not be touched");
   assert(mtime2Before === mtime2After, "file2.txt should not be touched");
 
@@ -93,10 +93,10 @@ async function testUpdateChangedFiles() {
   assert(result.written === 1, `Expected 1 file written, got ${result.written}`);
   assert(result.unchanged === 1, `Expected 1 unchanged, got ${result.unchanged}`);
   assert(result.filesWritten.length === 1, `Expected 1 file in filesWritten array`);
-  assert(result.filesWritten[0] === files[0].path, "filesWritten should contain file1.txt");
+  assert(result.filesWritten[0]! === files[0]!.path, "filesWritten should contain file1.txt");
 
-  const content1 = await readFile(files[0].path, "utf-8");
-  const content2 = await readFile(files[1].path, "utf-8");
+  const content1 = await readFile(files[0]!.path, "utf-8");
+  const content2 = await readFile(files[1]!.path, "utf-8");
   assert(content1 === "changed content", "file1.txt should have updated content");
   assert(content2 === "foo bar", "file2.txt should remain unchanged");
 
@@ -113,9 +113,9 @@ async function testNestedDirectories() {
   const result = await writeFilesIfChanged(files);
 
   assert(result.written === 1, `Expected 1 file written, got ${result.written}`);
-  assert(existsSync(files[0].path), "Nested file should exist");
+  assert(existsSync(files[0]!.path), "Nested file should exist");
 
-  const content = await readFile(files[0].path, "utf-8");
+  const content = await readFile(files[0]!.path, "utf-8");
   assert(content === "nested content", "Nested file should have correct content");
 
   console.log("  ✓ Nested directories handled correctly");

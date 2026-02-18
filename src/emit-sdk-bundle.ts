@@ -2,7 +2,7 @@
  * Generates a bundle containing all client SDK files as a single module
  * that can be served by the API
  */
-export function emitSdkBundle(clientFiles: { path: string; content: string }[], clientDir: string) {
+export function emitSdkBundle(clientFiles: { path: string; content: string }[], clientDir: string, version: string) {
   // Extract just the relative paths within the client directory
   const files: Record<string, string> = {};
   
@@ -21,7 +21,6 @@ export function emitSdkBundle(clientFiles: { path: string; content: string }[], 
     }
   }
   
-  const version = `1.0.0`; // TODO: Could get from config later
 
   return `/**
  * AUTO-GENERATED FILE - DO NOT EDIT

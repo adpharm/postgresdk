@@ -25,13 +25,11 @@ test("list() return type infers included relations", () => {
   const mockAuthor: AuthorWithBooks = {
     id: "1",
     name: "Test Author",
-    created_at: new Date(),
     books: [
       {
         id: "1",
         title: "Test Book",
         author_id: "1",
-        created_at: new Date()
       }
     ]
   };
@@ -58,19 +56,15 @@ test("list() with nested includes infers nested types", () => {
   const mockAuthor: AuthorWithBooksAndTags = {
     id: "1",
     name: "Test Author",
-    created_at: new Date(),
     books: [
       {
         id: "1",
         title: "Test Book",
         author_id: "1",
-        created_at: new Date(),
         tags: [
           {
             id: "1",
             name: "Test Tag",
-            book_id: "1",
-            created_at: new Date()
           }
         ]
       }
@@ -90,7 +84,6 @@ test("list() without include returns base type", () => {
   const mockAuthor: AuthorBase = {
     id: "1",
     name: "Test Author",
-    created_at: new Date()
   };
 
   expect(mockAuthor.id).toBeDefined();
@@ -112,18 +105,14 @@ test("Multiple relations inferred correctly", () => {
     id: "1",
     title: "Test Book",
     author_id: "1",
-    created_at: new Date(),
     author: {
       id: "1",
       name: "Test Author",
-      created_at: new Date()
     },
     tags: [
       {
         id: "1",
         name: "Test Tag",
-        book_id: "1",
-        created_at: new Date()
       }
     ]
   };

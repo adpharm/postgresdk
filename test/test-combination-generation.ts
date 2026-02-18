@@ -14,24 +14,24 @@ import type { Graph } from "../src/rel-classify";
 // Mock table with 4 relationships (like captures table)
 const capturesTable: Table = {
   name: "captures",
-  schema: "public",
   columns: [
-    { name: "id", type: "text", pgType: "text", nullable: false, defaultValue: null },
-    { name: "website_id", type: "text", pgType: "text", nullable: true, defaultValue: null },
+    { name: "id", pgType: "text", nullable: false, hasDefault: false },
+    { name: "website_id", pgType: "text", nullable: true, hasDefault: false },
   ],
   pk: ["id"],
+  uniques: [],
   fks: [
-    { from: ["website_id"], to: { schema: "public", table: "websites", columns: ["id"] } }
+    { from: ["website_id"], toTable: "websites", to: ["id"], onDelete: "no action", onUpdate: "no action" }
   ]
 };
 
 // Mock graph with 4 relationships
 const graph: Graph = {
   captures: {
-    website: { kind: "one", target: "websites", fk: { from: ["website_id"], to: { schema: "public", table: "websites", columns: ["id"] } } },
-    video_sections: { kind: "many", target: "video_sections", via: { table: "video_sections", column: "capture_id" } },
-    capture_technologies: { kind: "many", target: "capture_technologies", via: { table: "capture_technologies", column: "capture_id" } },
-    technologies: { kind: "many", target: "technologies", via: { table: "capture_technologies", column: "capture_id" } }
+    website: { from: "captures", key: "website", kind: "one", target: "websites" },
+    video_sections: { from: "captures", key: "video_sections", kind: "many", target: "video_sections", via: "video_sections" },
+    capture_technologies: { from: "captures", key: "capture_technologies", kind: "many", target: "capture_technologies", via: "capture_technologies" },
+    technologies: { from: "captures", key: "technologies", kind: "many", target: "technologies", via: "capture_technologies" }
   },
   websites: {},
   video_sections: {},

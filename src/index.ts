@@ -1,9 +1,13 @@
 // Load environment variables first, before any other imports
 import "dotenv/config";
 
-import { join, relative } from "node:path";
-import { pathToFileURL } from "node:url";
-import { existsSync } from "node:fs";
+import { join, relative, dirname } from "node:path";
+import { pathToFileURL, fileURLToPath } from "node:url";
+import { existsSync, readFileSync } from "node:fs";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const { version: CLI_VERSION } = JSON.parse(readFileSync(join(__dirname, "../package.json"), "utf-8")) as { version: string };
 import { introspect } from "./introspect";
 import { buildGraph } from "./rel-classify";
 import { emitIncludeSpec } from "./emit-include-spec";
@@ -49,6 +53,7 @@ export async function generate(configPath: string) {
   const normalizedAuth = normalizeAuthConfig(rawCfg.auth);
   const cfg: Config = { ...rawCfg, auth: normalizedAuth };
 
+  console.log(`📦 postgresdk v${CLI_VERSION}`);
   console.log("🔍 Introspecting database...");
   const model = await introspect(cfg.connectionString, cfg.schema || "public");
 
@@ -260,7 +265,7 @@ export async function generate(configPath: string) {
   
   files.push({
     path: join(serverDir, "sdk-bundle.ts"),
-    content: emitSdkBundle(clientFiles, clientDir),
+    content: emitSdkBundle(clientFiles, clientDir, CLI_VERSION),
   });
 
   // Generate tests if configured

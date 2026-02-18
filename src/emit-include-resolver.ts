@@ -50,8 +50,9 @@ export function emitIncludeResolver(graph: Graph, useJsExtensions?: boolean): st
 
     // Add conditional for each possible relation
     for (let i = 0; i < edgeEntries.length; i++) {
-      const [relKey, edge] = edgeEntries[i];
-      if (!relKey || !edge) continue;
+      const entry = edgeEntries[i];
+      if (!entry) continue;
+      const [relKey, edge] = entry;
 
       const targetType = pascal(edge.target);
       const isLast = i === edgeEntries.length - 1;

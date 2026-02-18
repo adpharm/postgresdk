@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- feat: Display CLI version on startup and embed it in generated SDK bundle
+  - CLI now logs `📦 postgresdk vX.Y.Z` at the start of `generate()`
+  - SDK bundle now uses the actual version from `package.json` instead of hardcoded `"1.0.0"`
+  - `emitSdkBundle` now accepts `version` as an explicit parameter
+
 ## [v0.18.10] - 2026-02-08
 
 - feat: Add automatic type inference for included relations
