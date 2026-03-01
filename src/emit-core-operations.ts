@@ -122,7 +122,8 @@ export async function createRecord(
                    RETURNING \${returningClause}\`;
 
     const preparedVals = vals.map((v, i) =>
-      v !== null && v !== undefined && typeof v === 'object' && ctx.jsonbColumns?.includes(cols[i])
+      v !== null && v !== undefined && typeof v === 'object' &&
+      (ctx.jsonbColumns?.includes(cols[i]) || ctx.vectorColumns?.includes(cols[i]))
         ? JSON.stringify(v)
         : v
     );
@@ -642,7 +643,8 @@ export async function updateRecord(
     const returningClause = buildColumnList(ctx.select, ctx.exclude, ctx.allColumnNames);
     const text = \`UPDATE "\${ctx.table}" SET \${setSql} WHERE \${wherePkSql} RETURNING \${returningClause}\`;
     const updateVals = Object.entries(filteredData).map(([col, v]) =>
-      v !== null && v !== undefined && typeof v === 'object' && ctx.jsonbColumns?.includes(col)
+      v !== null && v !== undefined && typeof v === 'object' &&
+      (ctx.jsonbColumns?.includes(col) || ctx.vectorColumns?.includes(col))
         ? JSON.stringify(v)
         : v
     );

@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- fix: Serialize vector/halfvec columns when building query parameters
+  - Vector columns (e.g., `halfvec`, `pgvector`) passed as JS arrays were not being stringified, causing query failures
+  - Serialization now applies to columns listed in `vectorColumns` in addition to `jsonbColumns`
+  - Adds unit tests covering correct stringification for both `createRecord` and `updateRecord` with vector columns
+
 ## [v0.18.12] - 2026-03-01
 
 - fix: Serialize only JSONB columns when building query parameters

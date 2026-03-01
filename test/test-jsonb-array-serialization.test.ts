@@ -44,8 +44,9 @@ const baseCtx = {
   pkColumns: ["id"],
   softDeleteColumn: null,
   includeMethodsDepth: 0,
-  allColumnNames: ["id", "tags", "meta"],
-  jsonbColumns: ["meta"],  // "meta" is jsonb; "tags" is text[]
+  allColumnNames: ["id", "tags", "meta", "embedding"],
+  jsonbColumns: ["meta"],      // "meta" is jsonb; "tags" is text[]
+  vectorColumns: ["embedding"], // "embedding" is halfvec/vector
 };
 
 // --- createRecord ---
@@ -86,4 +87,26 @@ test("updateRecord: jsonb column is stringified", async () => {
   const metaParam = calls[0]!.params[2];
   expect(typeof metaParam).toBe("string");
   expect(JSON.parse(metaParam)).toEqual({ y: 2 });
+});
+
+// --- vector columns ---
+
+test("createRecord: vector column is stringified (not passed as native array)", async () => {
+  const embedding = [-0.013, 0.035, -0.009];
+  const { pg, calls } = makePgMock({ id: 1, embedding });
+  await createRecord({ ...baseCtx, pg }, { embedding });
+  expect(calls.length).toBeGreaterThan(0);
+  const embParam = calls[0]!.params[0];
+  expect(typeof embParam).toBe("string");
+  expect(JSON.parse(embParam)).toEqual(embedding);
+});
+
+test("updateRecord: vector column is stringified (not passed as native array)", async () => {
+  const embedding = [-0.013, 0.035, -0.009];
+  const { pg, calls } = makePgMock({ id: 1, embedding });
+  await updateRecord({ ...baseCtx, pg }, [1], { embedding });
+  expect(calls.length).toBeGreaterThan(0);
+  const embParam = calls[0]!.params[1]; // params: [pkValue, embedding]
+  expect(typeof embParam).toBe("string");
+  expect(JSON.parse(embParam)).toEqual(embedding);
 });
