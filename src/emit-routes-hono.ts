@@ -14,6 +14,10 @@ function isVectorType(pgType: string): boolean {
   return t === "vector" || t === "halfvec" || t === "sparsevec" || t === "bit";
 }
 
+function isJsonbType(pgType: string): boolean {
+  return pgType.toLowerCase() === "json" || pgType.toLowerCase() === "jsonb";
+}
+
 export function emitHonoRoutes(
   table: Table,
   _graph: Graph,
@@ -25,6 +29,7 @@ export function emitHonoRoutes(
   // Check if table has any vector columns
   const hasVectorColumns = table.columns.some(c => isVectorType(c.pgType));
   const vectorColumns = table.columns.filter(c => isVectorType(c.pgType)).map(c => c.name);
+  const jsonbColumns = table.columns.filter(c => isJsonbType(c.pgType)).map(c => c.name);
   
   // Normalize pk to an array and fallback to ["id"] if empty
   const rawPk = (table as any).pk;
@@ -123,7 +128,9 @@ export function register${Type}Routes(app: Hono, deps: { pg: { query: (text: str
     pkColumns: ${JSON.stringify(safePkCols)},
     softDeleteColumn: ${softDel ? `"${softDel}"` : "null"},
     includeMethodsDepth: ${opts.includeMethodsDepth},
-    allColumnNames: [${table.columns.map(c => `"${c.name}"`).join(", ")}]${vectorColumns.length > 0 ? `,\n    vectorColumns: ${JSON.stringify(vectorColumns)}` : ""}
+    allColumnNames: [${table.columns.map(c => `"${c.name}"`).join(", ")}]${
+  vectorColumns.length > 0 ? `,\n    vectorColumns: ${JSON.stringify(vectorColumns)}` : ""}${
+  jsonbColumns.length > 0 ? `,\n    jsonbColumns: ${JSON.stringify(jsonbColumns)}` : ""}
   };
 ${hasAuth ? `
   // 🔐 Auth: protect all routes for this table

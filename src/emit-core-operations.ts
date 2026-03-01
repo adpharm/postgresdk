@@ -21,6 +21,7 @@ export interface OperationContext {
   softDeleteColumn?: string | null;
   includeMethodsDepth: number;
   vectorColumns?: string[];
+  jsonbColumns?: string[];
   allColumnNames?: string[];
   select?: string[];
   exclude?: string[];
@@ -76,22 +77,6 @@ function buildColumnList(
 }
 
 /**
- * Prepare query parameters for PostgreSQL.
- * The pg library should handle JSONB automatically, but there are edge cases
- * where explicit stringification is needed (e.g., certain pg versions or when
- * objects have been through serialization/deserialization).
- */
-function prepareParams(params: any[]): any[] {
-  return params.map(p => {
-    if (p === null || p === undefined) return p;
-    // Stringify objects/arrays for JSONB - while pg should handle this automatically,
-    // we've observed cases where it fails without explicit stringification
-    if (typeof p === 'object') return JSON.stringify(p);
-    return p;
-  });
-}
-
-/**
  * Parse vector columns in retrieved rows.
  * pgvector returns vectors as strings (e.g., "[1.5,2.5,3.5]") which need to be
  * parsed back to number[] to match TypeScript types.
@@ -136,8 +121,13 @@ export async function createRecord(
                    VALUES (\${placeholders})
                    RETURNING \${returningClause}\`;
 
-    log.debug("SQL:", text, "vals:", vals);
-    const { rows } = await ctx.pg.query(text, prepareParams(vals));
+    const preparedVals = vals.map((v, i) =>
+      v !== null && v !== undefined && typeof v === 'object' && ctx.jsonbColumns?.includes(cols[i])
+        ? JSON.stringify(v)
+        : v
+    );
+    log.debug("SQL:", text, "vals:", preparedVals);
+    const { rows } = await ctx.pg.query(text, preparedVals);
     const parsedRows = parseVectorColumns(rows, ctx.vectorColumns);
 
     return { data: parsedRows[0] ?? null, status: parsedRows[0] ? 201 : 500 };
@@ -179,7 +169,7 @@ export async function getByPk(
     const text = \`SELECT \${columns} FROM "\${ctx.table}" WHERE \${wherePkSql} LIMIT 1\`;
     log.debug(\`GET \${ctx.table} by PK:\`, pkValues, "SQL:", text);
 
-    const { rows } = await ctx.pg.query(text, prepareParams(pkValues));
+    const { rows } = await ctx.pg.query(text, pkValues);
     const parsedRows = parseVectorColumns(rows, ctx.vectorColumns);
 
     if (!parsedRows[0]) {
@@ -651,10 +641,15 @@ export async function updateRecord(
 
     const returningClause = buildColumnList(ctx.select, ctx.exclude, ctx.allColumnNames);
     const text = \`UPDATE "\${ctx.table}" SET \${setSql} WHERE \${wherePkSql} RETURNING \${returningClause}\`;
-    const params = [...pkValues, ...Object.values(filteredData)];
+    const updateVals = Object.entries(filteredData).map(([col, v]) =>
+      v !== null && v !== undefined && typeof v === 'object' && ctx.jsonbColumns?.includes(col)
+        ? JSON.stringify(v)
+        : v
+    );
+    const params = [...pkValues, ...updateVals];
 
     log.debug(\`PATCH \${ctx.table} SQL:\`, text, "params:", params);
-    const { rows } = await ctx.pg.query(text, prepareParams(params));
+    const { rows } = await ctx.pg.query(text, params);
     const parsedRows = parseVectorColumns(rows, ctx.vectorColumns);
 
     if (!parsedRows[0]) {
@@ -705,7 +700,7 @@ export async function deleteRecord(
       : \`DELETE FROM "\${ctx.table}" WHERE \${wherePkSql} RETURNING \${returningClause}\`;
 
     log.debug(\`DELETE \${ctx.softDeleteColumn ? '(soft)' : ''} \${ctx.table} SQL:\`, text, "pk:", pkValues);
-    const { rows } = await ctx.pg.query(text, prepareParams(pkValues));
+    const { rows } = await ctx.pg.query(text, pkValues);
     const parsedRows = parseVectorColumns(rows, ctx.vectorColumns);
 
     if (!parsedRows[0]) {

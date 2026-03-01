@@ -75,7 +75,9 @@
   "remoteEnv": {
     // "NODE_OPTIONS": "--max-old-space-size=4096",
     "CLAUDE_CONFIG_DIR": "/home/vscode/.claude",
-    "POWERLEVEL9K_DISABLE_GITSTATUS": "true"
+    "POWERLEVEL9K_DISABLE_GITSTATUS": "true",
+    // increase the max output tokens for claude code from 32000 to 64000
+    "CLAUDE_CODE_MAX_OUTPUT_TOKENS": 64000
   },
   "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=delegated",
   "workspaceFolder": "/workspace",

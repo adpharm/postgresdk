@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- fix: Serialize only JSONB columns when building query parameters
+  - Previously all objects/arrays were JSON.stringify'd before being passed to pg, which broke native Postgres array columns (text[], int[], etc.)
+  - Serialization is now column-aware: only columns listed as `jsonb`/`json` type are stringified; native arrays pass through unchanged
+  - `OperationContext` now carries a `jsonbColumns` field, populated from the table schema at route-registration time
+  - Adds unit tests covering the correct behavior for both JSONB and native array columns
+
 ## [v0.18.11] - 2026-02-18
 
 - feat: Display CLI version on startup and embed it in generated SDK bundle
