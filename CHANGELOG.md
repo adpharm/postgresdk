@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- feat: Export named types for include method return shapes
+  - Include methods now emit named type aliases (e.g., `SelectBooksWithAuthor`) instead of inline intersection types
+  - Named types are exported from each table's client file and re-exported from the SDK index
+  - Enables users to reference include result types directly in their own code without manual type construction
+
 ## [v0.18.13] - 2026-03-01
 
 - fix: Serialize vector/halfvec columns when building query parameters

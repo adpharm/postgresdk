@@ -219,7 +219,12 @@ export async function generate(configPath: string) {
   // client index (SDK)
   files.push({
     path: join(clientDir, "index.ts"),
-    content: emitClientIndex(Object.values(model.tables), cfg.useJsExtensionsClient),
+    content: emitClientIndex(
+      Object.values(model.tables),
+      cfg.useJsExtensionsClient,
+      graph,
+      { maxDepth: cfg.includeMethodsDepth ?? 2, skipJunctionTables: cfg.skipJunctionTables ?? true }
+    ),
   });
 
   // server router (with createRouter and registerAllRoutes helpers)

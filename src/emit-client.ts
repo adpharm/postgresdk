@@ -130,6 +130,16 @@ export function emitClient(
     }
   }
 
+  // Collect unique named type aliases (list* and getByPk* share the same typeName)
+  const seenTypeNames = new Set<string>();
+  let typeAliasesCode = "";
+  for (const method of includeMethods) {
+    if (!seenTypeNames.has(method.typeName)) {
+      seenTypeNames.add(method.typeName);
+      typeAliasesCode += `export type ${method.typeName} = ${method.baseType};\n`;
+    }
+  }
+
   // Generate include method implementations
   let includeMethodsCode = "";
   for (const method of includeMethods) {
@@ -226,7 +236,7 @@ export function emitClient(
         ? `{ ${safePk.map(col => `${col}: pk.${col}`).join(", ")} }`
         : `{ ${safePk[0] || 'id'}: pk }`;
 
-      const baseReturnType = method.returnType.replace(" | null", "");
+      const baseReturnType = method.typeName;
 
       // Generate param destructuring and include spec transformation
       let transformCode = "";
@@ -266,7 +276,7 @@ export function emitClient(
    * @param params - Optional include options (including select/exclude for base and nested tables)
    * @returns The record with nested ${method.path.join(' and ')} if found, null otherwise
    */
-  async ${method.name}(pk: ${pkType}, params?: ${paramsType}): Promise<${method.returnType}> {${transformCode}
+  async ${method.name}(pk: ${pkType}, params?: ${paramsType}): Promise<${method.typeName} | null> {${transformCode}
     const results = await this.post<PaginatedResponse<${baseReturnType}>>(\`\${this.resource}/list\`, {
       where: ${pkWhere},
       select: params?.select,
@@ -318,7 +328,7 @@ export function emitClient(
    * @param params - Query parameters (where, orderBy, order, limit, offset) and include options
    * @returns Paginated results with nested ${method.path.join(' and ')} included
    */
-  async ${method.name}(params?: ${paramsType}): Promise<${method.returnType}> {${transformCode}
+  async ${method.name}(params?: ${paramsType}): Promise<PaginatedResponse<${method.typeName}>> {${transformCode}
   }
 `;
     }
@@ -340,6 +350,7 @@ ${includeSpecImport}
 ${includeResolverImport}
 ${otherTableImports.join("\n")}
 
+${typeAliasesCode}
 /**
  * Client for ${table.name} table operations
  */
@@ -796,7 +807,12 @@ ${includeMethodsCode}}
 `;
 }
 
-export function emitClientIndex(tables: Table[], useJsExtensions?: boolean) {
+export function emitClientIndex(
+  tables: Table[],
+  useJsExtensions?: boolean,
+  graph?: Graph,
+  includeOpts?: { maxDepth: number; skipJunctionTables: boolean }
+) {
   const ext = useJsExtensions ? ".js" : "";
   let out = `/**
  * AUTO-GENERATED FILE - DO NOT EDIT
@@ -870,6 +886,25 @@ export function emitClientIndex(tables: Table[], useJsExtensions?: boolean) {
   // Export shared types
   out += `\n// Shared types\n`;
   out += `export type { PaginatedResponse } from "./types/shared${ext}";\n`;
+
+  // Export named include result types (e.g. SelectBooksWithAuthor)
+  if (graph && includeOpts) {
+    const opts = { maxDepth: includeOpts.maxDepth, skipJunctionTables: includeOpts.skipJunctionTables };
+    for (const t of tables) {
+      const methods = generateIncludeMethods(t, graph, opts, tables);
+      const seenTypeNames = new Set<string>();
+      const typeNames: string[] = [];
+      for (const method of methods) {
+        if (!seenTypeNames.has(method.typeName)) {
+          seenTypeNames.add(method.typeName);
+          typeNames.push(method.typeName);
+        }
+      }
+      if (typeNames.length > 0) {
+        out += `export type { ${typeNames.join(", ")} } from "./${t.name}${ext}";\n`;
+      }
+    }
+  }
 
   return out;
 }

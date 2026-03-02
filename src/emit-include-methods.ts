@@ -8,6 +8,8 @@ export type IncludeMethod = {
   isMany: boolean[];
   targets: string[];
   returnType: string;
+  typeName: string;
+  baseType: string;
   includeSpec: any;
 };
 
@@ -160,24 +162,30 @@ export function generateIncludeMethods(
       const newIsMany = [...isMany, edge.kind === "many"];
       const newTargets = [...targets, edge.target];
       const methodSuffix = pathToMethodSuffix(newPath);
-      
+      const baseType = buildReturnType(baseTableName, newPath, newIsMany, newTargets, graph);
+      const typeName = `Select${pascal(baseTableName)}${methodSuffix}`;
+
       // Add list method
       methods.push({
         name: `list${methodSuffix}`,
         path: newPath,
         isMany: newIsMany,
         targets: newTargets,
-        returnType: `PaginatedResponse<${buildReturnType(baseTableName, newPath, newIsMany, newTargets, graph)}>`,
+        returnType: `PaginatedResponse<${baseType}>`,
+        typeName,
+        baseType,
         includeSpec: buildIncludeSpec(newPath)
       });
-      
+
       // Add getByPk method
       methods.push({
         name: `getByPk${methodSuffix}`,
         path: newPath,
         isMany: newIsMany,
         targets: newTargets,
-        returnType: `${buildReturnType(baseTableName, newPath, newIsMany, newTargets, graph)} | null`,
+        returnType: `${baseType} | null`,
+        typeName,
+        baseType,
         includeSpec: buildIncludeSpec(newPath)
       });
       
@@ -221,22 +229,28 @@ export function generateIncludeMethods(
             const combinedSuffix = `With${pascal(key1)}And${pascal(key2)}`;
             const type1 = `${key1}: ${edge1.kind === "many" ? `Select${pascal(edge1.target)}[]` : `Select${pascal(edge1.target)}`}`;
             const type2 = `${key2}: ${edge2.kind === "many" ? `Select${pascal(edge2.target)}[]` : `Select${pascal(edge2.target)}`}`;
-            
+            const combinedBaseType = `Select${pascal(baseTableName)} & { ${type1}; ${type2} }`;
+            const combinedTypeName = `Select${pascal(baseTableName)}${combinedSuffix}`;
+
             methods.push({
               name: `list${combinedSuffix}`,
               path: combinedPath,
               isMany: [edge1.kind === "many", edge2.kind === "many"],
               targets: [edge1.target, edge2.target],
-              returnType: `PaginatedResponse<Select${pascal(baseTableName)} & { ${type1}; ${type2} }>`,
+              returnType: `PaginatedResponse<${combinedBaseType}>`,
+              typeName: combinedTypeName,
+              baseType: combinedBaseType,
               includeSpec: { [key1]: true, [key2]: true }
             });
-            
+
             methods.push({
               name: `getByPk${combinedSuffix}`,
               path: combinedPath,
               isMany: [edge1.kind === "many", edge2.kind === "many"],
               targets: [edge1.target, edge2.target],
-              returnType: `(Select${pascal(baseTableName)} & { ${type1}; ${type2} }) | null`,
+              returnType: `${combinedBaseType} | null`,
+              typeName: combinedTypeName,
+              baseType: combinedBaseType,
               includeSpec: { [key1]: true, [key2]: true }
             });
           }
