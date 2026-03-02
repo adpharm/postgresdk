@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [v0.18.15] - 2026-03-02
 
 - fix: Fix nested includes for singular (belongs-to/has-one) relations
   - Singular relation types now use `{ include?: ChildIncludeSpec }` wrapper instead of accepting `ChildIncludeSpec` directly, matching the pattern used by many/via relations
