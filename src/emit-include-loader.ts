@@ -295,9 +295,15 @@ export async function loadIncludes(
         // Could be belongs-to (current has FK to target) OR has-one (target unique-FK to current)
         const specValue = s[key];
         const options: RelationOptions = {};
+        let childSpec: any = undefined;
+
         if (specValue && typeof specValue === "object" && specValue !== true) {
           if (specValue.select !== undefined) options.select = specValue.select;
           if (specValue.exclude !== undefined) options.exclude = specValue.exclude;
+          // Support { include: TargetIncludeSpec } — mirrors the many/via handler
+          if (specValue.include !== undefined) {
+            childSpec = specValue.include;
+          }
         }
 
         const currFks = (FK_INDEX as any)[table] as Array<{from:string[];toTable:string;to:string[]}>;
@@ -317,7 +323,7 @@ export async function loadIncludes(
             for (const r of rows) r[key] = null;
           }
         }
-        const childSpec = s[key] && typeof s[key] === "object" ? s[key] : undefined;
+
         if (childSpec) {
           const children = rows.map(r => r[key]).filter(Boolean);
           try {

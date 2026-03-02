@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- fix: Fix nested includes for singular (belongs-to/has-one) relations
+  - Singular relation types now use `{ include?: ChildIncludeSpec }` wrapper instead of accepting `ChildIncludeSpec` directly, matching the pattern used by many/via relations
+  - Include loader now extracts `specValue.include` for singular relations so nested child specs are followed correctly
+  - Client code generation now always emits a valid include spec and merges user-provided includes with any required defaults, preventing required includes from being omitted
+
 ## [v0.18.14] - 2026-03-02
 
 - feat: Export named types for include method return shapes

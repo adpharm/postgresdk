@@ -24,7 +24,7 @@ export function emitIncludeSpec(graph: Graph) {
           edge.target
         )}IncludeSpec; limit?: number; offset?: number; orderBy?: string; order?: "asc" | "desc"; };\n`;
       } else {
-        out += `  ${relKey}?: boolean | { select?: string[]; exclude?: string[]; } | ${toPascal(edge.target)}IncludeSpec;\n`;
+        out += `  ${relKey}?: boolean | { select?: string[]; exclude?: string[]; include?: ${toPascal(edge.target)}IncludeSpec; };\n`;
       }
     }
     out += `};\n\n`;

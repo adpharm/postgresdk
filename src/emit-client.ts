@@ -260,9 +260,13 @@ export function emitClient(
         } else if (pattern.type === 'nested' && pattern.nestedKey) {
           const key = pattern.nestedKey;
           const paramName = includeParamNames[0];
+          const nestedValue = pattern.nestedValue!;
+          const requiredIncludes = Object.entries(nestedValue).map(([k, v]) => `${k}: ${JSON.stringify(v)}`).join(', ');
           transformCode = `
     const { ${destructure} } = params ?? {};
-    const includeSpec = ${paramName} ? { ${key}: ${paramName} } : ${JSON.stringify(method.includeSpec)};`;
+    const includeSpec = { ${key}: ${paramName}
+      ? { ...${paramName}, include: { ${requiredIncludes}, ...${paramName}.include } }
+      : ${JSON.stringify(nestedValue)} };`;
         }
       } else {
         transformCode = `
@@ -312,9 +316,13 @@ export function emitClient(
         } else if (pattern.type === 'nested' && pattern.nestedKey) {
           const key = pattern.nestedKey;
           const paramName = includeParamNames[0];
+          const nestedValue = pattern.nestedValue!;
+          const requiredIncludes = Object.entries(nestedValue).map(([k, v]) => `${k}: ${JSON.stringify(v)}`).join(', ');
           transformCode = `
     const { ${destructure}, ...baseParams } = params ?? {};
-    const includeSpec = ${paramName} ? { ${key}: ${paramName} } : ${JSON.stringify(method.includeSpec)};
+    const includeSpec = { ${key}: ${paramName}
+      ? { ...${paramName}, include: { ${requiredIncludes}, ...${paramName}.include } }
+      : ${JSON.stringify(nestedValue)} };
     return this.post<${method.returnType}>(\`\${this.resource}/list\`, { ...baseParams, include: includeSpec });`;
         }
       } else {
