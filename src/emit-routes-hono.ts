@@ -99,7 +99,8 @@ const listSchema = z.object({
   limit: z.number().int().positive().max(1000).optional(),
   offset: z.number().int().min(0).optional(),
   orderBy: z.union([columnEnum, z.array(columnEnum)]).optional(),
-  order: z.union([z.enum(["asc", "desc"]), z.array(z.enum(["asc", "desc"]))]).optional(),${hasVectorColumns ? `
+  order: z.union([z.enum(["asc", "desc"]), z.array(z.enum(["asc", "desc"]))]).optional(),
+  distinctOn: z.union([columnEnum, z.array(columnEnum)]).optional(),${hasVectorColumns ? `
   vector: z.object({
     field: z.string(),
     query: z.array(z.number()),

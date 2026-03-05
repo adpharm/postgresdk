@@ -39,8 +39,9 @@ export const ${Type}ListParamsSchema = z.object({
   offset: z.number().int().nonnegative().optional(),
   where: z.any().optional(),
   vector: VectorSearchParamsSchema.optional(),
-  orderBy: z.enum([${columnNames}]).optional(),
-  order: z.enum(["asc", "desc"]).optional()
+  orderBy: z.union([z.enum([${columnNames}]), z.array(z.enum([${columnNames}]))]).optional(),
+  order: z.union([z.enum(["asc", "desc"]), z.array(z.enum(["asc", "desc"]))]).optional(),
+  distinctOn: z.union([z.enum([${columnNames}]), z.array(z.enum([${columnNames}]))]).optional()
 }).strict();
 
 // Schema for ordering parameters

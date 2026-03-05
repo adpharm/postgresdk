@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- feat: Add `distinctOn` support to list operations
+  - Accepts a single column or array of columns; emits `DISTINCT ON (...)` in the SQL query
+  - Automatically ensures `DISTINCT ON` columns are the leftmost prefix of the `ORDER BY` clause (PostgreSQL requirement)
+  - Count query uses a subquery with `DISTINCT ON` to return accurate pagination totals
+  - Exposed in Zod validation schemas, Hono route schemas, and generated client type signatures
+  - `orderBy` and `order` params now correctly accept arrays in generated Zod schemas
+
 ## [v0.18.15] - 2026-03-02
 
 - fix: Fix nested includes for singular (belongs-to/has-one) relations

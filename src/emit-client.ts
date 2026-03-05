@@ -517,6 +517,7 @@ ${hasJsonbColumns ? `  /**
     };` : ""}
     orderBy?: string | string[];
     order?: "asc" | "desc" | ("asc" | "desc")[];
+    distinctOn?: string | string[];
   }): Promise<PaginatedResponse<Partial<Select${Type}<TJsonb>>${hasVectorColumns ? ' & { _distance?: number }' : ''}>>;
   /**
    * List ${table.name} records with field exclusion
@@ -537,6 +538,7 @@ ${hasJsonbColumns ? `  /**
     };` : ""}
     orderBy?: string | string[];
     order?: "asc" | "desc" | ("asc" | "desc")[];
+    distinctOn?: string | string[];
   }): Promise<PaginatedResponse<Partial<Select${Type}<TJsonb>>${hasVectorColumns ? ' & { _distance?: number }' : ''}>>;
   /**
    * List ${table.name} records with pagination and filtering
@@ -568,6 +570,7 @@ ${hasJsonbColumns ? `  /**
     };` : ""}
     orderBy?: string | string[];
     order?: "asc" | "desc" | ("asc" | "desc")[];
+    distinctOn?: string | string[];
   }): Promise<PaginatedResponse<${Type}WithIncludes<TInclude>${hasVectorColumns ? ' & { _distance?: number }' : ''}>>;
   async list<TJsonb extends Partial<Select${Type}> = {}>(params?: {
     include?: ${Type}IncludeSpec;
@@ -584,6 +587,7 @@ ${hasJsonbColumns ? `  /**
     };` : ""}
     orderBy?: string | string[];
     order?: "asc" | "desc" | ("asc" | "desc")[];
+    distinctOn?: string | string[];
   }): Promise<PaginatedResponse<Select${Type}<TJsonb> | Partial<Select${Type}<TJsonb>>>> {
     return this.post<PaginatedResponse<Select${Type}<TJsonb>${hasVectorColumns ? ' & { _distance?: number }' : ''}>>(\`\${this.resource}/list\`, params ?? {});
   }` : `  /**
@@ -605,6 +609,7 @@ ${hasJsonbColumns ? `  /**
     };` : ""}
     orderBy?: string | string[];
     order?: "asc" | "desc" | ("asc" | "desc")[];
+    distinctOn?: string | string[];
   }): Promise<PaginatedResponse<Partial<Select${Type}>${hasVectorColumns ? ' & { _distance?: number }' : ''}>>;
   /**
    * List ${table.name} records with field exclusion
@@ -625,6 +630,7 @@ ${hasJsonbColumns ? `  /**
     };` : ""}
     orderBy?: string | string[];
     order?: "asc" | "desc" | ("asc" | "desc")[];
+    distinctOn?: string | string[];
   }): Promise<PaginatedResponse<Partial<Select${Type}>${hasVectorColumns ? ' & { _distance?: number }' : ''}>>;
   /**
    * List ${table.name} records with pagination and filtering
@@ -650,6 +656,7 @@ ${hasJsonbColumns ? `  /**
     };` : ""}
     orderBy?: string | string[];
     order?: "asc" | "desc" | ("asc" | "desc")[];
+    distinctOn?: string | string[];
   }): Promise<PaginatedResponse<${Type}WithIncludes<TInclude>${hasVectorColumns ? ' & { _distance?: number }' : ''}>>;
   async list(params?: {
     include?: ${Type}IncludeSpec;
@@ -666,6 +673,7 @@ ${hasJsonbColumns ? `  /**
     };` : ""}
     orderBy?: string | string[];
     order?: "asc" | "desc" | ("asc" | "desc")[];
+    distinctOn?: string | string[];
   }): Promise<PaginatedResponse<Select${Type} | Partial<Select${Type}>>> {
     return this.post<PaginatedResponse<Select${Type}${hasVectorColumns ? ' & { _distance?: number }' : ''}>>(\`\${this.resource}/list\`, params ?? {});
   }`}

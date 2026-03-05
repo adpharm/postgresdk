@@ -468,6 +468,7 @@ export async function listRecords(
     include?: any;
     orderBy?: string | string[];
     order?: "asc" | "desc" | ("asc" | "desc")[];
+    distinctOn?: string | string[];
     vector?: {
       field: string;
       query: number[];
@@ -477,7 +478,11 @@ export async function listRecords(
   }
 ): Promise<{ data?: any; total?: number; limit?: number; offset?: number; hasMore?: boolean; error?: string; issues?: any; needsIncludes?: boolean; includeSpec?: any; status: number }> {
   try {
-    const { where: whereClause, limit = 50, offset = 0, include, orderBy, order, vector } = params;
+    const { where: whereClause, limit = 50, offset = 0, include, orderBy, order, vector, distinctOn } = params;
+
+    // DISTINCT ON support
+    const distinctCols: string[] | null = distinctOn ? (Array.isArray(distinctOn) ? distinctOn : [distinctOn]) : null;
+    const _distinctOnColsSQL = distinctCols ? distinctCols.map(c => '"' + c + '"').join(', ') : '';
 
     // Get distance operator if vector search
     const distanceOp = vector ? getVectorDistanceOperator(vector.metric) : "";
@@ -536,26 +541,49 @@ export async function listRecords(
     }
 
     // Build SELECT clause
+    const _distinctOnPrefix = distinctCols ? 'DISTINCT ON (' + _distinctOnColsSQL + ') ' : '';
     const baseColumns = buildColumnList(ctx.select, ctx.exclude, ctx.allColumnNames);
     const selectClause = vector
-      ? \`\${baseColumns}, ("\${vector.field}" \${distanceOp} ($1)::vector) AS _distance\`
-      : baseColumns;
+      ? \`\${_distinctOnPrefix}\${baseColumns}, ("\${vector.field}" \${distanceOp} ($1)::vector) AS _distance\`
+      : \`\${_distinctOnPrefix}\${baseColumns}\`;
 
     // Build ORDER BY clause
     let orderBySQL = "";
     if (vector) {
       // For vector search, always order by distance
       orderBySQL = \`ORDER BY "\${vector.field}" \${distanceOp} ($1)::vector\`;
-    } else if (orderBy) {
-      const columns = Array.isArray(orderBy) ? orderBy : [orderBy];
-      const directions = Array.isArray(order) ? order : (order ? Array(columns.length).fill(order) : Array(columns.length).fill("asc"));
+    } else {
+      const userCols = orderBy ? (Array.isArray(orderBy) ? orderBy : [orderBy]) : [];
+      const userDirs: ("asc" | "desc")[] = orderBy
+        ? (Array.isArray(order) ? order : (order ? Array(userCols.length).fill(order) : Array(userCols.length).fill("asc")))
+        : [];
 
-      const orderParts = columns.map((col, i) => {
-        const dir = (directions[i] || "asc").toUpperCase();
-        return \`"\${col}" \${dir}\`;
-      });
+      const finalCols: string[] = [];
+      const finalDirs: string[] = [];
 
-      orderBySQL = \`ORDER BY \${orderParts.join(", ")}\`;
+      if (distinctCols) {
+        // DISTINCT ON requires its columns to be the leftmost ORDER BY prefix
+        for (const col of distinctCols) {
+          const userIdx = userCols.indexOf(col);
+          finalCols.push(col);
+          finalDirs.push(userIdx >= 0 ? (userDirs[userIdx] || "asc") : "asc");
+        }
+        // Append remaining user-specified cols not already covered by distinctOn
+        for (let i = 0; i < userCols.length; i++) {
+          if (!distinctCols.includes(userCols[i]!)) {
+            finalCols.push(userCols[i]!);
+            finalDirs.push(userDirs[i] || "asc");
+          }
+        }
+      } else {
+        finalCols.push(...userCols);
+        finalDirs.push(...userDirs.map(d => d || "asc"));
+      }
+
+      if (finalCols.length > 0) {
+        const orderParts = finalCols.map((c, i) => \`"\${c}" \${finalDirs[i]!.toUpperCase()}\`);
+        orderBySQL = \`ORDER BY \${orderParts.join(", ")}\`;
+      }
     }
 
     // Add limit and offset params
@@ -564,7 +592,9 @@ export async function listRecords(
     const allParams = [...queryParams, ...whereParams, limit, offset];
 
     // Get total count for pagination
-    const countText = \`SELECT COUNT(*) FROM "\${ctx.table}" \${countWhereSQL}\`;
+    const countText = distinctCols
+      ? \`SELECT COUNT(*) FROM (SELECT DISTINCT ON (\${_distinctOnColsSQL}) 1 FROM "\${ctx.table}" \${countWhereSQL} ORDER BY \${_distinctOnColsSQL}) __distinct_count\`
+      : \`SELECT COUNT(*) FROM "\${ctx.table}" \${countWhereSQL}\`;
     log.debug(\`LIST \${ctx.table} COUNT SQL:\`, countText, "params:", countParams);
     const countResult = await ctx.pg.query(countText, countParams);
     const total = parseInt(countResult.rows[0].count, 10);
