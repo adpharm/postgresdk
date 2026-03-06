@@ -87,8 +87,8 @@ export async function introspect(connectionString: string, schema: string): Prom
         c.column_default,
         a.atttypmod
       FROM information_schema.columns c
-      LEFT JOIN pg_catalog.pg_class cl ON cl.relname = c.table_name
-      LEFT JOIN pg_catalog.pg_namespace n ON n.oid = cl.relnamespace AND n.nspname = c.table_schema
+      LEFT JOIN pg_catalog.pg_namespace n ON n.nspname = c.table_schema
+      LEFT JOIN pg_catalog.pg_class cl ON cl.relname = c.table_name AND cl.relnamespace = n.oid
       LEFT JOIN pg_catalog.pg_attribute a ON a.attrelid = cl.oid AND a.attname = c.column_name
       WHERE c.table_schema = $1
       ORDER BY c.table_name, c.ordinal_position

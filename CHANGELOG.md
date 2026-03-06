@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- fix: Fix schema-scoped introspection JOIN order
+  - `pg_namespace` is now joined before `pg_class` so `cl.relnamespace = n.oid` correctly filters tables to the target schema
+  - Prevents cross-schema name collisions returning wrong `atttypmod` values during introspection
+
 ## [v0.18.16] - 2026-03-05
 
 - feat: Add `distinctOn` support to list operations
