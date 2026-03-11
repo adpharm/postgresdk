@@ -30,7 +30,7 @@ import { emitSdkBundle } from "./emit-sdk-bundle";
 import { emitCoreOperations } from "./emit-core-operations";
 import { emitTableTest, emitTestSetup, emitDockerCompose, emitTestScript, emitVitestConfig, emitTestGitignore } from "./emit-tests";
 import { emitUnifiedContract } from "./emit-sdk-contract";
-import { ensureDirs, writeFilesIfChanged } from "./utils";
+import { ensureDirs, writeFilesIfChanged, deleteStaleFiles } from "./utils";
 import type { Config } from "./types";
 import { normalizeAuthConfig, getAuthStrategy } from "./types";
 
@@ -321,10 +321,35 @@ export async function generate(configPath: string) {
   console.log("✍️  Writing files...");
   const writeResult = await writeFilesIfChanged(files);
 
-  if (writeResult.written === 0) {
+  // Clean up stale files (for tables no longer in schema) unless opted out
+  let deleteResult = { deleted: 0, filesDeleted: [] as string[] };
+  if (cfg.clean !== false) {
+    const dirsToScan = [
+      serverDir,
+      join(serverDir, "types"),
+      join(serverDir, "zod"),
+      join(serverDir, "routes"),
+      join(serverDir, "core"),
+      clientDir,
+      join(clientDir, "types"),
+      join(clientDir, "zod"),
+      join(clientDir, "params"),
+    ];
+    if (generateTests) dirsToScan.push(testDir);
+
+    // Normalize paths to match how we build file paths (resolve to absolute)
+    const generatedPaths = new Set(files.map(f => f.path));
+    deleteResult = await deleteStaleFiles(generatedPaths, dirsToScan);
+  }
+
+  if (writeResult.written === 0 && deleteResult.deleted === 0) {
     console.log(`✅ All ${writeResult.unchanged} files up-to-date (no changes)`);
   } else {
-    console.log(`✅ Updated ${writeResult.written} files, ${writeResult.unchanged} unchanged`);
+    const parts = [];
+    if (writeResult.written > 0) parts.push(`updated ${writeResult.written} files`);
+    if (deleteResult.deleted > 0) parts.push(`deleted ${deleteResult.deleted} stale files`);
+    if (writeResult.unchanged > 0) parts.push(`${writeResult.unchanged} unchanged`);
+    console.log(`✅ ${parts.join(", ")}`);
   }
 
   console.log(`  Server: ${serverDir}`);

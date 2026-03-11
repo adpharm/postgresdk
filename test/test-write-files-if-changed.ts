@@ -12,7 +12,7 @@
 import { existsSync, rmSync, statSync } from "fs";
 import { readFile } from "fs/promises";
 import { join } from "path";
-import { writeFilesIfChanged } from "../src/utils";
+import { writeFilesIfChanged, deleteStaleFiles } from "../src/utils";
 
 const TEST_DIR = "test/.test-write-files-if-changed";
 
@@ -121,6 +121,65 @@ async function testNestedDirectories() {
   console.log("  ✓ Nested directories handled correctly");
 }
 
+async function testDeleteStaleFiles() {
+  console.log("\n📝 Test 5: Delete stale files");
+
+  const dir = join(TEST_DIR, "stale-test");
+
+  // Write some files directly (simulating previously generated files)
+  const staleFile = join(dir, "stale-table.ts");
+  const keptFile = join(dir, "kept-table.ts");
+  await writeFilesIfChanged([
+    { path: staleFile, content: "stale content" },
+    { path: keptFile, content: "kept content" },
+  ]);
+
+  assert(existsSync(staleFile), "stale file should exist before cleanup");
+  assert(existsSync(keptFile), "kept file should exist before cleanup");
+
+  // Only keptFile is in the generated set
+  const result = await deleteStaleFiles(new Set([keptFile]), [dir]);
+
+  assert(result.deleted === 1, `Expected 1 deleted, got ${result.deleted}`);
+  assert(result.filesDeleted[0] === staleFile, "filesDeleted should contain stale file");
+  assert(!existsSync(staleFile), "stale file should be deleted");
+  assert(existsSync(keptFile), "kept file should still exist");
+
+  console.log("  ✓ Stale files deleted correctly");
+}
+
+async function testDeleteStaleFilesNonExistentDir() {
+  console.log("\n📝 Test 6: Skip non-existent dirs gracefully");
+
+  const result = await deleteStaleFiles(new Set(), [join(TEST_DIR, "does-not-exist")]);
+
+  assert(result.deleted === 0, `Expected 0 deleted, got ${result.deleted}`);
+
+  console.log("  ✓ Non-existent dirs handled gracefully");
+}
+
+async function testDeleteStaleFilesPreservesNonManagedExtensions() {
+  console.log("\n📝 Test 7: Preserve files with unmanaged extensions");
+
+  const dir = join(TEST_DIR, "ext-test");
+  const jsonFile = join(dir, "data.json");
+  const tsFile = join(dir, "stale.ts");
+
+  await writeFilesIfChanged([
+    { path: jsonFile, content: "{}" },
+    { path: tsFile, content: "export {}" },
+  ]);
+
+  // Neither file is in generated set, but only .ts should be deleted
+  const result = await deleteStaleFiles(new Set(), [dir]);
+
+  assert(result.deleted === 1, `Expected 1 deleted, got ${result.deleted}`);
+  assert(!existsSync(tsFile), "stale .ts file should be deleted");
+  assert(existsSync(jsonFile), ".json file should be preserved");
+
+  console.log("  ✓ Non-managed extensions preserved");
+}
+
 async function main() {
   console.log("🧪 Testing writeFilesIfChanged utility");
   console.log("=".repeat(50));
@@ -131,6 +190,9 @@ async function main() {
     await testSkipUnchangedFiles();
     await testUpdateChangedFiles();
     await testNestedDirectories();
+    await testDeleteStaleFiles();
+    await testDeleteStaleFilesNonExistentDir();
+    await testDeleteStaleFilesPreservesNonManagedExtensions();
     await cleanup();
 
     console.log("\n" + "=".repeat(50));
@@ -142,6 +204,9 @@ async function main() {
     console.log("  • Changed files are updated");
     console.log("  • Correct counts are returned");
     console.log("  • Nested directories are handled");
+    console.log("  • Stale files are deleted");
+    console.log("  • Non-existent dirs are handled gracefully");
+    console.log("  • Non-managed file extensions are preserved");
   } catch (err) {
     console.error("\n❌ Test failed:", err);
     await cleanup();

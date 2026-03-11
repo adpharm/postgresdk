@@ -1,5 +1,5 @@
-import { mkdir, writeFile, readFile } from "fs/promises";
-import { dirname } from "path";
+import { mkdir, writeFile, readFile, readdir, unlink } from "fs/promises";
+import { dirname, join } from "path";
 import { existsSync } from "fs";
 import { createHash } from "crypto";
 
@@ -56,4 +56,36 @@ export function hashContent(content: string): string {
 
 export async function ensureDirs(dirs: string[]) {
   for (const d of dirs) await mkdir(d, { recursive: true });
+}
+
+/**
+ * Delete files in the given directories that are not in the set of generated paths.
+ * Used to remove stale files for tables that no longer exist in the schema.
+ */
+export async function deleteStaleFiles(
+  generatedPaths: Set<string>,
+  dirsToScan: string[]
+): Promise<{ deleted: number; filesDeleted: string[] }> {
+  let deleted = 0;
+  const filesDeleted: string[] = [];
+
+  for (const dir of dirsToScan) {
+    if (!existsSync(dir)) continue;
+
+    const entries = await readdir(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isFile()) continue;
+      // Only manage files we would generate (.ts, .md, .yml, .sh)
+      if (!/\.(ts|md|yml|sh)$/.test(entry.name)) continue;
+
+      const fullPath = join(dir, entry.name);
+      if (!generatedPaths.has(fullPath)) {
+        await unlink(fullPath);
+        deleted++;
+        filesDeleted.push(fullPath);
+      }
+    }
+  }
+
+  return { deleted, filesDeleted };
 }

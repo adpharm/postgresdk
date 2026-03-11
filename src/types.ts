@@ -65,6 +65,9 @@ export interface Config {
   // Use .js extensions in client SDK imports (for specific bundlers/environments)
   useJsExtensionsClient?: boolean;
   
+  // Delete generated files for tables/items no longer in the schema (default: true)
+  clean?: boolean;
+
   // Test generation configuration
   tests?: {
     // Generate test files

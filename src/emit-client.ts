@@ -170,6 +170,7 @@ export function emitClient(
     where?: Where<Select${Type}>;
     orderBy?: string | string[];
     order?: "asc" | "desc" | ("asc" | "desc")[];
+    distinctOn?: string | string[];
     ${paramName}?: {
       select?: string[];
       exclude?: string[];
@@ -202,6 +203,7 @@ export function emitClient(
     where?: Where<Select${Type}>;
     orderBy?: string | string[];
     order?: "asc" | "desc" | ("asc" | "desc")[];
+    distinctOn?: string | string[];
     ${includeParams};
   }`;
     } else if (pattern.type === 'nested' && pattern.nestedKey) {
@@ -218,6 +220,7 @@ export function emitClient(
     where?: Where<Select${Type}>;
     orderBy?: string | string[];
     order?: "asc" | "desc" | ("asc" | "desc")[];
+    distinctOn?: string | string[];
     ${paramName}?: {
       select?: string[];
       exclude?: string[];
