@@ -456,6 +456,12 @@ function getVectorDistanceOperator(metric?: string): string {
   }
 }
 
+/** Builds a SQL ORDER BY clause from parallel cols/dirs arrays. Returns "" when cols is empty. */
+function buildOrderBySQL(cols: string[], dirs: ("asc" | "desc")[]): string {
+  if (cols.length === 0) return "";
+  return \`ORDER BY \${cols.map((c, i) => \`"\${c}" \${(dirs[i] ?? "asc").toUpperCase()}\`).join(", ")}\`;
+}
+
 /**
  * LIST operation - Get multiple records with optional filters and vector search
  */
@@ -483,6 +489,17 @@ export async function listRecords(
     // DISTINCT ON support
     const distinctCols: string[] | null = distinctOn ? (Array.isArray(distinctOn) ? distinctOn : [distinctOn]) : null;
     const _distinctOnColsSQL = distinctCols ? distinctCols.map(c => '"' + c + '"').join(', ') : '';
+
+    // Pre-compute user order cols (reused in ORDER BY block and useSubquery check)
+    const userOrderCols: string[] = orderBy ? (Array.isArray(orderBy) ? orderBy : [orderBy]) : [];
+
+    // Auto-detect subquery form: needed when distinctOn is set AND the caller wants to order
+    // by a column outside of distinctOn (inline DISTINCT ON can't satisfy that without silently
+    // overriding the requested ordering). Vector search always stays inline.
+    const useSubquery: boolean =
+      distinctCols !== null &&
+      !vector &&
+      userOrderCols.some(col => !distinctCols.includes(col));
 
     // Get distance operator if vector search
     const distanceOp = vector ? getVectorDistanceOperator(vector.metric) : "";
@@ -549,41 +566,35 @@ export async function listRecords(
 
     // Build ORDER BY clause
     let orderBySQL = "";
+    const userDirs: ("asc" | "desc")[] = userOrderCols.length > 0
+      ? (Array.isArray(order) ? order : (order ? Array(userOrderCols.length).fill(order) : Array(userOrderCols.length).fill("asc")))
+      : [];
+
     if (vector) {
-      // For vector search, always order by distance
+      // Vector search always orders by distance; DISTINCT ON + vector stays inline
       orderBySQL = \`ORDER BY "\${vector.field}" \${distanceOp} ($1)::vector\`;
-    } else {
-      const userCols = orderBy ? (Array.isArray(orderBy) ? orderBy : [orderBy]) : [];
-      const userDirs: ("asc" | "desc")[] = orderBy
-        ? (Array.isArray(order) ? order : (order ? Array(userCols.length).fill(order) : Array(userCols.length).fill("asc")))
-        : [];
-
+    } else if (useSubquery) {
+      // Subquery form: outer query gets the user's full ORDER BY.
+      // Inner query only needs to satisfy PG's DISTINCT ON prefix requirement (built at query assembly).
+      orderBySQL = buildOrderBySQL(userOrderCols, userDirs);
+    } else if (distinctCols) {
+      // Inline DISTINCT ON: prepend distinctCols as the leftmost ORDER BY prefix (PG requirement)
       const finalCols: string[] = [];
-      const finalDirs: string[] = [];
-
-      if (distinctCols) {
-        // DISTINCT ON requires its columns to be the leftmost ORDER BY prefix
-        for (const col of distinctCols) {
-          const userIdx = userCols.indexOf(col);
-          finalCols.push(col);
-          finalDirs.push(userIdx >= 0 ? (userDirs[userIdx] || "asc") : "asc");
-        }
-        // Append remaining user-specified cols not already covered by distinctOn
-        for (let i = 0; i < userCols.length; i++) {
-          if (!distinctCols.includes(userCols[i]!)) {
-            finalCols.push(userCols[i]!);
-            finalDirs.push(userDirs[i] || "asc");
-          }
-        }
-      } else {
-        finalCols.push(...userCols);
-        finalDirs.push(...userDirs.map(d => d || "asc"));
+      const finalDirs: ("asc" | "desc")[] = [];
+      for (const col of distinctCols) {
+        const userIdx = userOrderCols.indexOf(col);
+        finalCols.push(col);
+        finalDirs.push(userIdx >= 0 ? (userDirs[userIdx] ?? "asc") : "asc");
       }
-
-      if (finalCols.length > 0) {
-        const orderParts = finalCols.map((c, i) => \`"\${c}" \${finalDirs[i]!.toUpperCase()}\`);
-        orderBySQL = \`ORDER BY \${orderParts.join(", ")}\`;
+      for (let i = 0; i < userOrderCols.length; i++) {
+        if (!distinctCols.includes(userOrderCols[i]!)) {
+          finalCols.push(userOrderCols[i]!);
+          finalDirs.push(userDirs[i] ?? "asc");
+        }
       }
+      orderBySQL = buildOrderBySQL(finalCols, finalDirs);
+    } else {
+      orderBySQL = buildOrderBySQL(userOrderCols, userDirs);
     }
 
     // Add limit and offset params
@@ -600,7 +611,15 @@ export async function listRecords(
     const total = parseInt(countResult.rows[0].count, 10);
 
     // Get paginated data
-    const text = \`SELECT \${selectClause} FROM "\${ctx.table}" \${whereSQL} \${orderBySQL} LIMIT \${limitParam} OFFSET \${offsetParam}\`;
+    let text: string;
+    if (useSubquery) {
+      // Inner query: DISTINCT ON with only the distinctCols ORDER BY prefix (PG requirement).
+      // Outer query: free ORDER BY from the user's full orderBy list, plus LIMIT/OFFSET.
+      const innerQuery = \`SELECT DISTINCT ON (\${_distinctOnColsSQL}) \${baseColumns} FROM "\${ctx.table}" \${whereSQL} ORDER BY \${_distinctOnColsSQL}\`;
+      text = \`SELECT * FROM (\${innerQuery}) __distinct \${orderBySQL} LIMIT \${limitParam} OFFSET \${offsetParam}\`;
+    } else {
+      text = \`SELECT \${selectClause} FROM "\${ctx.table}" \${whereSQL} \${orderBySQL} LIMIT \${limitParam} OFFSET \${offsetParam}\`;
+    }
     log.debug(\`LIST \${ctx.table} SQL:\`, text, "params:", allParams);
 
     const { rows } = await ctx.pg.query(text, allParams);

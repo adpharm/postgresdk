@@ -189,6 +189,56 @@ test("distinctOn - total count reflects number of distinct groups", async () => 
   }
 });
 
+test("distinctOn with non-distinct orderBy - uses subquery form and respects outer ordering", async () => {
+  const pg = new Client({ connectionString: "postgres://user:pass@localhost:5432/testdb" });
+  await pg.connect();
+
+  try {
+    await pg.query("DELETE FROM book_tags");
+    await pg.query("DELETE FROM books");
+    await pg.query("DELETE FROM authors");
+
+    const a1 = await pg.query("INSERT INTO authors (name) VALUES ('SubA') RETURNING *");
+    const a2 = await pg.query("INSERT INTO authors (name) VALUES ('SubB') RETURNING *");
+    const a3 = await pg.query("INSERT INTO authors (name) VALUES ('SubC') RETURNING *");
+
+    // One representative book per author with predictable titles for outer ORDER BY
+    await pg.query("INSERT INTO books (title, author_id) VALUES ('Zeta', $1)", [a1.rows[0].id]);
+    await pg.query("INSERT INTO books (title, author_id) VALUES ('Zeta Extra', $1)", [a1.rows[0].id]);
+    await pg.query("INSERT INTO books (title, author_id) VALUES ('Mu', $1)", [a2.rows[0].id]);
+    await pg.query("INSERT INTO books (title, author_id) VALUES ('Alpha', $1)", [a3.rows[0].id]);
+
+    const { registerAuthorsRoutes } = await import("./.results/server/routes/authors");
+    const { registerBooksRoutes } = await import("./.results/server/routes/books");
+
+    const app = new Hono();
+    registerAuthorsRoutes(app, { pg });
+    registerBooksRoutes(app, { pg });
+
+    const server = serve({ fetch: app.fetch, port: 3495 });
+    const sdk = new SDK({ baseUrl: "http://localhost:3495" });
+
+    // orderBy: "title" is NOT in distinctOn: "author_id" → triggers subquery form
+    // Outer ORDER BY title ASC → expect Alpha, Mu, Zeta (or Zeta Extra)
+    const result = await sdk.books.list({
+      distinctOn: "author_id",
+      orderBy: "title",
+      order: "asc",
+      limit: 100,
+    });
+
+    expect(result.data.length).toBe(3); // one per author
+    const titles = result.data.map((b: any) => b.title);
+    expect(titles[0]).toBe("Alpha");
+    expect(titles[1]).toBe("Mu");
+    expect(titles[2]).toMatch(/^Zeta/); // either "Zeta" or "Zeta Extra"
+
+    server.close();
+  } finally {
+    await pg.end();
+  }
+});
+
 test("distinctOn - invalid column rejected with 400", async () => {
   const pg = new Client({ connectionString: "postgres://user:pass@localhost:5432/testdb" });
   await pg.connect();

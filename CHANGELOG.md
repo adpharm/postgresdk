@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- fix: `distinctOn` + `orderBy` on a non-distinct column now returns correctly ordered results
+  - Auto-detects when `orderBy` references a column not in `distinctOn` and switches to a subquery form
+  - Inner query uses `DISTINCT ON` with the required prefix ordering; outer query applies the user's full `ORDER BY`
+  - Inline `DISTINCT ON` path and vector search path are unchanged
+
 ## [v0.18.18] - 2026-03-11
 
 - feat: Add stale file cleanup to `generate()` — removes files for tables no longer in the schema
