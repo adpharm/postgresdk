@@ -680,6 +680,16 @@ const sorted = await sdk.users.list({
   order: ["asc", "desc"]  // or use single direction: order: "asc"
 });
 
+// DISTINCT ON - one row per unique value (PostgreSQL)
+const latestPerUser = await sdk.events.list({
+  distinctOn: "user_id",             // or array: ["user_id", "type"]
+  orderBy: "created_at",
+  order: "desc"
+});
+// Returns one event per user_id, ordered by created_at DESC.
+// When orderBy contains columns outside of distinctOn, a subquery is used
+// automatically so the outer ordering is always respected.
+
 // Advanced WHERE operators
 const filtered = await sdk.users.list({
   where: {
