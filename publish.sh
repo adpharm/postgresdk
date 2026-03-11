@@ -51,7 +51,7 @@ echo -e "${GREEN}✓ Build complete${NC}\n"
 
 # Run tests
 echo -e "${BLUE}🧪 Running tests...${NC}"
-bun test || {
+bun run test || {
     echo -e "${RED}❌ Tests failed. Fix issues before publishing.${NC}"
     exit 1
 }
