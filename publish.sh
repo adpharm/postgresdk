@@ -141,7 +141,6 @@ if [ "$VERSION_TYPE" != "none" ]; then
         git commit -m "Release v${NEW_VERSION}"
         git tag -a "v${NEW_VERSION}" -m "Release v${NEW_VERSION}"
         echo -e "${GREEN}✓ Committed and tagged as v${NEW_VERSION}${NC}"
-        echo -e "${YELLOW}Don't forget to push: git push && git push --tags${NC}"
 
         # Update changelog: replace "## [Unreleased]" with versioned heading
         if grep -q "^## \[Unreleased\]" CHANGELOG.md; then
@@ -161,6 +160,10 @@ if [ "$VERSION_TYPE" != "none" ]; then
         else
             echo -e "${YELLOW}⚠️  No [Unreleased] section found in CHANGELOG.md — skipping changelog update.${NC}"
         fi
+
+        echo -e "\n${BLUE}🚀 Pushing commits and tags...${NC}"
+        git push && git push --tags
+        echo -e "${GREEN}✓ Pushed to remote${NC}"
     fi
 fi
 
