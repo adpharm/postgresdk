@@ -178,6 +178,7 @@ async function main() {
     `${CLIENT_DIR}/books.ts`,
     `${CLIENT_DIR}/tags.ts`,
     `${CLIENT_DIR}/index.ts`,
+    `${SERVER_DIR}/routes/websites.ts`,
   ];
   for (const f of required) {
     if (!existsSync(f)) throw new Error(`Missing generated file: ${f}`);

@@ -123,7 +123,7 @@ export async function createRecord(
 
     const preparedVals = vals.map((v, i) =>
       v !== null && v !== undefined && typeof v === 'object' &&
-      (ctx.jsonbColumns?.includes(cols[i]) || ctx.vectorColumns?.includes(cols[i]))
+      (ctx.jsonbColumns?.includes(cols[i]!) || ctx.vectorColumns?.includes(cols[i]!))
         ? JSON.stringify(v)
         : v
     );
@@ -474,20 +474,51 @@ function getVectorDistanceOperator(metric?: string): string {
   }
 }
 
+export type TrigramMetric = "similarity" | "wordSimilarity" | "strictWordSimilarity";
+
+export type TrigramParam =
+  | { field: string; query: string; metric?: TrigramMetric; threshold?: number }
+  | { fields: string[]; strategy?: "greatest" | "concat"; query: string; metric?: TrigramMetric; threshold?: number }
+  | { fields: Array<{ field: string; weight: number }>; query: string; metric?: TrigramMetric; threshold?: number };
+
 /**
- * Build the pg_trgm SQL function expression for a given field and metric.
+ * Build a pg_trgm function expression for a raw SQL field expression.
  * $1 is always the query string parameter.
  */
-function getTrigramFnExpr(field: string, metric?: string): string {
+function trigramFnRaw(fieldExpr: string, metric?: TrigramMetric): string {
   switch (metric) {
-    case "wordSimilarity":
-      return \`word_similarity($1, "\${field}")\`;
-    case "strictWordSimilarity":
-      return \`strict_word_similarity($1, "\${field}")\`;
-    case "similarity":
-    default:
-      return \`similarity("\${field}", $1)\`;
+    case "wordSimilarity":      return \`word_similarity($1, \${fieldExpr})\`;
+    case "strictWordSimilarity": return \`strict_word_similarity($1, \${fieldExpr})\`;
+    default:                    return \`similarity(\${fieldExpr}, $1)\`;
   }
+}
+
+/** Build the full pg_trgm SQL expression for the given trigram param. */
+function getTrigramFnExpr(trigram: TrigramParam): string {
+  if ("field" in trigram) {
+    return trigramFnRaw(\`"\${trigram.field}"\`, trigram.metric);
+  }
+
+  const { fields, metric } = trigram;
+
+  // Weighted: fields is Array<{ field, weight }>
+  if (fields.length > 0 && typeof fields[0] === "object" && "weight" in fields[0]) {
+    const wfields = fields as Array<{ field: string; weight: number }>;
+    const totalWeight = wfields.reduce((sum, f) => sum + f.weight, 0);
+    const terms = wfields.map(f => \`\${trigramFnRaw(\`"\${f.field}"\`, metric)} * \${f.weight}\`).join(" + ");
+    return \`(\${terms}) / \${totalWeight}\`;
+  }
+
+  const sfields = fields as string[];
+  const strategy = (trigram as Extract<TrigramParam, { fields: string[] }>).strategy ?? "greatest";
+
+  if (strategy === "concat") {
+    const concatExpr = sfields.map(f => \`"\${f}"\`).join(\` || ' ' || \`);
+    return trigramFnRaw(concatExpr, metric);
+  }
+
+  // greatest (default)
+  return \`GREATEST(\${sfields.map(f => trigramFnRaw(\`"\${f}"\`, metric)).join(", ")})\`;
 }
 
 /** Builds a SQL ORDER BY clause from parallel cols/dirs arrays. Returns "" when cols is empty. */
@@ -515,12 +546,7 @@ export async function listRecords(
       metric?: "cosine" | "l2" | "inner";
       maxDistance?: number;
     };
-    trigram?: {
-      field: string;
-      query: string;
-      metric?: "similarity" | "wordSimilarity" | "strictWordSimilarity";
-      threshold?: number;
-    };
+    trigram?: TrigramParam;
   }
 ): Promise<{ data?: any; total?: number; limit?: number; offset?: number; hasMore?: boolean; error?: string; issues?: any; needsIncludes?: boolean; includeSpec?: any; status: number }> {
   try {
@@ -546,7 +572,7 @@ export async function listRecords(
     const distanceOp = vector ? getVectorDistanceOperator(vector.metric) : "";
 
     // Get trigram similarity SQL expression (pg_trgm). $1 is always the query string.
-    const trigramFnExpr = trigram ? getTrigramFnExpr(trigram.field, trigram.metric) : "";
+    const trigramFnExpr = trigram ? getTrigramFnExpr(trigram) : "";
 
     // Add vector or trigram query as $1 if present (mutually exclusive)
     const queryParams: any[] = vector

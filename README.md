@@ -960,6 +960,27 @@ const results = await sdk.books.list({
 });
 ```
 
+**Multi-field trigram search:**
+```typescript
+// Greatest strategy (default): score = GREATEST(sim(name), sim(url))
+const results = await sdk.websites.list({
+  trigram: { fields: ["name", "url"], query: "google", strategy: "greatest" }
+});
+
+// Concat strategy: concatenate fields before scoring ("name url")
+const results = await sdk.websites.list({
+  trigram: { fields: ["name", "url"], query: "google", strategy: "concat" }
+});
+
+// Weighted strategy: weighted average of per-field scores
+const results = await sdk.websites.list({
+  trigram: {
+    fields: [{ field: "name", weight: 2 }, { field: "url", weight: 1 }],
+    query: "google"
+  }
+});
+```
+
 **Note:** `trigram` and `vector` are mutually exclusive on a single `list()` call.
 
 See the generated SDK documentation for all available operators: `$eq`, `$ne`, `$gt`, `$gte`, `$lt`, `$lte`, `$in`, `$nin`, `$like`, `$ilike`, `$similarity`, `$wordSimilarity`, `$strictWordSimilarity`, `$is`, `$isNot`, `$or`, `$and`, `$jsonbContains`, `$jsonbContainedBy`, `$jsonbHasKey`, `$jsonbHasAnyKeys`, `$jsonbHasAllKeys`, `$jsonbPath`.

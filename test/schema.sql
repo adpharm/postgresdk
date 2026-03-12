@@ -78,6 +78,13 @@ CREATE TABLE users (
   preferences JSONB
 );
 
+-- Websites table for multi-column trigram search testing
+CREATE TABLE IF NOT EXISTS websites (
+  id   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  url  TEXT NOT NULL
+);
+
 -- Vector indexes for similarity search performance
 -- NOTE: Commented out for tests as ivfflat requires more data to work properly
 -- CREATE INDEX IF NOT EXISTS idx_video_sections_vision ON video_sections USING ivfflat (vision_embedding vector_cosine_ops);

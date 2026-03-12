@@ -28,6 +28,7 @@ export function emitHonoRoutes(
 
   // Check if table has any vector columns
   const hasVectorColumns = table.columns.some(c => isVectorType(c.pgType));
+  const trigramMetricZod = `z.enum(["similarity", "wordSimilarity", "strictWordSimilarity"]).optional()`;
   const vectorColumns = table.columns.filter(c => isVectorType(c.pgType)).map(c => c.name);
   const jsonbColumns = table.columns.filter(c => isJsonbType(c.pgType)).map(c => c.name);
   
@@ -107,12 +108,27 @@ const listSchema = z.object({
     metric: z.enum(["cosine", "l2", "inner"]).optional(),
     maxDistance: z.number().optional()
   }).optional(),` : ""}
-  trigram: z.object({
-    field: z.string(),
-    query: z.string(),
-    metric: z.enum(["similarity", "wordSimilarity", "strictWordSimilarity"]).optional(),
-    threshold: z.number().min(0).max(1).optional()
-  }).optional()
+  trigram: z.union([
+    z.object({
+      field: z.string(),
+      query: z.string(),
+      metric: ${trigramMetricZod},
+      threshold: z.number().min(0).max(1).optional()
+    }),
+    z.object({
+      fields: z.array(z.string()).min(1),
+      strategy: z.enum(["greatest", "concat"]).optional(),
+      query: z.string(),
+      metric: ${trigramMetricZod},
+      threshold: z.number().min(0).max(1).optional()
+    }),
+    z.object({
+      fields: z.array(z.object({ field: z.string(), weight: z.number().positive() })).min(1),
+      query: z.string(),
+      metric: ${trigramMetricZod},
+      threshold: z.number().min(0).max(1).optional()
+    })
+  ]).optional()
 }).strict().refine(
   (data) => !(data.select && data.exclude),
   { message: "Cannot specify both 'select' and 'exclude' parameters" }

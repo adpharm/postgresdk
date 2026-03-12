@@ -33,6 +33,7 @@
     "test/.jsonb-sdk-test",
     "test/.jsonb-arrays-test",
     "test/.results",
+    "test/.typecheck-test",
     "test/.results-apikey",
     "test/.results-jwt",
     "test/.results-same-dir",

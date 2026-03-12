@@ -68,6 +68,7 @@ export function emitClient(
 ) {
   const Type = pascal(table.name);
   const ext = opts.useJsExtensions ? ".js" : "";
+  const trigramParamType = `{ field: string; query: string; metric?: "similarity" | "wordSimilarity" | "strictWordSimilarity"; threshold?: number } | { fields: string[]; strategy?: "greatest" | "concat"; query: string; metric?: "similarity" | "wordSimilarity" | "strictWordSimilarity"; threshold?: number } | { fields: Array<{ field: string; weight: number }>; query: string; metric?: "similarity" | "wordSimilarity" | "strictWordSimilarity"; threshold?: number }`;
 
   // Check if table has any vector columns
   const hasVectorColumns = table.columns.some(c => isVectorType(c.pgType));
@@ -518,7 +519,7 @@ ${hasJsonbColumns ? `  /**
       metric?: "cosine" | "l2" | "inner";
       maxDistance?: number;
     };` : ""}
-    trigram?: { field: string; query: string; metric?: "similarity" | "wordSimilarity" | "strictWordSimilarity"; threshold?: number };
+    trigram?: ${trigramParamType};
     orderBy?: string | string[];
     order?: "asc" | "desc" | ("asc" | "desc")[];
     distinctOn?: string | string[];
@@ -540,7 +541,7 @@ ${hasJsonbColumns ? `  /**
       metric?: "cosine" | "l2" | "inner";
       maxDistance?: number;
     };` : ""}
-    trigram?: { field: string; query: string; metric?: "similarity" | "wordSimilarity" | "strictWordSimilarity"; threshold?: number };
+    trigram?: ${trigramParamType};
     orderBy?: string | string[];
     order?: "asc" | "desc" | ("asc" | "desc")[];
     distinctOn?: string | string[];
@@ -573,7 +574,7 @@ ${hasJsonbColumns ? `  /**
       metric?: "cosine" | "l2" | "inner";
       maxDistance?: number;
     };` : ""}
-    trigram?: { field: string; query: string; metric?: "similarity" | "wordSimilarity" | "strictWordSimilarity"; threshold?: number };
+    trigram?: ${trigramParamType};
     orderBy?: string | string[];
     order?: "asc" | "desc" | ("asc" | "desc")[];
     distinctOn?: string | string[];
@@ -591,7 +592,7 @@ ${hasJsonbColumns ? `  /**
       metric?: "cosine" | "l2" | "inner";
       maxDistance?: number;
     };` : ""}
-    trigram?: { field: string; query: string; metric?: "similarity" | "wordSimilarity" | "strictWordSimilarity"; threshold?: number };
+    trigram?: ${trigramParamType};
     orderBy?: string | string[];
     order?: "asc" | "desc" | ("asc" | "desc")[];
     distinctOn?: string | string[];
@@ -614,7 +615,7 @@ ${hasJsonbColumns ? `  /**
       metric?: "cosine" | "l2" | "inner";
       maxDistance?: number;
     };` : ""}
-    trigram?: { field: string; query: string; metric?: "similarity" | "wordSimilarity" | "strictWordSimilarity"; threshold?: number };
+    trigram?: ${trigramParamType};
     orderBy?: string | string[];
     order?: "asc" | "desc" | ("asc" | "desc")[];
     distinctOn?: string | string[];
@@ -636,7 +637,7 @@ ${hasJsonbColumns ? `  /**
       metric?: "cosine" | "l2" | "inner";
       maxDistance?: number;
     };` : ""}
-    trigram?: { field: string; query: string; metric?: "similarity" | "wordSimilarity" | "strictWordSimilarity"; threshold?: number };
+    trigram?: ${trigramParamType};
     orderBy?: string | string[];
     order?: "asc" | "desc" | ("asc" | "desc")[];
     distinctOn?: string | string[];
@@ -663,7 +664,7 @@ ${hasJsonbColumns ? `  /**
       metric?: "cosine" | "l2" | "inner";
       maxDistance?: number;
     };` : ""}
-    trigram?: { field: string; query: string; metric?: "similarity" | "wordSimilarity" | "strictWordSimilarity"; threshold?: number };
+    trigram?: ${trigramParamType};
     orderBy?: string | string[];
     order?: "asc" | "desc" | ("asc" | "desc")[];
     distinctOn?: string | string[];
@@ -681,7 +682,7 @@ ${hasJsonbColumns ? `  /**
       metric?: "cosine" | "l2" | "inner";
       maxDistance?: number;
     };` : ""}
-    trigram?: { field: string; query: string; metric?: "similarity" | "wordSimilarity" | "strictWordSimilarity"; threshold?: number };
+    trigram?: ${trigramParamType};
     orderBy?: string | string[];
     order?: "asc" | "desc" | ("asc" | "desc")[];
     distinctOn?: string | string[];

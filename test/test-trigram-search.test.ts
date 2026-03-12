@@ -284,6 +284,137 @@ test("trigram top-level param - combined with WHERE clause", async () => {
   }
 });
 
+// --- Multi-column trigram tests (websites table: name + url) ---
+
+const WEBSITES = [
+  { name: "Google Search", url: "search.google.com" },
+  { name: "GitHub",        url: "github.com" },
+  { name: "Stack Overflow", url: "stackoverflow.com" },
+  { name: "Random Blog",   url: "randomblog.net" },
+];
+
+async function seedWebsites(pg: Client): Promise<void> {
+  await pg.query("DELETE FROM websites");
+  for (const site of WEBSITES) {
+    await pg.query("INSERT INTO websites (name, url) VALUES ($1, $2)", [site.name, site.url]);
+  }
+}
+
+test("trigram multi-field - greatest strategy scores best-matching column", async () => {
+  const pg = new Client({ connectionString: PG_URL });
+  await pg.connect();
+
+  try {
+    await seedWebsites(pg);
+
+    const { registerWebsitesRoutes } = await import("./.results/server/routes/websites");
+    const app = new Hono();
+    registerWebsitesRoutes(app, { pg });
+    const server = serve({ fetch: app.fetch, port: 3507 });
+
+    const sdk = new SDK({ baseUrl: "http://localhost:3507" });
+
+    const results = await sdk.websites.list({
+      trigram: { fields: ["name", "url"], query: "google", strategy: "greatest" },
+      limit: 10,
+    });
+
+    expect(results.data.length).toBeGreaterThan(0);
+    // All rows have _similarity
+    results.data.forEach(r => {
+      expect(typeof r._similarity).toBe("number");
+    });
+    // "Google Search" (name matches) should rank first
+    expect(results.data[0]!.name).toBe("Google Search");
+    // Scores are descending
+    for (let i = 1; i < results.data.length; i++) {
+      expect(results.data[i - 1]!._similarity!).toBeGreaterThanOrEqual(results.data[i]!._similarity!);
+    }
+
+    server.close();
+  } finally {
+    await pg.end();
+  }
+});
+
+test("trigram multi-field - concat strategy matches across field boundary", async () => {
+  const pg = new Client({ connectionString: PG_URL });
+  await pg.connect();
+
+  try {
+    await seedWebsites(pg);
+
+    const { registerWebsitesRoutes } = await import("./.results/server/routes/websites");
+    const app = new Hono();
+    registerWebsitesRoutes(app, { pg });
+    const server = serve({ fetch: app.fetch, port: 3508 });
+
+    const sdk = new SDK({ baseUrl: "http://localhost:3508" });
+
+    const results = await sdk.websites.list({
+      trigram: { fields: ["name", "url"], query: "google", strategy: "concat" },
+      limit: 10,
+    });
+
+    expect(results.data.length).toBeGreaterThan(0);
+    results.data.forEach(r => {
+      expect(typeof r._similarity).toBe("number");
+    });
+    // Google Search scores highest — "google" appears in both name and url when concatenated
+    expect(results.data[0]!.name).toBe("Google Search");
+    // Scores are descending
+    for (let i = 1; i < results.data.length; i++) {
+      expect(results.data[i - 1]!._similarity!).toBeGreaterThanOrEqual(results.data[i]!._similarity!);
+    }
+
+    server.close();
+  } finally {
+    await pg.end();
+  }
+});
+
+test("trigram multi-field - weighted strategy blends scores by weight", async () => {
+  const pg = new Client({ connectionString: PG_URL });
+  await pg.connect();
+
+  try {
+    await seedWebsites(pg);
+
+    const { registerWebsitesRoutes } = await import("./.results/server/routes/websites");
+    const app = new Hono();
+    registerWebsitesRoutes(app, { pg });
+    const server = serve({ fetch: app.fetch, port: 3509 });
+
+    const sdk = new SDK({ baseUrl: "http://localhost:3509" });
+
+    const results = await sdk.websites.list({
+      trigram: {
+        fields: [{ field: "name", weight: 2 }, { field: "url", weight: 1 }],
+        query: "google",
+      },
+      limit: 10,
+    });
+
+    expect(results.data.length).toBeGreaterThan(0);
+    results.data.forEach(r => {
+      expect(typeof r._similarity).toBe("number");
+      // Weighted score is a blend — must be between 0 and 1
+      expect(r._similarity!).toBeGreaterThanOrEqual(0);
+      expect(r._similarity!).toBeLessThanOrEqual(1);
+    });
+    // "Google Search" (name strongly matches, weight 2) should rank first
+    expect(results.data[0]!.name).toBe("Google Search");
+    // Scores are descending
+    for (let i = 1; i < results.data.length; i++) {
+      expect(results.data[i - 1]!._similarity!).toBeGreaterThanOrEqual(results.data[i]!._similarity!);
+    }
+
+    server.close();
+  } finally {
+    await pg.end();
+  }
+});
+
 test("trigram top-level param - wordSimilarity metric", async () => {
   const pg = new Client({ connectionString: PG_URL });
   await pg.connect();

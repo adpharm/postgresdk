@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- feat: Extend trigram search to support multi-column queries with configurable strategies
+  - `trigram` param now accepts `{ fields: string[], strategy?, query, metric?, threshold? }` for multi-field search
+  - `strategy: "greatest"` (default) returns `GREATEST(sim(col1), sim(col2), ...)` — best-matching column wins
+  - `strategy: "concat"` concatenates columns before scoring — useful when the query may span field boundaries
+  - `trigram` param also accepts `{ fields: Array<{ field, weight }>, query, metric?, threshold? }` for weighted blending — computes a weighted average of per-field similarity scores
+  - Typed as a discriminated union (`TrigramParam`) in both generated client types and Zod route schemas
+
 ## [v0.18.20] - 2026-03-12
 
 - feat: Add trigram similarity search to list operations via `pg_trgm`
