@@ -8,6 +8,9 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 -- Needed for vector similarity search
 CREATE EXTENSION IF NOT EXISTS "vector";
 
+-- Needed for trigram similarity search
+CREATE EXTENSION IF NOT EXISTS "pg_trgm";
+
 -- Drop in dependency order (M:N junctions first)
 DROP TABLE IF EXISTS video_sections CASCADE;
 DROP TABLE IF EXISTS book_tags CASCADE;

@@ -910,7 +910,59 @@ const uniqueResults = Array.from(
 
 **Note:** Vector columns are auto-detected during introspection. Rows with `NULL` embeddings are excluded from vector search results.
 
-See the generated SDK documentation for all available operators: `$eq`, `$ne`, `$gt`, `$gte`, `$lt`, `$lte`, `$in`, `$nin`, `$like`, `$ilike`, `$is`, `$isNot`, `$or`, `$and`, `$jsonbContains`, `$jsonbContainedBy`, `$jsonbHasKey`, `$jsonbHasAnyKeys`, `$jsonbHasAllKeys`, `$jsonbPath`.
+#### Trigram Search (pg_trgm)
+
+PostgreSDK supports full-text fuzzy search via [pg_trgm](https://www.postgresql.org/docs/current/pgtrgm.html). Requires the `pg_trgm` extension installed.
+
+```sql
+CREATE EXTENSION IF NOT EXISTS "pg_trgm";
+```
+
+```typescript
+// Basic trigram similarity search on a text field
+const results = await sdk.books.list({
+  trigram: {
+    field: "title",
+    query: "postgrs",          // typo-tolerant fuzzy match
+    metric: "similarity",      // "similarity" (default), "wordSimilarity", "strictWordSimilarity"
+    threshold: 0.3             // optional: exclude rows below this score (0–1)
+  },
+  limit: 10
+});
+
+// _similarity score is automatically included in each result
+results.data.forEach(book => {
+  console.log(book.title, book._similarity);
+});
+
+// Combine with WHERE filters
+const filtered = await sdk.books.list({
+  trigram: { field: "title", query: "postgrs", threshold: 0.2 },
+  where: { published: true },
+  limit: 20
+});
+```
+
+**Similarity Metrics:**
+- `similarity` (default): Standard trigram similarity — `"col" % value`. Fraction of matching trigrams.
+- `wordSimilarity`: Highest similarity between the query and any word in the column — `value <% "col"`.
+- `strictWordSimilarity`: Strict word similarity — `value <<% "col"`. Requires the query to match an entire word.
+
+**Inline `where` operators (without a top-level `trigram` param):**
+```typescript
+// Filter by trigram similarity inside a where clause
+const results = await sdk.books.list({
+  where: {
+    title: { $similarity: "postgrs" }          // % operator
+    // title: { $wordSimilarity: "postgrs" }   // <% operator
+    // title: { $strictWordSimilarity: "postgrs" } // <<% operator
+  }
+});
+```
+
+**Note:** `trigram` and `vector` are mutually exclusive on a single `list()` call.
+
+See the generated SDK documentation for all available operators: `$eq`, `$ne`, `$gt`, `$gte`, `$lt`, `$lte`, `$in`, `$nin`, `$like`, `$ilike`, `$similarity`, `$wordSimilarity`, `$strictWordSimilarity`, `$is`, `$isNot`, `$or`, `$and`, `$jsonbContains`, `$jsonbContainedBy`, `$jsonbHasKey`, `$jsonbHasAnyKeys`, `$jsonbHasAllKeys`, `$jsonbPath`.
 
 ---
 

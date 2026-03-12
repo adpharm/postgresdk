@@ -55,6 +55,12 @@ export type WhereOperator<T> = {
   $like?: T extends string ? string : never;
   /** Case-insensitive LIKE (strings only) */
   $ilike?: T extends string ? string : never;
+  /** Trigram similarity match - "col" % value (pg_trgm required, uses similarity_threshold GUC) */
+  $similarity?: T extends string ? string : never;
+  /** Word trigram similarity match - value <% "col" (pg_trgm required) */
+  $wordSimilarity?: T extends string ? string : never;
+  /** Strict word trigram similarity match - value <<% "col" (pg_trgm required) */
+  $strictWordSimilarity?: T extends string ? string : never;
   /** IS NULL */
   $is?: null;
   /** IS NOT NULL */

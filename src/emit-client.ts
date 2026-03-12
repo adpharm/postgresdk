@@ -518,10 +518,11 @@ ${hasJsonbColumns ? `  /**
       metric?: "cosine" | "l2" | "inner";
       maxDistance?: number;
     };` : ""}
+    trigram?: { field: string; query: string; metric?: "similarity" | "wordSimilarity" | "strictWordSimilarity"; threshold?: number };
     orderBy?: string | string[];
     order?: "asc" | "desc" | ("asc" | "desc")[];
     distinctOn?: string | string[];
-  }): Promise<PaginatedResponse<Partial<Select${Type}<TJsonb>>${hasVectorColumns ? ' & { _distance?: number }' : ''}>>;
+  }): Promise<PaginatedResponse<Partial<Select${Type}<TJsonb>> & { _similarity?: number }${hasVectorColumns ? ' & { _distance?: number }' : ''}>>;
   /**
    * List ${table.name} records with field exclusion
    * @param params - Query parameters with exclude
@@ -539,10 +540,11 @@ ${hasJsonbColumns ? `  /**
       metric?: "cosine" | "l2" | "inner";
       maxDistance?: number;
     };` : ""}
+    trigram?: { field: string; query: string; metric?: "similarity" | "wordSimilarity" | "strictWordSimilarity"; threshold?: number };
     orderBy?: string | string[];
     order?: "asc" | "desc" | ("asc" | "desc")[];
     distinctOn?: string | string[];
-  }): Promise<PaginatedResponse<Partial<Select${Type}<TJsonb>>${hasVectorColumns ? ' & { _distance?: number }' : ''}>>;
+  }): Promise<PaginatedResponse<Partial<Select${Type}<TJsonb>> & { _similarity?: number }${hasVectorColumns ? ' & { _distance?: number }' : ''}>>;
   /**
    * List ${table.name} records with pagination and filtering
    * @param params - Query parameters
@@ -571,10 +573,11 @@ ${hasJsonbColumns ? `  /**
       metric?: "cosine" | "l2" | "inner";
       maxDistance?: number;
     };` : ""}
+    trigram?: { field: string; query: string; metric?: "similarity" | "wordSimilarity" | "strictWordSimilarity"; threshold?: number };
     orderBy?: string | string[];
     order?: "asc" | "desc" | ("asc" | "desc")[];
     distinctOn?: string | string[];
-  }): Promise<PaginatedResponse<${Type}WithIncludes<TInclude>${hasVectorColumns ? ' & { _distance?: number }' : ''}>>;
+  }): Promise<PaginatedResponse<${Type}WithIncludes<TInclude> & { _similarity?: number }${hasVectorColumns ? ' & { _distance?: number }' : ''}>>;
   async list<TJsonb extends Partial<Select${Type}> = {}>(params?: {
     include?: ${Type}IncludeSpec;
     select?: string[];
@@ -588,11 +591,12 @@ ${hasJsonbColumns ? `  /**
       metric?: "cosine" | "l2" | "inner";
       maxDistance?: number;
     };` : ""}
+    trigram?: { field: string; query: string; metric?: "similarity" | "wordSimilarity" | "strictWordSimilarity"; threshold?: number };
     orderBy?: string | string[];
     order?: "asc" | "desc" | ("asc" | "desc")[];
     distinctOn?: string | string[];
   }): Promise<PaginatedResponse<Select${Type}<TJsonb> | Partial<Select${Type}<TJsonb>>>> {
-    return this.post<PaginatedResponse<Select${Type}<TJsonb>${hasVectorColumns ? ' & { _distance?: number }' : ''}>>(\`\${this.resource}/list\`, params ?? {});
+    return this.post<PaginatedResponse<Select${Type}<TJsonb> & { _similarity?: number }${hasVectorColumns ? ' & { _distance?: number }' : ''}>>(\`\${this.resource}/list\`, params ?? {});
   }` : `  /**
    * List ${table.name} records with field selection
    * @param params - Query parameters with select
@@ -610,10 +614,11 @@ ${hasJsonbColumns ? `  /**
       metric?: "cosine" | "l2" | "inner";
       maxDistance?: number;
     };` : ""}
+    trigram?: { field: string; query: string; metric?: "similarity" | "wordSimilarity" | "strictWordSimilarity"; threshold?: number };
     orderBy?: string | string[];
     order?: "asc" | "desc" | ("asc" | "desc")[];
     distinctOn?: string | string[];
-  }): Promise<PaginatedResponse<Partial<Select${Type}>${hasVectorColumns ? ' & { _distance?: number }' : ''}>>;
+  }): Promise<PaginatedResponse<Partial<Select${Type}> & { _similarity?: number }${hasVectorColumns ? ' & { _distance?: number }' : ''}>>;
   /**
    * List ${table.name} records with field exclusion
    * @param params - Query parameters with exclude
@@ -631,10 +636,11 @@ ${hasJsonbColumns ? `  /**
       metric?: "cosine" | "l2" | "inner";
       maxDistance?: number;
     };` : ""}
+    trigram?: { field: string; query: string; metric?: "similarity" | "wordSimilarity" | "strictWordSimilarity"; threshold?: number };
     orderBy?: string | string[];
     order?: "asc" | "desc" | ("asc" | "desc")[];
     distinctOn?: string | string[];
-  }): Promise<PaginatedResponse<Partial<Select${Type}>${hasVectorColumns ? ' & { _distance?: number }' : ''}>>;
+  }): Promise<PaginatedResponse<Partial<Select${Type}> & { _similarity?: number }${hasVectorColumns ? ' & { _distance?: number }' : ''}>>;
   /**
    * List ${table.name} records with pagination and filtering
    * @param params - Query parameters
@@ -657,10 +663,11 @@ ${hasJsonbColumns ? `  /**
       metric?: "cosine" | "l2" | "inner";
       maxDistance?: number;
     };` : ""}
+    trigram?: { field: string; query: string; metric?: "similarity" | "wordSimilarity" | "strictWordSimilarity"; threshold?: number };
     orderBy?: string | string[];
     order?: "asc" | "desc" | ("asc" | "desc")[];
     distinctOn?: string | string[];
-  }): Promise<PaginatedResponse<${Type}WithIncludes<TInclude>${hasVectorColumns ? ' & { _distance?: number }' : ''}>>;
+  }): Promise<PaginatedResponse<${Type}WithIncludes<TInclude> & { _similarity?: number }${hasVectorColumns ? ' & { _distance?: number }' : ''}>>;
   async list(params?: {
     include?: ${Type}IncludeSpec;
     select?: string[];
@@ -674,11 +681,12 @@ ${hasJsonbColumns ? `  /**
       metric?: "cosine" | "l2" | "inner";
       maxDistance?: number;
     };` : ""}
+    trigram?: { field: string; query: string; metric?: "similarity" | "wordSimilarity" | "strictWordSimilarity"; threshold?: number };
     orderBy?: string | string[];
     order?: "asc" | "desc" | ("asc" | "desc")[];
     distinctOn?: string | string[];
   }): Promise<PaginatedResponse<Select${Type} | Partial<Select${Type}>>> {
-    return this.post<PaginatedResponse<Select${Type}${hasVectorColumns ? ' & { _distance?: number }' : ''}>>(\`\${this.resource}/list\`, params ?? {});
+    return this.post<PaginatedResponse<Select${Type} & { _similarity?: number }${hasVectorColumns ? ' & { _distance?: number }' : ''}>>(\`\${this.resource}/list\`, params ?? {});
   }`}
 
 ${hasJsonbColumns ? `  /**

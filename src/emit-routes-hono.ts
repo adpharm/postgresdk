@@ -106,7 +106,13 @@ const listSchema = z.object({
     query: z.array(z.number()),
     metric: z.enum(["cosine", "l2", "inner"]).optional(),
     maxDistance: z.number().optional()
-  }).optional()` : ""}
+  }).optional(),` : ""}
+  trigram: z.object({
+    field: z.string(),
+    query: z.string(),
+    metric: z.enum(["similarity", "wordSimilarity", "strictWordSimilarity"]).optional(),
+    threshold: z.number().min(0).max(1).optional()
+  }).optional()
 }).strict().refine(
   (data) => !(data.select && data.exclude),
   { message: "Cannot specify both 'select' and 'exclude' parameters" }

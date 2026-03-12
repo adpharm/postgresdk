@@ -283,6 +283,24 @@ function buildWhereClause(
             whereParams.push(opValue);
             paramIndex++;
             break;
+          case '$similarity':
+            // pg_trgm: boolean similarity operator (respects similarity_threshold GUC)
+            whereParts.push(\`"\${key}" % $\${paramIndex}\`);
+            whereParams.push(opValue);
+            paramIndex++;
+            break;
+          case '$wordSimilarity':
+            // pg_trgm: word similarity operator (value <% col)
+            whereParts.push(\`$\${paramIndex} <% "\${key}"\`);
+            whereParams.push(opValue);
+            paramIndex++;
+            break;
+          case '$strictWordSimilarity':
+            // pg_trgm: strict word similarity operator (value <<% col)
+            whereParts.push(\`$\${paramIndex} <<% "\${key}"\`);
+            whereParams.push(opValue);
+            paramIndex++;
+            break;
           case '$is':
             if (opValue === null) {
               whereParts.push(\`"\${key}" IS NULL\`);
@@ -456,6 +474,22 @@ function getVectorDistanceOperator(metric?: string): string {
   }
 }
 
+/**
+ * Build the pg_trgm SQL function expression for a given field and metric.
+ * $1 is always the query string parameter.
+ */
+function getTrigramFnExpr(field: string, metric?: string): string {
+  switch (metric) {
+    case "wordSimilarity":
+      return \`word_similarity($1, "\${field}")\`;
+    case "strictWordSimilarity":
+      return \`strict_word_similarity($1, "\${field}")\`;
+    case "similarity":
+    default:
+      return \`similarity("\${field}", $1)\`;
+  }
+}
+
 /** Builds a SQL ORDER BY clause from parallel cols/dirs arrays. Returns "" when cols is empty. */
 function buildOrderBySQL(cols: string[], dirs: ("asc" | "desc")[]): string {
   if (cols.length === 0) return "";
@@ -463,7 +497,7 @@ function buildOrderBySQL(cols: string[], dirs: ("asc" | "desc")[]): string {
 }
 
 /**
- * LIST operation - Get multiple records with optional filters and vector search
+ * LIST operation - Get multiple records with optional filters, vector search, and trigram similarity search
  */
 export async function listRecords(
   ctx: OperationContext,
@@ -481,10 +515,16 @@ export async function listRecords(
       metric?: "cosine" | "l2" | "inner";
       maxDistance?: number;
     };
+    trigram?: {
+      field: string;
+      query: string;
+      metric?: "similarity" | "wordSimilarity" | "strictWordSimilarity";
+      threshold?: number;
+    };
   }
 ): Promise<{ data?: any; total?: number; limit?: number; offset?: number; hasMore?: boolean; error?: string; issues?: any; needsIncludes?: boolean; includeSpec?: any; status: number }> {
   try {
-    const { where: whereClause, limit = 50, offset = 0, include, orderBy, order, vector, distinctOn } = params;
+    const { where: whereClause, limit = 50, offset = 0, include, orderBy, order, vector, trigram, distinctOn } = params;
 
     // DISTINCT ON support
     const distinctCols: string[] | null = distinctOn ? (Array.isArray(distinctOn) ? distinctOn : [distinctOn]) : null;
@@ -495,20 +535,28 @@ export async function listRecords(
 
     // Auto-detect subquery form: needed when distinctOn is set AND the caller wants to order
     // by a column outside of distinctOn (inline DISTINCT ON can't satisfy that without silently
-    // overriding the requested ordering). Vector search always stays inline.
+    // overriding the requested ordering). Vector/trigram search always stays inline.
     const useSubquery: boolean =
       distinctCols !== null &&
       !vector &&
+      !trigram &&
       userOrderCols.some(col => !distinctCols.includes(col));
 
     // Get distance operator if vector search
     const distanceOp = vector ? getVectorDistanceOperator(vector.metric) : "";
 
-    // Add vector to params array if present
-    const queryParams: any[] = vector ? [JSON.stringify(vector.query)] : [];
+    // Get trigram similarity SQL expression (pg_trgm). $1 is always the query string.
+    const trigramFnExpr = trigram ? getTrigramFnExpr(trigram.field, trigram.metric) : "";
 
-    // Build WHERE clause for SELECT/UPDATE queries (with vector as $1 if present)
-    let paramIndex = vector ? 2 : 1;
+    // Add vector or trigram query as $1 if present (mutually exclusive)
+    const queryParams: any[] = vector
+      ? [JSON.stringify(vector.query)]
+      : trigram
+      ? [trigram.query]
+      : [];
+
+    // Build WHERE clause for SELECT/UPDATE queries (with vector/trigram as $1 if present)
+    let paramIndex = vector || trigram ? 2 : 1;
     const whereParts: string[] = [];
     let whereParams: any[] = [];
 
@@ -532,28 +580,38 @@ export async function listRecords(
       whereParts.push(\`("\${vector.field}" \${distanceOp} ($1)::vector) < \${vector.maxDistance}\`);
     }
 
+    // Add trigram threshold filter if specified (inlined as literal — it's a float, safe)
+    if (trigram?.threshold !== undefined) {
+      whereParts.push(\`\${trigramFnExpr} >= \${trigram.threshold}\`);
+    }
+
     const whereSQL = whereParts.length > 0 ? \`WHERE \${whereParts.join(" AND ")}\` : "";
 
     // Build WHERE clause for COUNT query (may need different param indices)
     let countWhereSQL = whereSQL;
     let countParams = whereParams;
 
-    if (vector && vector.maxDistance === undefined && whereParams.length > 0) {
-      // COUNT query doesn't use vector, so rebuild WHERE without vector offset
+    // When a $1 query param exists (vector/trigram) but has NO threshold filter, the COUNT query
+    // must not reference $1 since it's only needed in SELECT/ORDER BY. Rebuild WHERE from scratch
+    // starting at $1. When a threshold IS set, $1 appears in the WHERE condition so keep it.
+    const hasQueryParam = !!(vector || trigram);
+    const hasThreshold = vector?.maxDistance !== undefined || trigram?.threshold !== undefined;
+
+    if (hasQueryParam && !hasThreshold && whereParams.length > 0) {
       const countWhereParts: string[] = [];
       if (ctx.softDeleteColumn) {
         countWhereParts.push(\`"\${ctx.softDeleteColumn}" IS NULL\`);
       }
       if (whereClause) {
-        const result = buildWhereClause(whereClause, 1); // Start at $1 for count
+        const result = buildWhereClause(whereClause, 1); // Start at $1, no query-param offset
         if (result.sql) {
           countWhereParts.push(result.sql);
           countParams = result.params;
         }
       }
       countWhereSQL = countWhereParts.length > 0 ? \`WHERE \${countWhereParts.join(" AND ")}\` : "";
-    } else if (vector?.maxDistance !== undefined) {
-      // COUNT query includes vector for maxDistance filter
+    } else if (hasQueryParam && hasThreshold) {
+      // $1 appears in WHERE threshold condition — COUNT needs the full params
       countParams = [...queryParams, ...whereParams];
     }
 
@@ -562,6 +620,8 @@ export async function listRecords(
     const baseColumns = buildColumnList(ctx.select, ctx.exclude, ctx.allColumnNames);
     const selectClause = vector
       ? \`\${_distinctOnPrefix}\${baseColumns}, ("\${vector.field}" \${distanceOp} ($1)::vector) AS _distance\`
+      : trigram
+      ? \`\${_distinctOnPrefix}\${baseColumns}, \${trigramFnExpr} AS _similarity\`
       : \`\${_distinctOnPrefix}\${baseColumns}\`;
 
     // Build ORDER BY clause
@@ -573,6 +633,9 @@ export async function listRecords(
     if (vector) {
       // Vector search always orders by distance; DISTINCT ON + vector stays inline
       orderBySQL = \`ORDER BY "\${vector.field}" \${distanceOp} ($1)::vector\`;
+    } else if (trigram) {
+      // Trigram search orders by similarity score descending
+      orderBySQL = \`ORDER BY _similarity DESC\`;
     } else if (useSubquery) {
       // Subquery form: outer query gets the user's full ORDER BY.
       // Inner query only needs to satisfy PG's DISTINCT ON prefix requirement (built at query assembly).

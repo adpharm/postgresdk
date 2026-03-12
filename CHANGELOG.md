@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- feat: Add trigram similarity search to list operations via `pg_trgm`
+  - New `trigram` param on `list()`: `{ field, query, metric?, threshold? }` — orders results by similarity score descending
+  - Supports three metrics: `similarity` (default, `%` operator), `wordSimilarity` (`<%`), `strictWordSimilarity` (`<<%`)
+  - Optional `threshold` filters rows below the given similarity score (0–1)
+  - `_similarity` score is auto-included in every result row when trigram search is active
+  - New `where` operators `$similarity`, `$wordSimilarity`, `$strictWordSimilarity` for inline trigram filtering
+  - `trigram` and `vector` params are mutually exclusive; `distinctOn` subquery form is disabled when trigram is active
+  - `pg_trgm` extension is now enabled in the test schema
+
 ## [v0.18.19] - 2026-03-11
 
 - fix: `distinctOn` + `orderBy` on a non-distinct column now returns correctly ordered results
