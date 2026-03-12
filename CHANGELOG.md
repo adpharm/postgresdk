@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [v0.18.20] - 2026-03-12
 
 - feat: Add trigram similarity search to list operations via `pg_trgm`
   - New `trigram` param on `list()`: `{ field, query, metric?, threshold? }` — orders results by similarity score descending

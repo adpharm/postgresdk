@@ -142,8 +142,25 @@ if [ "$VERSION_TYPE" != "none" ]; then
         git tag -a "v${NEW_VERSION}" -m "Release v${NEW_VERSION}"
         echo -e "${GREEN}✓ Committed and tagged as v${NEW_VERSION}${NC}"
         echo -e "${YELLOW}Don't forget to push: git push && git push --tags${NC}"
-        echo -e "${YELLOW}Don't forget to update the changelog with '[v${NEW_VERSION}] - ${TODAY}', if there is an unreleased section.${NC}"
-        echo -e "${YELLOW}Don't forget to add and commit with 'git add . && git commit -m \"updating changelog with v${NEW_VERSION} release\"'.${NC}"
+
+        # Update changelog: replace "## [Unreleased]" with versioned heading
+        if grep -q "^## \[Unreleased\]" CHANGELOG.md; then
+            echo -e "\n${BLUE}📝 Updating CHANGELOG.md...${NC}"
+            sed -i "s/^## \[Unreleased\]/## [v${NEW_VERSION}] - ${TODAY}/" CHANGELOG.md
+
+            # Verify the replacement worked
+            if grep -q "^## \[v${NEW_VERSION}\] - ${TODAY}" CHANGELOG.md; then
+                echo -e "${GREEN}✓ Changelog updated: [Unreleased] → [v${NEW_VERSION}] - ${TODAY}${NC}"
+                git add .
+                git commit -m "updating changelog with v${NEW_VERSION} release"
+                echo -e "${GREEN}✓ Changelog commit created${NC}"
+            else
+                echo -e "${RED}❌ Changelog update verification failed — please update manually.${NC}"
+                exit 1
+            fi
+        else
+            echo -e "${YELLOW}⚠️  No [Unreleased] section found in CHANGELOG.md — skipping changelog update.${NC}"
+        fi
     fi
 fi
 
