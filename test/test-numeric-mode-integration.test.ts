@@ -167,9 +167,9 @@ test("generated Zod schemas match auto mode expectations", async () => {
   // Read generated Zod file
   const zodFile = await Bun.file(`${OUTPUT_DIR}/client/zod/numeric_test.ts`).text();
 
-  // int4 and int2 should be z.number()
-  expect(zodFile).toContain("id: z.number()");
-  expect(zodFile).toContain("small_val: z.number()");
+  // int4 and int2 should be z.number().int()
+  expect(zodFile).toContain("id: z.number().int()");
+  expect(zodFile).toContain("small_val: z.number().int()");
 
   // int8 and numeric should be z.string()
   expect(zodFile).toContain("big_val: z.string()");

@@ -16,10 +16,10 @@ export function emitZod(table: Table, opts: { numericMode: "string" | "number" |
     if (t === "uuid") return `z.string()`;
     if (t === "bool" || t === "boolean") return `z.boolean()`;
     if (t === "int2" || t === "int4" || t === "int8") {
-      if (opts.numericMode === "number") return `z.number()`;
+      if (opts.numericMode === "number") return `z.number().int()`;
       if (opts.numericMode === "string") return `z.string()`;
-      // auto mode: int2/int4 → number, int8 → string (for precision safety)
-      return (t === "int2" || t === "int4") ? `z.number()` : `z.string()`;
+      // auto mode: int2/int4 → number (int), int8 → string (for precision safety)
+      return (t === "int2" || t === "int4") ? `z.number().int()` : `z.string()`;
     }
     if (t === "numeric" || t === "float4" || t === "float8") {
       if (opts.numericMode === "number") return `z.number()`;
