@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- feat: Soft-delete filtering now applied in generated include-loader for all relation types
+  - `belongsTo`, `hasOne`, `one:N`, and `M:N` loaders all append `AND "col" IS NULL` when a soft-delete column is configured for the target table
+  - Soft-delete column map is validated at code-gen time (column must exist on the table) and baked into the emitted file
+
 ## [v0.18.23] - 2026-03-16
 
 - feat: Add `includeSoftDeleted` option to bypass soft-delete filtering on `getByPk` and `list`

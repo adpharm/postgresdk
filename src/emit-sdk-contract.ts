@@ -1,20 +1,9 @@
-import type { Table, Model } from "./introspect";
+import type { Column, Table, Model } from "./introspect";
 import type { Config, AuthConfig } from "./types";
 import { getAuthStrategy } from "./types";
 import type { Graph } from "./rel-classify";
 import { pascal } from "./utils";
 import { generateIncludeMethods } from "./emit-include-methods";
-
-/**
- * Represents any valid JSON value (for JSONB/JSON columns)
- */
-type JsonValue =
-  | string
-  | number
-  | boolean
-  | null
-  | JsonValue[]
-  | { [key: string]: JsonValue };
 
 export interface UnifiedContract {
   version: string;
@@ -56,7 +45,7 @@ export interface SDKMethod {
   name: string;
   signature: string;
   description: string;
-  example: string;
+  example?: string;
   correspondsTo?: string; // API endpoint
 }
 
@@ -96,7 +85,7 @@ export function generateUnifiedContract(model: Model, config: Config & { auth?: 
   const relationships: RelationshipContract[] = [];
   
   // Process each table
-  const tables = model && model.tables ? Object.values(model.tables) : [];
+  const tables = Object.values(model.tables);
   if (process.env.SDK_DEBUG) {
     console.log(`[SDK Contract] Processing ${tables.length} tables`);
   }
@@ -240,7 +229,17 @@ function generateResourceWithSDK(table: Table, model: Model, graph?: Graph, conf
   const hasSinglePK = table.pk.length === 1;
   const pkField = hasSinglePK ? table.pk[0] : 'id';
   const enums = model.enums || {};
-  
+
+  // Resolve effective soft delete column for this table (mirrors route emitter logic)
+  const overrides = config?.softDeleteColumnOverrides;
+  const resolvedSoftDeleteCol = overrides && tableName in overrides
+    ? (overrides[tableName] ?? null)
+    : (config?.softDeleteColumn ?? null);
+  // Only emit soft delete docs if the column actually exists on this table
+  const softDeleteCol = resolvedSoftDeleteCol && table.columns.some(c => c.name === resolvedSoftDeleteCol)
+    ? resolvedSoftDeleteCol
+    : null;
+
   const sdkMethods: SDKMethod[] = [];
   const endpoints: EndpointContract[] = [];
   
@@ -249,24 +248,13 @@ function generateResourceWithSDK(table: Table, model: Model, graph?: Graph, conf
     name: "list",
     signature: `list(params?: ListParams): Promise<PaginatedResponse<${Type}>>`,
     description: `List ${tableName} with filtering, sorting, and pagination. Returns paginated results with metadata.`,
-    example: `// Get all ${tableName}
-const result = await sdk.${tableName}.list();
-console.log(result.data);        // array of records
-console.log(result.total);       // total matching records
-console.log(result.hasMore);     // true if more pages available
-
-// With filters and pagination
-const filtered = await sdk.${tableName}.list({
-  limit: 20,
-  offset: 0,
-  where: { ${table.columns[0]?.name || 'field'}: { $like: '%search%' } },
+    example: `const result = await sdk.${tableName}.list({
+  where: { ${table.columns[0]?.name || 'id'}: { $ilike: '%value%' } },
   orderBy: '${table.columns[0]?.name || 'created_at'}',
-  order: 'desc'
-});
-
-// Calculate total pages
-const totalPages = Math.ceil(filtered.total / filtered.limit);
-const currentPage = Math.floor(filtered.offset / filtered.limit) + 1;`,
+  order: 'desc',
+  limit: 20,
+  offset: 0${softDeleteCol ? `,\n  includeSoftDeleted: false` : ""}
+}); // result.data, result.total, result.hasMore`,
     correspondsTo: `GET ${basePath}`
   });
 
@@ -284,13 +272,7 @@ const currentPage = Math.floor(filtered.offset / filtered.limit) + 1;`,
       name: "getByPk",
       signature: `getByPk(${pkField}: string): Promise<${Type} | null>`,
       description: `Get a single ${tableName} by primary key`,
-      example: `// Get by ID
-const item = await sdk.${tableName}.getByPk('123e4567-e89b-12d3-a456-426614174000');
-
-// Check if exists
-if (item === null) {
-  console.log('Not found');
-}`,
+      example: `const item = await sdk.${tableName}.getByPk('id');${softDeleteCol ? `\nconst withDeleted = await sdk.${tableName}.getByPk('id', { includeSoftDeleted: true });` : ""} // null if not found`,
       correspondsTo: `GET ${basePath}/:${pkField}`
     });
     
@@ -307,14 +289,9 @@ if (item === null) {
     name: "create",
     signature: `create(data: Insert${Type}): Promise<${Type}>`,
     description: `Create a new ${tableName}`,
-    example: `import type { Insert${Type} } from './client/types/${tableName}';
-
-const newItem: Insert${Type} = {
+    example: `const created = await sdk.${tableName}.create({
   ${generateExampleFields(table, 'create')}
-};
-
-const created = await sdk.${tableName}.create(newItem);
-console.log('Created:', created.${pkField});`,
+});`,
     correspondsTo: `POST ${basePath}`
   });
   
@@ -332,13 +309,9 @@ console.log('Created:', created.${pkField});`,
       name: "update",
       signature: `update(${pkField}: string, data: Update${Type}): Promise<${Type}>`,
       description: `Update an existing ${tableName}`,
-      example: `import type { Update${Type} } from './client/types/${tableName}';
-
-const updates: Update${Type} = {
+      example: `const updated = await sdk.${tableName}.update('id', {
   ${generateExampleFields(table, 'update')}
-};
-
-const updated = await sdk.${tableName}.update('123', updates);`,
+});`,
       correspondsTo: `PATCH ${basePath}/:${pkField}`
     });
     
@@ -357,8 +330,7 @@ const updated = await sdk.${tableName}.update('123', updates);`,
       name: "delete",
       signature: `delete(${pkField}: string): Promise<${Type}>`,
       description: `Delete a ${tableName}`,
-      example: `const deleted = await sdk.${tableName}.delete('123');
-console.log('Deleted:', deleted);`,
+      example: `const deleted = await sdk.${tableName}.delete('id');`,
       correspondsTo: `DELETE ${basePath}/:${pkField}`
     });
     
@@ -372,7 +344,7 @@ console.log('Deleted:', deleted);`,
   
   // Add include methods if we have the graph
   if (graph && config) {
-    const allTables = model && model.tables ? Object.values(model.tables) : undefined;
+    const allTables = Object.values(model.tables);
     const includeMethods = generateIncludeMethods(table, graph, {
       maxDepth: config.includeMethodsDepth ?? 2,
       skipJunctionTables: config.skipJunctionTables ?? true
@@ -380,25 +352,10 @@ console.log('Deleted:', deleted);`,
     
     for (const method of includeMethods) {
       const isGetByPk = method.name.startsWith("getByPk");
-      const exampleCall = isGetByPk
-        ? `const result = await sdk.${tableName}.${method.name}('123e4567-e89b-12d3-a456-426614174000');`
-        : `const result = await sdk.${tableName}.${method.name}();
-console.log(result.data);    // array of records with includes
-console.log(result.total);   // total count
-console.log(result.hasMore); // more pages available
-
-// With filters and pagination
-const filtered = await sdk.${tableName}.${method.name}({
-  limit: 20,
-  offset: 0,
-  where: { /* filter conditions */ }
-});`;
-
       sdkMethods.push({
         name: method.name,
         signature: `${method.name}(${isGetByPk ? `${pkField}: string` : 'params?: ListParams'}): ${method.returnType}`,
         description: `Get ${tableName} with included ${method.path.join(', ')} data`,
-        example: exampleCall,
         correspondsTo: `POST ${basePath}/list`
       });
     }
@@ -422,7 +379,7 @@ const filtered = await sdk.${tableName}.${method.name}({
   };
 }
 
-function generateFieldContract(column: any, table: Table, enums: Record<string, string[]>): FieldContract {
+function generateFieldContract(column: Column, table: Table, enums: Record<string, string[]>): FieldContract {
   const field: FieldContract = {
     name: column.name,
     type: postgresTypeToJsonType(column.pgType, enums),
@@ -446,85 +403,53 @@ function generateFieldContract(column: any, table: Table, enums: Record<string, 
   return field;
 }
 
-function postgresTypeToTsType(column: any, enums: Record<string, string[]>): string {
+/** Shared base category for a postgres type, used by both TS and JSON type mappers. */
+type PgBaseCategory = 'number' | 'boolean' | 'string' | 'string[]' | 'number[]' | 'date' | 'json' | 'uuid';
+
+function pgTypeCategory(t: string): PgBaseCategory {
+  switch (t) {
+    case 'int': case 'int2': case 'int4': case 'int8':
+    case 'integer': case 'smallint': case 'bigint':
+    case 'decimal': case 'numeric':
+    case 'real': case 'float4': case 'float8': case 'double precision': case 'float':
+      return 'number';
+    case 'boolean': case 'bool':
+      return 'boolean';
+    case 'date': case 'timestamp': case 'timestamptz':
+      return 'date';
+    case 'json': case 'jsonb':
+      return 'json';
+    case 'uuid':
+      return 'uuid';
+    case 'text[]': case 'varchar[]': case '_text': case '_varchar':
+      return 'string[]';
+    case 'int[]': case 'integer[]': case '_int': case '_int2': case '_int4': case '_int8': case '_integer':
+      return 'number[]';
+    case 'vector':
+      return 'number[]';
+    default:
+      return 'string';
+  }
+}
+
+function postgresTypeToTsType(column: Column, enums: Record<string, string[]>): string {
   const pgType = column.pgType.toLowerCase();
 
-  // Check if this is an enum type
   if (enums[pgType]) {
     const enumType = enums[pgType].map(v => `"${v}"`).join(" | ");
-    if (column.nullable) {
-      return `${enumType} | null`;
-    }
-    return enumType;
+    return column.nullable ? `${enumType} | null` : enumType;
   }
 
-  // Check if this is an array of enums
-  if (pgType.startsWith("_")) {
-    const enumName = pgType.slice(1);
-    const enumValues = enums[enumName];
-    if (enumValues) {
-      const enumType = enumValues.map(v => `"${v}"`).join(" | ");
-      const arrayType = `(${enumType})[]`;
-      if (column.nullable) {
-        return `${arrayType} | null`;
-      }
-      return arrayType;
-    }
+  const enumArrayValues = enums[pgType.slice(1)];
+  if (pgType.startsWith("_") && enumArrayValues) {
+    const arrayType = `(${enumArrayValues.map(v => `"${v}"`).join(" | ")})[]`;
+    return column.nullable ? `${arrayType} | null` : arrayType;
   }
 
-  const baseType = (() => {
-    switch (pgType) {
-      case 'int':
-      case 'int2':
-      case 'int4':
-      case 'int8':
-      case 'integer':
-      case 'smallint':
-      case 'bigint':
-      case 'decimal':
-      case 'numeric':
-      case 'real':
-      case 'float4':
-      case 'float8':
-      case 'double precision':
-      case 'float':
-        return 'number';
-      case 'boolean':
-      case 'bool':
-        return 'boolean';
-      case 'date':
-      case 'timestamp':
-      case 'timestamptz':
-        return 'string'; // ISO date string
-      case 'json':
-      case 'jsonb':
-        return 'JsonValue';
-      case 'uuid':
-        return 'string';
-      case 'text[]':
-      case 'varchar[]':
-      case '_text':
-      case '_varchar':
-        return 'string[]';
-      case 'int[]':
-      case 'integer[]':
-      case '_int':
-      case '_int2':
-      case '_int4':
-      case '_int8':
-      case '_integer':
-        return 'number[]';
-      case 'vector':
-        return 'number[]';
-      default:
-        return 'string';
-    }
-  })();
-
-  if (column.nullable) {
-    return `${baseType} | null`;
-  }
-  return baseType;
+  const cat = pgTypeCategory(pgType);
+  // date and uuid both serialize as strings in TS; json/jsonb map to JsonValue
+  const baseType = cat === 'date' || cat === 'uuid' ? 'string' : cat === 'json' ? 'JsonValue' : cat;
+  return column.nullable ? `${baseType} | null` : baseType;
 }
 
 function generateExampleFields(table: Table, operation: 'create' | 'update'): string {
@@ -555,7 +480,7 @@ function generateExampleFields(table: Table, operation: 'create' | 'update'): st
   return fields.join(',\n');
 }
 
-function generateExampleValue(column: any): string {
+function generateExampleValue(column: Column): string {
   const name = column.name.toLowerCase();
   
   if (name.includes('email')) return `'user@example.com'`;
@@ -632,85 +557,20 @@ function generateQueryParams(table: Table, enums: Record<string, string[]>): Rec
 
 function postgresTypeToJsonType(pgType: string, enums: Record<string, string[]>): string {
   const t = pgType.toLowerCase();
+  if (enums[t]) return t;
+  if (t.startsWith("_") && enums[t.slice(1)]) return `${t.slice(1)}[]`;
 
-  // Check if this is an enum type
-  if (enums[t]) {
-    return t; // Return the enum name
-  }
-
-  // Check if this is an array of enums
-  if (t.startsWith("_") && enums[t.slice(1)]) {
-    return `${t.slice(1)}[]`;
-  }
-
-  switch (t) {
-    case 'int':
-    case 'int2':
-    case 'int4':
-    case 'int8':
-    case 'integer':
-    case 'smallint':
-    case 'bigint':
-    case 'decimal':
-    case 'numeric':
-    case 'real':
-    case 'float4':
-    case 'float8':
-    case 'double precision':
-    case 'float':
-      return 'number';
-    case 'boolean':
-    case 'bool':
-      return 'boolean';
-    case 'date':
-    case 'timestamp':
-    case 'timestamptz':
-      return 'date/datetime';
-    case 'json':
-    case 'jsonb':
-      return 'object';
-    case 'uuid':
-      return 'uuid';
-    case 'text[]':
-    case 'varchar[]':
-    case '_text':
-    case '_varchar':
-      return 'string[]';
-    case 'int[]':
-    case 'integer[]':
-    case '_int':
-    case '_int2':
-    case '_int4':
-    case '_int8':
-    case '_integer':
-      return 'number[]';
-    case 'vector':
-      return 'number[]';
-    default:
-      return 'string';
-  }
+  const cat = pgTypeCategory(t);
+  return cat === 'date' ? 'date/datetime' : cat === 'json' ? 'object' : cat;
 }
 
-function generateFieldDescription(column: any, table: Table): string {
-  const descriptions: string[] = [];
-  
-  // Special fields
-  if (column.name === 'id') {
-    descriptions.push("Primary key");
-  } else if (column.name === 'created_at') {
-    descriptions.push("Creation timestamp");
-  } else if (column.name === 'updated_at') {
-    descriptions.push("Last update timestamp");
-  } else if (column.name === 'deleted_at') {
-    descriptions.push("Soft delete timestamp");
-  } else if (column.name.endsWith('_id')) {
-    const relatedTable = column.name.slice(0, -3);
-    descriptions.push(`Foreign key to ${relatedTable}`);
-  } else {
-    descriptions.push(column.name.replace(/_/g, ' '));
-  }
-  
-  return descriptions.join(", ");
+function generateFieldDescription(column: Column, table: Table): string {
+  if (column.name === 'id') return "Primary key";
+  if (column.name === 'created_at') return "Creation timestamp";
+  if (column.name === 'updated_at') return "Last update timestamp";
+  if (column.name === 'deleted_at') return "Soft delete timestamp";
+  if (column.name.endsWith('_id')) return `Foreign key to ${column.name.slice(0, -3)}`;
+  return column.name.replace(/_/g, ' ');
 }
 
 /**
@@ -761,295 +621,53 @@ export function generateUnifiedContractMarkdown(contract: UnifiedContract): stri
     }
   }
 
-  // WHERE Clause Filtering
-  lines.push("## Filtering with WHERE Clauses");
-  lines.push("");
-  lines.push("The SDK provides type-safe WHERE clause filtering with support for various operators.");
-  lines.push("");
-  lines.push("### Basic Filtering");
-  lines.push("");
-  lines.push("**Direct equality:**");
-  lines.push("");
-  lines.push("```typescript");
-  lines.push("// Find users with specific email");
-  lines.push("const users = await sdk.users.list({");
-  lines.push("  where: { email: 'user@example.com' }");
-  lines.push("});");
-  lines.push("");
-  lines.push("// Multiple conditions (AND)");
-  lines.push("const activeUsers = await sdk.users.list({");
-  lines.push("  where: {");
-  lines.push("    status: 'active',");
-  lines.push("    role: 'admin'");
-  lines.push("  }");
-  lines.push("});");
-  lines.push("```");
-  lines.push("");
-  lines.push("### Comparison Operators");
-  lines.push("");
-  lines.push("Use comparison operators for numeric, date, and other comparable fields:");
-  lines.push("");
-  lines.push("```typescript");
-  lines.push("// Greater than / Less than");
-  lines.push("const adults = await sdk.users.list({");
-  lines.push("  where: { age: { $gt: 18 } }");
-  lines.push("});");
-  lines.push("");
-  lines.push("// Range queries");
-  lines.push("const workingAge = await sdk.users.list({");
-  lines.push("  where: {");
-  lines.push("    age: { $gte: 18, $lte: 65 }");
-  lines.push("  }");
-  lines.push("});");
-  lines.push("");
-  lines.push("// Not equal");
-  lines.push("const notPending = await sdk.orders.list({");
-  lines.push("  where: { status: { $ne: 'pending' } }");
-  lines.push("});");
-  lines.push("```");
-  lines.push("");
-  lines.push("### String Operators");
-  lines.push("");
-  lines.push("Pattern matching for string fields:");
-  lines.push("");
-  lines.push("```typescript");
-  lines.push("// Case-sensitive LIKE");
-  lines.push("const johnsmiths = await sdk.users.list({");
-  lines.push("  where: { name: { $like: '%Smith%' } }");
-  lines.push("});");
-  lines.push("");
-  lines.push("// Case-insensitive ILIKE");
-  lines.push("const gmailUsers = await sdk.users.list({");
-  lines.push("  where: { email: { $ilike: '%@gmail.com' } }");
-  lines.push("});");
-  lines.push("```");
-  lines.push("");
-  lines.push("### Array Operators");
-  lines.push("");
-  lines.push("Filter by multiple possible values:");
-  lines.push("");
-  lines.push("```typescript");
-  lines.push("// IN - match any value in array");
-  lines.push("const specificUsers = await sdk.users.list({");
-  lines.push("  where: {");
-  lines.push("    id: { $in: ['id1', 'id2', 'id3'] }");
-  lines.push("  }");
-  lines.push("});");
-  lines.push("");
-  lines.push("// NOT IN - exclude values");
-  lines.push("const nonSystemUsers = await sdk.users.list({");
-  lines.push("  where: {");
-  lines.push("    role: { $nin: ['admin', 'system'] }");
-  lines.push("  }");
-  lines.push("});");
-  lines.push("```");
-  lines.push("");
-  lines.push("### NULL Checks");
-  lines.push("");
-  lines.push("Check for null or non-null values:");
-  lines.push("");
-  lines.push("```typescript");
-  lines.push("// IS NULL");
-  lines.push("const activeRecords = await sdk.records.list({");
-  lines.push("  where: { deleted_at: { $is: null } }");
-  lines.push("});");
-  lines.push("");
-  lines.push("// IS NOT NULL");
-  lines.push("const deletedRecords = await sdk.records.list({");
-  lines.push("  where: { deleted_at: { $isNot: null } }");
-  lines.push("});");
-  lines.push("```");
-  lines.push("");
-  lines.push("### Combining Operators");
-  lines.push("");
-  lines.push("Mix multiple operators for complex queries:");
-  lines.push("");
-  lines.push("```typescript");
-  lines.push("const filteredUsers = await sdk.users.list({");
-  lines.push("  where: {");
-  lines.push("    age: { $gte: 18, $lt: 65 },");
-  lines.push("    email: { $ilike: '%@company.com' },");
-  lines.push("    status: { $in: ['active', 'pending'] },");
-  lines.push("    deleted_at: { $is: null }");
-  lines.push("  },");
-  lines.push("  limit: 50,");
-  lines.push("  offset: 0");
-  lines.push("});");
-  lines.push("```");
-  lines.push("");
-  lines.push("### Available Operators");
-  lines.push("");
-  lines.push("| Operator | Description | Example | Types |");
-  lines.push("|----------|-------------|---------|-------|");
-  lines.push("| `$eq` | Equal to | `{ age: { $eq: 25 } }` | All |");
-  lines.push("| `$ne` | Not equal to | `{ status: { $ne: 'inactive' } }` | All |");
-  lines.push("| `$gt` | Greater than | `{ price: { $gt: 100 } }` | Number, Date |");
-  lines.push("| `$gte` | Greater than or equal | `{ age: { $gte: 18 } }` | Number, Date |");
-  lines.push("| `$lt` | Less than | `{ quantity: { $lt: 10 } }` | Number, Date |");
-  lines.push("| `$lte` | Less than or equal | `{ age: { $lte: 65 } }` | Number, Date |");
-  lines.push("| `$in` | In array | `{ id: { $in: ['a', 'b'] } }` | All |");
-  lines.push("| `$nin` | Not in array | `{ role: { $nin: ['admin'] } }` | All |");
-  lines.push("| `$like` | Pattern match (case-sensitive) | `{ name: { $like: '%John%' } }` | String |");
-  lines.push("| `$ilike` | Pattern match (case-insensitive) | `{ email: { $ilike: '%@GMAIL%' } }` | String |");
-  lines.push("| `$is` | IS NULL | `{ deleted_at: { $is: null } }` | Nullable fields |");
-  lines.push("| `$isNot` | IS NOT NULL | `{ created_by: { $isNot: null } }` | Nullable fields |");
-  lines.push("| `$jsonbContains` | JSONB contains | `{ metadata: { $jsonbContains: { tags: ['premium'] } } }` | JSONB/JSON |");
-  lines.push("| `$jsonbContainedBy` | JSONB contained by | `{ metadata: { $jsonbContainedBy: {...} } }` | JSONB/JSON |");
-  lines.push("| `$jsonbHasKey` | JSONB has key | `{ settings: { $jsonbHasKey: 'theme' } }` | JSONB/JSON |");
-  lines.push("| `$jsonbHasAnyKeys` | JSONB has any keys | `{ settings: { $jsonbHasAnyKeys: ['dark', 'light'] } }` | JSONB/JSON |");
-  lines.push("| `$jsonbHasAllKeys` | JSONB has all keys | `{ config: { $jsonbHasAllKeys: ['api', 'db'] } }` | JSONB/JSON |");
-  lines.push("| `$jsonbPath` | JSONB nested value | `{ meta: { $jsonbPath: { path: ['user', 'age'], operator: '$gte', value: 18 } } }` | JSONB/JSON |");
-  lines.push("");
+  lines.push(`## Filtering
 
-  // Logical operators
-  lines.push("### Logical Operators");
-  lines.push("");
-  lines.push("Combine conditions using `$or` and `$and` (supports 2 levels of nesting):");
-  lines.push("");
-  lines.push("| Operator | Description | Example |");
-  lines.push("|----------|-------------|---------|");
-  lines.push("| `$or` | Match any condition | `{ $or: [{ status: 'active' }, { role: 'admin' }] }` |");
-  lines.push("| `$and` | Match all conditions (explicit) | `{ $and: [{ age: { $gte: 18 } }, { status: 'verified' }] }` |");
-  lines.push("");
-  lines.push("```typescript");
-  lines.push("// OR - match any condition");
-  lines.push("const results = await sdk.users.list({");
-  lines.push("  where: {");
-  lines.push("    $or: [");
-  lines.push("      { email: { $ilike: '%@gmail.com' } },");
-  lines.push("      { status: 'premium' }");
-  lines.push("    ]");
-  lines.push("  }");
-  lines.push("});");
-  lines.push("");
-  lines.push("// Mixed AND + OR (implicit AND at root level)");
-  lines.push("const complex = await sdk.users.list({");
-  lines.push("  where: {");
-  lines.push("    status: 'active',  // AND");
-  lines.push("    $or: [");
-  lines.push("      { age: { $lt: 18 } },");
-  lines.push("      { age: { $gt: 65 } }");
-  lines.push("    ]");
-  lines.push("  }");
-  lines.push("});");
-  lines.push("");
-  lines.push("// Nested (2 levels max)");
-  lines.push("const nested = await sdk.users.list({");
-  lines.push("  where: {");
-  lines.push("    $and: [");
-  lines.push("      {");
-  lines.push("        $or: [");
-  lines.push("          { firstName: { $ilike: '%john%' } },");
-  lines.push("          { lastName: { $ilike: '%john%' } }");
-  lines.push("        ]");
-  lines.push("      },");
-  lines.push("      { status: 'active' }");
-  lines.push("    ]");
-  lines.push("  }");
-  lines.push("});");
-  lines.push("```");
-  lines.push("");
-  lines.push("**Note:** The WHERE clause types are fully type-safe. TypeScript will only allow operators that are valid for each field type.");
-  lines.push("");
+Type-safe WHERE clauses. Root-level keys are AND'd; use \`$or\`/\`$and\` for logic (2 levels max).
 
-  // Sorting
-  lines.push("## Sorting");
-  lines.push("");
-  lines.push("Sort query results using the `orderBy` and `order` parameters. Supports both single and multi-column sorting.");
-  lines.push("");
-  lines.push("### Single Column Sorting");
-  lines.push("");
-  lines.push("```typescript");
-  lines.push("// Sort by one column ascending");
-  lines.push("const users = await sdk.users.list({");
-  lines.push("  orderBy: 'created_at',");
-  lines.push("  order: 'asc'");
-  lines.push("});");
-  lines.push("");
-  lines.push("// Sort descending");
-  lines.push("const latest = await sdk.users.list({");
-  lines.push("  orderBy: 'created_at',");
-  lines.push("  order: 'desc'");
-  lines.push("});");
-  lines.push("");
-  lines.push("// Order defaults to 'asc' if not specified");
-  lines.push("const sorted = await sdk.users.list({");
-  lines.push("  orderBy: 'name'");
-  lines.push("});");
-  lines.push("```");
-  lines.push("");
-  lines.push("### Multi-Column Sorting");
-  lines.push("");
-  lines.push("```typescript");
-  lines.push("// Sort by multiple columns (all same direction)");
-  lines.push("const users = await sdk.users.list({");
-  lines.push("  orderBy: ['status', 'created_at'],");
-  lines.push("  order: 'desc'");
-  lines.push("});");
-  lines.push("");
-  lines.push("// Different direction per column");
-  lines.push("const sorted = await sdk.users.list({");
-  lines.push("  orderBy: ['status', 'created_at'],");
-  lines.push("  order: ['asc', 'desc']  // status ASC, created_at DESC");
-  lines.push("});");
-  lines.push("```");
-  lines.push("");
-  lines.push("### Combining Sorting with Filters");
-  lines.push("");
-  lines.push("```typescript");
-  lines.push("const results = await sdk.users.list({");
-  lines.push("  where: {");
-  lines.push("    status: 'active',");
-  lines.push("    age: { $gte: 18 }");
-  lines.push("  },");
-  lines.push("  orderBy: 'created_at',");
-  lines.push("  order: 'desc',");
-  lines.push("  limit: 50,");
-  lines.push("  offset: 0");
-  lines.push("});");
-  lines.push("```");
-  lines.push("");
-  lines.push("**Note:** Column names are validated by Zod schemas. Only valid table columns are accepted, preventing SQL injection.");
-  lines.push("");
+\`\`\`typescript
+await sdk.users.list({
+  where: {
+    status:     { $in: ['active', 'pending'] },
+    age:        { $gte: 18, $lt: 65 },
+    email:      { $ilike: '%@company.com' },
+    deleted_at: { $is: null },
+    meta:       { $jsonbContains: { tag: 'vip' } },
+    $or: [{ role: 'admin' }, { role: 'mod' }]
+  }
+});
+\`\`\`
 
-  // Vector Search
-  lines.push("## Vector Search");
-  lines.push("");
-  lines.push("For tables with `vector` columns (requires pgvector extension), use the `vector` parameter for similarity search:");
-  lines.push("");
-  lines.push("```typescript");
-  lines.push("// Basic similarity search");
-  lines.push("const results = await sdk.embeddings.list({");
-  lines.push("  vector: {");
-  lines.push("    field: 'embedding',");
-  lines.push("    query: [0.1, 0.2, 0.3, ...],  // Your embedding vector");
-  lines.push("    metric: 'cosine'  // 'cosine' (default), 'l2', or 'inner'");
-  lines.push("  },");
-  lines.push("  limit: 10");
-  lines.push("});");
-  lines.push("");
-  lines.push("// Results include _distance field");
-  lines.push("results.data[0]._distance;  // Similarity distance");
-  lines.push("");
-  lines.push("// Distance threshold filtering");
-  lines.push("const closeMatches = await sdk.embeddings.list({");
-  lines.push("  vector: {");
-  lines.push("    field: 'embedding',");
-  lines.push("    query: queryVector,");
-  lines.push("    maxDistance: 0.5  // Only return results within this distance");
-  lines.push("  }");
-  lines.push("});");
-  lines.push("");
-  lines.push("// Hybrid search: vector + WHERE filters");
-  lines.push("const filtered = await sdk.embeddings.list({");
-  lines.push("  vector: { field: 'embedding', query: queryVector },");
-  lines.push("  where: {");
-  lines.push("    status: 'published',");
-  lines.push("    embedding: { $isNot: null }");
-  lines.push("  }");
-  lines.push("});");
-  lines.push("```");
-  lines.push("");
+| Operator | SQL | Types |
+|----------|-----|-------|
+| \`$eq\` \`$ne\` | = ≠ | All |
+| \`$gt\` \`$gte\` \`$lt\` \`$lte\` | > ≥ < ≤ | Number, Date |
+| \`$in\` \`$nin\` | IN / NOT IN | All |
+| \`$like\` \`$ilike\` | LIKE / ILIKE | String |
+| \`$is\` \`$isNot\` | IS NULL / IS NOT NULL | Nullable |
+| \`$jsonbContains\` \`$jsonbContainedBy\` \`$jsonbHasKey\` \`$jsonbHasAnyKeys\` \`$jsonbHasAllKeys\` \`$jsonbPath\` | JSONB ops | JSONB |
+| \`$or\` \`$and\` | OR / AND (2 levels) | — |
+
+## Sorting
+
+\`orderBy\` accepts a column name or array; \`order\` accepts \`'asc'\`/\`'desc'\` or a per-column array.
+
+\`\`\`typescript
+await sdk.users.list({ orderBy: ['status', 'created_at'], order: ['asc', 'desc'] });
+\`\`\`
+
+## Vector Search
+
+For tables with \`vector\` columns (requires pgvector). Results include a \`_distance\` field.
+
+\`\`\`typescript
+const results = await sdk.embeddings.list({
+  vector: { field: 'embedding', query: [0.1, 0.2, 0.3, /* ... */], metric: 'cosine', maxDistance: 0.5 },
+  where: { status: 'published' },
+  limit: 10
+}); // results.data[0]._distance
+\`\`\`
+`);
 
   // Resources
   lines.push("## Resources");
@@ -1075,10 +693,12 @@ export function generateUnifiedContractMarkdown(contract: UnifiedContract): stri
         lines.push(`- API: \`${method.correspondsTo}\``);
       }
       lines.push("");
-      lines.push("```typescript");
-      lines.push(method.example);
-      lines.push("```");
-      lines.push("");
+      if (method.example) {
+        lines.push("```typescript");
+        lines.push(method.example);
+        lines.push("```");
+        lines.push("");
+      }
     }
     
     // API Endpoints
@@ -1120,24 +740,14 @@ export function generateUnifiedContractMarkdown(contract: UnifiedContract): stri
     lines.push("");
   }
   
-  // Type imports
-  lines.push("## Type Imports");
-  lines.push("");
-  lines.push("```typescript");
-  lines.push("// Import SDK and types");
-  lines.push("import { SDK } from './client';");
-  lines.push("");
-  lines.push("// Import types for a specific table");
-  lines.push("import type {");
-  lines.push("  SelectTableName,  // Full record type");
-  lines.push("  InsertTableName,  // Create payload type");
-  lines.push("  UpdateTableName   // Update payload type");
-  lines.push("} from './client/types/table_name';");
-  lines.push("");
-  lines.push("// Import all types");
-  lines.push("import type * as Types from './client/types';");
-  lines.push("```");
-  lines.push("");
+  lines.push(`## Type Imports
+
+\`\`\`typescript
+import { SDK } from './client';
+import type { SelectTableName, InsertTableName, UpdateTableName } from './client/types/table_name';
+import type * as Types from './client/types';
+\`\`\`
+`);
   
   return lines.join("\n");
 }

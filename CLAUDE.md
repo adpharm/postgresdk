@@ -63,4 +63,7 @@ Reference [./CLAUDE-UI-STYLE-GUIDE.md](./CLAUDE-UI-STYLE-GUIDE.md) for ui stuff.
 **Important**
 
 - We use Bun. Not NPM.
-- We have tests defined in package.json. Use them. Run `bun run test` to run them. Don't bother running individual tests - RUN THE WHOLE DAMN THING!
+- We have tests defined in package.json. Use them. Run `bun run test` to run them.
+- If you add a test (and you should for bug fixes and new features), ask your self these questions:
+  1. is the test real and not facade?
+  2. is the test run as part of `bun run test`? (that's the only valid way to run tests)

@@ -153,9 +153,17 @@ export async function generate(configPath: string) {
   });
 
   // include-loader (server)
+  // Build a validated per-table soft-delete column map (column must exist on the table)
+  const softDeleteCols = Object.fromEntries(
+    Object.values(model.tables).map((t) => {
+      const col = resolveSoftDeleteColumn(cfg, t.name);
+      const validated = col && t.columns.some((c) => c.name === col) ? col : null;
+      return [t.name, validated];
+    })
+  );
   files.push({
     path: join(serverDir, "include-loader.ts"),
-    content: emitIncludeLoader(graph, model, cfg.includeMethodsDepth || 2, cfg.useJsExtensions),
+    content: emitIncludeLoader(model, cfg.includeMethodsDepth || 2, { softDeleteCols, useJsExtensions: cfg.useJsExtensions }),
   });
 
   // logger (server)
@@ -196,7 +204,7 @@ export async function generate(configPath: string) {
     let routeContent: string;
     if (serverFramework === "hono") {
       routeContent = emitHonoRoutes(table, graph, {
-        softDeleteColumn: resolveSoftDeleteColumn(cfg, table.name),
+        softDeleteColumn: softDeleteCols[table.name] ?? null,
         includeMethodsDepth: cfg.includeMethodsDepth || 2,
         authStrategy: getAuthStrategy(normalizedAuth),
         useJsExtensions: cfg.useJsExtensions,

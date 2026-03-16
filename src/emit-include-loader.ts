@@ -1,5 +1,9 @@
-import type { Graph } from "./rel-classify";
 import type { Model } from "./introspect";
+
+type EmitIncludeLoaderOpts = {
+  softDeleteCols?: Record<string, string | null>;
+  useJsExtensions?: boolean;
+};
 
 /**
  * Emit a generic include loader that:
@@ -7,7 +11,9 @@ import type { Model } from "./introspect";
  * - Loads children in batches per edge kind
  * - Stitches onto parent rows (mutates copies)
  */
-export function emitIncludeLoader(graph: Graph, model: Model, maxDepth: number, useJsExtensions?: boolean) {
+export function emitIncludeLoader(model: Model, maxDepth: number, opts: EmitIncludeLoaderOpts = {}) {
+  const { softDeleteCols = {}, useJsExtensions } = opts;
+
   // Precompute helpful maps for FK discovery
   const fkIndex: Record<
     string,
@@ -57,12 +63,22 @@ const log = {
 };
 
 // Helpers for PK/FK discovery from model (inlined)
-const FK_INDEX = ${JSON.stringify(fkIndex, null, 2)} as const;
-const PKS = ${JSON.stringify(
+const FK_INDEX: Record<string, Array<{from: string[]; toTable: string; to: string[]}>> = ${JSON.stringify(fkIndex, null, 2)};
+const PKS: Record<string, string[]> = ${JSON.stringify(
     Object.fromEntries(Object.values(model.tables).map((t) => [t.name, t.pk])),
     null,
     2
-  )} as const;
+  )};
+/** Soft-delete column per table, null if not applicable. Baked in at generation time. */
+const SOFT_DELETE_COLS: Record<string, string | null> = ${JSON.stringify(softDeleteCols, null, 2)};
+
+/** Returns a SQL fragment like ' AND "col" IS NULL' for the given table, or "" if none. */
+function softDeleteFilter(table: string, alias?: string): string {
+  const col = SOFT_DELETE_COLS[table];
+  if (!col) return "";
+  const ref = alias ? \`\${alias}."\${col}"\` : \`"\${col}"\`;
+  return \` AND \${ref} IS NULL\`;
+}
 
 // Build WHERE predicate for OR-of-AND on composite values
 function buildOrAndPredicate(cols: string[], count: number, startIndex: number) {
@@ -152,6 +168,49 @@ function filterFields<T extends Record<string, any>>(
   });
 }
 
+/** Sentinel used as window-function LIMIT when no per-parent limit is requested. */
+const NO_LIMIT = 999_999_999;
+
+/**
+ * FK_INDEX and PKS are fully populated at code-gen time for all schema tables,
+ * so lookups by TableName are always defined. These helpers assert non-null
+ * in one place rather than scattering \`!\` or \`as any\` at every call site.
+ */
+function fksOf(table: string): Array<{from: string[]; toTable: string; to: string[]}> {
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+  return FK_INDEX[table]!;
+}
+function pkOf(table: string): string[] {
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+  return PKS[table]!;
+}
+
+/** Parse relation options and nested child spec from a specValue entry. */
+function parseSpecOptions(specValue: any): { options: RelationOptions; childSpec: any } {
+  const options: RelationOptions = {};
+  let childSpec: any = undefined;
+  if (specValue && typeof specValue === "object" && specValue !== true) {
+    if (specValue.select !== undefined) options.select = specValue.select;
+    if (specValue.exclude !== undefined) options.exclude = specValue.exclude;
+    if (specValue.limit !== undefined) options.limit = specValue.limit;
+    if (specValue.offset !== undefined) options.offset = specValue.offset;
+    if (specValue.orderBy !== undefined) options.orderBy = specValue.orderBy;
+    if (specValue.order !== undefined) options.order = specValue.order;
+    if (specValue.include !== undefined) {
+      childSpec = specValue.include;
+    } else {
+      // Support legacy format: { tags: true } alongside new: { include: { tags: true } }
+      const nonOptionKeys = Object.keys(specValue).filter(
+        k => k !== 'select' && k !== 'exclude' && k !== 'limit' && k !== 'offset' && k !== 'orderBy' && k !== 'order'
+      );
+      if (nonOptionKeys.length > 0) {
+        childSpec = Object.fromEntries(nonOptionKeys.map(k => [k, specValue[k]]));
+      }
+    }
+  }
+  return { options, childSpec };
+}
+
 // Public entry
 export async function loadIncludes(
   root: TableName,
@@ -191,37 +250,7 @@ export async function loadIncludes(
       // Safely run each loader; never let one bad edge 500 the route
       if (rel.via) {
         // M:N via junction
-        const specValue = s[key];
-        const options: RelationOptions = {};
-        let childSpec: any = undefined;
-
-        if (specValue && typeof specValue === "object" && specValue !== true) {
-          // Extract options
-          if (specValue.select !== undefined) options.select = specValue.select;
-          if (specValue.exclude !== undefined) options.exclude = specValue.exclude;
-          if (specValue.limit !== undefined) options.limit = specValue.limit;
-          if (specValue.offset !== undefined) options.offset = specValue.offset;
-          if (specValue.orderBy !== undefined) options.orderBy = specValue.orderBy;
-          if (specValue.order !== undefined) options.order = specValue.order;
-
-          // Extract nested spec - support both formats:
-          // New: { limit: 3, include: { tags: true } }
-          // Old: { tags: true } (backward compatibility)
-          if (specValue.include !== undefined) {
-            childSpec = specValue.include;
-          } else {
-            // Build childSpec from non-option keys
-            const nonOptionKeys = Object.keys(specValue).filter(
-              k => k !== 'select' && k !== 'exclude' && k !== 'limit' && k !== 'offset' && k !== 'orderBy' && k !== 'order'
-            );
-            if (nonOptionKeys.length > 0) {
-              childSpec = {};
-              for (const k of nonOptionKeys) {
-                childSpec[k] = specValue[k];
-              }
-            }
-          }
-        }
+        const { options, childSpec } = parseSpecOptions(s[key]);
 
         try {
           await loadManyToMany(table, target, rel.via as string, rows, key, options);
@@ -243,37 +272,7 @@ export async function loadIncludes(
 
       if (rel.kind === "many") {
         // 1:N target has FK to current
-        const specValue = s[key];
-        const options: RelationOptions = {};
-        let childSpec: any = undefined;
-
-        if (specValue && typeof specValue === "object" && specValue !== true) {
-          // Extract options
-          if (specValue.select !== undefined) options.select = specValue.select;
-          if (specValue.exclude !== undefined) options.exclude = specValue.exclude;
-          if (specValue.limit !== undefined) options.limit = specValue.limit;
-          if (specValue.offset !== undefined) options.offset = specValue.offset;
-          if (specValue.orderBy !== undefined) options.orderBy = specValue.orderBy;
-          if (specValue.order !== undefined) options.order = specValue.order;
-
-          // Extract nested spec - support both formats:
-          // New: { limit: 3, include: { tags: true } }
-          // Old: { tags: true } (backward compatibility)
-          if (specValue.include !== undefined) {
-            childSpec = specValue.include;
-          } else {
-            // Build childSpec from non-option keys
-            const nonOptionKeys = Object.keys(specValue).filter(
-              k => k !== 'select' && k !== 'exclude' && k !== 'limit' && k !== 'offset' && k !== 'orderBy' && k !== 'order'
-            );
-            if (nonOptionKeys.length > 0) {
-              childSpec = {};
-              for (const k of nonOptionKeys) {
-                childSpec[k] = specValue[k];
-              }
-            }
-          }
-        }
+        const { options, childSpec } = parseSpecOptions(s[key]);
 
         try {
           await loadOneToMany(table, target, rows, key, options);
@@ -293,20 +292,11 @@ export async function loadIncludes(
       } else {
         // kind === "one"
         // Could be belongs-to (current has FK to target) OR has-one (target unique-FK to current)
-        const specValue = s[key];
-        const options: RelationOptions = {};
-        let childSpec: any = undefined;
+        // Destructure only select/exclude/childSpec — limit/offset/orderBy don't apply to 1:1 relations
+        const { options: { select, exclude }, childSpec } = parseSpecOptions(s[key]);
+        const options: RelationOptions = { select, exclude };
 
-        if (specValue && typeof specValue === "object" && specValue !== true) {
-          if (specValue.select !== undefined) options.select = specValue.select;
-          if (specValue.exclude !== undefined) options.exclude = specValue.exclude;
-          // Support { include: TargetIncludeSpec } — mirrors the many/via handler
-          if (specValue.include !== undefined) {
-            childSpec = specValue.include;
-          }
-        }
-
-        const currFks = (FK_INDEX as any)[table] as Array<{from:string[];toTable:string;to:string[]}>;
+        const currFks = fksOf(table);
         const toTarget = currFks.find(f => f.toTable === target);
         if (toTarget) {
           try {
@@ -338,16 +328,16 @@ export async function loadIncludes(
 
   async function loadBelongsTo(curr: TableName, target: TableName, rows: any[], key: string, options: RelationOptions = {}) {
     // current has FK cols referencing target PK
-    const fk = (FK_INDEX as any)[curr].find((f: any) => f.toTable === target);
+    const fk = fksOf(curr).find(f => f.toTable === target);
     if (!fk) { for (const r of rows) r[key] = null; return; }
     const tuples = distinctTuples(rows, fk.from).filter(t => t.every((v: any) => v != null));
     if (!tuples.length) { for (const r of rows) r[key] = null; return; }
 
     // Query target WHERE target.pk IN tuples
-    const pkCols = (PKS as any)[target] as string[];
+    const pkCols = pkOf(target);
     const where = buildOrAndPredicate(pkCols, tuples.length, 1);
     const params = tuples.flat();
-    const sql = \`SELECT * FROM "\${target}" WHERE \${where}\`;
+    const sql = \`SELECT * FROM "\${target}" WHERE \${where}\${softDeleteFilter(target)}\`;
     log.debug("belongsTo SQL", { curr, target, key, sql, paramsCount: params.length });
     const { rows: targets } = await pg.query(sql, params);
 
@@ -364,17 +354,17 @@ export async function loadIncludes(
 
   async function loadHasOne(curr: TableName, target: TableName, rows: any[], key: string, options: RelationOptions = {}) {
     // target has FK cols referencing current PK (unique)
-    const fk = (FK_INDEX as any)[target].find((f: any) => f.toTable === curr);
+    const fk = fksOf(target).find(f => f.toTable === curr);
     if (!fk) { for (const r of rows) r[key] = null; return; }
 
-    const pkCols = (PKS as any)[curr] as string[];
+    const pkCols = pkOf(curr);
     const tuples = distinctTuples(rows, pkCols).filter(t => t.every((v: any) => v != null));
     if (!tuples.length) { for (const r of rows) r[key] = null; return; }
 
     // SELECT target WHERE fk IN tuples
     const where = buildOrAndPredicate(fk.from, tuples.length, 1);
     const params = tuples.flat();
-    const sql = \`SELECT * FROM "\${target}" WHERE \${where}\`;
+    const sql = \`SELECT * FROM "\${target}" WHERE \${where}\${softDeleteFilter(target)}\`;
     log.debug("hasOne SQL", { curr, target, key, sql, paramsCount: params.length });
     const { rows: targets } = await pg.query(sql, params);
 
@@ -390,10 +380,10 @@ export async function loadIncludes(
 
   async function loadOneToMany(curr: TableName, target: TableName, rows: any[], key: string, options: RelationOptions = {}) {
     // target has FK cols referencing current PK
-    const fk = (FK_INDEX as any)[target].find((f: any) => f.toTable === curr);
+    const fk = fksOf(target).find(f => f.toTable === curr);
     if (!fk) { for (const r of rows) r[key] = []; return; }
 
-    const pkCols = (PKS as any)[curr] as string[];
+    const pkCols = pkOf(curr);
     const tuples = distinctTuples(rows, pkCols).filter(t => t.every((v: any) => v != null));
     if (!tuples.length) { for (const r of rows) r[key] = []; return; }
 
@@ -401,7 +391,7 @@ export async function loadIncludes(
     const params = tuples.flat();
 
     // Build SQL with optional ORDER BY, LIMIT, OFFSET
-    let sql = \`SELECT * FROM "\${target}" WHERE \${where}\`;
+    let sql = \`SELECT * FROM "\${target}" WHERE \${where}\${softDeleteFilter(target)}\`;
 
     // If limit/offset are needed, use window functions to limit per parent
     if (options.limit !== undefined || options.offset !== undefined) {
@@ -411,13 +401,13 @@ export async function loadIncludes(
 
       const partitionCols = fk.from.map((c: string) => \`"\${c}"\`).join(', ');
       const offset = options.offset ?? 0;
-      const limit = options.limit ?? 999999999;
+      const limit = options.limit ?? NO_LIMIT;
 
       sql = \`
         SELECT * FROM (
           SELECT *, ROW_NUMBER() OVER (PARTITION BY \${partitionCols} \${orderByClause}) as __rn
           FROM "\${target}"
-          WHERE \${where}
+          WHERE \${where}\${softDeleteFilter(target)}
         ) __sub
         WHERE __rn > \${offset} AND __rn <= \${offset + limit}
       \`;
@@ -447,11 +437,11 @@ export async function loadIncludes(
 
   async function loadManyToMany(curr: TableName, target: TableName, via: string, rows: any[], key: string, options: RelationOptions = {}) {
     // via has two FKs: one to curr, one to target
-    const toCurr = (FK_INDEX as any)[via].find((f: any) => f.toTable === curr);
-    const toTarget = (FK_INDEX as any)[via].find((f: any) => f.toTable === target);
+    const toCurr = fksOf(via).find(f => f.toTable === curr);
+    const toTarget = fksOf(via).find(f => f.toTable === target);
     if (!toCurr || !toTarget) { for (const r of rows) r[key] = []; return; }
 
-    const pkCols = (PKS as any)[curr] as string[];
+    const pkCols = pkOf(curr);
     const tuples = distinctTuples(rows, pkCols).filter(t => t.every((v: any) => v != null));
     if (!tuples.length) { for (const r of rows) r[key] = []; return; }
 
@@ -466,9 +456,9 @@ export async function loadIncludes(
 
       const partitionCols = toCurr.from.map((c: string) => \`j."\${c}"\`).join(', ');
       const offset = options.offset ?? 0;
-      const limit = options.limit ?? 999999999;
+      const limit = options.limit ?? NO_LIMIT;
 
-      const targetPkCols = (PKS as any)[target] as string[];
+      const targetPkCols = pkOf(target);
       const joinConditions = toTarget.from.map((jCol: string, i: number) => {
         return \`j."\${jCol}" = t."\${targetPkCols[i]}"\`;
       }).join(' AND ');
@@ -481,7 +471,7 @@ export async function loadIncludes(
                  \${toCurr.from.map((c: string) => \`j."\${c}"\`).join(' || \\',\\' || ')} as __parent_fk
           FROM "\${via}" j
           INNER JOIN "\${target}" t ON \${joinConditions}
-          WHERE \${whereVia}
+          WHERE \${whereVia}\${softDeleteFilter(target, "t")}
         ) __numbered
         WHERE __numbered.__rn > \${offset} AND __numbered.__rn <= \${offset + limit}
       \`;
@@ -524,8 +514,8 @@ export async function loadIncludes(
 
       // 2) Load targets by distinct target fk tuples in junction
       const tTuples = distinctTuples(jrows, toTarget.from);
-      const whereT = buildOrAndPredicate((PKS as any)[target], tTuples.length, 1);
-      const sqlT = \`SELECT * FROM "\${target}" WHERE \${whereT}\`;
+      const whereT = buildOrAndPredicate(pkOf(target), tTuples.length, 1);
+      const sqlT = \`SELECT * FROM "\${target}" WHERE \${whereT}\${softDeleteFilter(target)}\`;
       const paramsT = tTuples.flat();
       log.debug("manyToMany target SQL", { curr, target, via, key, sql: sqlT, paramsCount: paramsT.length });
       const { rows: targets } = await pg.query(sqlT, paramsT);
@@ -533,7 +523,7 @@ export async function loadIncludes(
       // Apply select/exclude filtering
       const filteredTargets = filterFields(targets, options.select, options.exclude);
 
-      const tIdx = indexByTuple(filteredTargets, (PKS as any)[target]);
+      const tIdx = indexByTuple(filteredTargets, pkOf(target));
 
       // 3) Group junction rows by current pk tuple, map to target rows
       const byCurr = groupByTuple(jrows, toCurr.from);
