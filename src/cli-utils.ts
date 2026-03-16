@@ -19,7 +19,7 @@ export async function confirmAndDeleteStaleFiles(
 ): Promise<{ deleted: number; skipped: number; filesDeleted: string[] }> {
   if (staleFiles.length === 0) return { deleted: 0, skipped: 0, filesDeleted: [] };
 
-  if (!force && !process.stdout.isTTY) {
+  if (!force && !process.stdin.isTTY) {
     console.log(`⚠️  ${staleFiles.length} stale file(s) not deleted (non-interactive shell). Re-run with --force to delete.`);
     return { deleted: 0, skipped: staleFiles.length, filesDeleted: [] };
   }

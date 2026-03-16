@@ -547,6 +547,8 @@ pnpm dlx postgresdk@latest pull
 
 The SDK files are written directly to your client project, giving you full TypeScript autocomplete and type safety.
 
+**Stale file cleanup:** Both `generate` and `pull` automatically remove files that are no longer part of the SDK. In an interactive terminal you'll be prompted to confirm each deletion; use `--force` (or `-y`) to skip prompts. In non-interactive environments (CI), stale files are skipped with a warning unless `--force` is passed.
+
 ### Using the SDK
 
 #### CRUD Operations
@@ -1014,6 +1016,7 @@ Commands:
 
 Options:
   -c, --config <path>  Path to config file (default: postgresdk.config.ts)
+  --force, -y          Delete stale files without prompting (generate & pull)
 
 Init subcommands/flags:
   init pull            Generate pull-only config (alias for --sdk)
@@ -1026,7 +1029,9 @@ Examples:
   npx postgresdk@latest init --api                        # API-side config
   npx postgresdk@latest generate
   npx postgresdk@latest generate -c custom.config.ts
+  npx postgresdk@latest generate --force                  # Skip stale file prompts
   npx postgresdk@latest pull --from=https://api.com --output=./src/sdk
+  npx postgresdk@latest pull --from=https://api.com --output=./src/sdk --force
 ```
 
 ### Generated Tests

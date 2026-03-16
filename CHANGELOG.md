@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- fix: TTY detection for stale file prompts now checks `stdin` instead of `stdout`
+  - Fixes false "non-interactive" detection when stdout is piped (e.g. `postgresdk generate | tee log.txt`) while the terminal is still interactive
+- docs: README updated with stale file cleanup behaviour and `--force`/`-y` flag examples
+
 ## [v0.18.28] - 2026-03-16
 
 - feat: stale file deletion now prompts for confirmation in interactive terminals
