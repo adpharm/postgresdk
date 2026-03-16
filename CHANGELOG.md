@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [v0.18.26] - 2026-03-16
 
 - feat: `includeSoftDeleted` now propagates into nested include-loader queries
   - Pass `includeSoftDeleted: true` on list/getByPk requests to surface soft-deleted rows in all relation types (`belongsTo`, `hasOne`, `one:N`, `M:N`)
