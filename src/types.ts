@@ -36,6 +36,8 @@ export interface Config {
   schema?: string;
   outDir?: string | { client: string; server: string };
   softDeleteColumn?: string | null;
+  /** Per-table overrides for soft delete column. Use `null` to disable soft deletes for a specific table. */
+  softDeleteColumnOverrides?: Record<string, string | null>;
   dateType?: "date" | "string";
   numericMode?: "string" | "number" | "auto";  // How to type numeric columns (default: "auto" - int2/int4→number, int8/numeric→string)
   

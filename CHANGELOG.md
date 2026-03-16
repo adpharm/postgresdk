@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- feat: Add `includeSoftDeleted` option to bypass soft-delete filtering on `getByPk` and `list`
+  - Pass `includeSoftDeleted: true` to retrieve records where the soft-delete column is not null
+  - Supported on both the generated HTTP client (`getByPk`, `list`) and the core server operations
+- feat: Add `softDeleteColumnOverrides` config option for per-table soft-delete column control
+  - Accepts a `Record<string, string | null>` — set a table's entry to `null` to disable soft deletes for that table entirely
+  - Per-table value takes precedence over the global `softDeleteColumn` setting
+
 ## [v0.18.22] - 2026-03-13
 
 - fix: Integer types (`int2`, `int4`) now emit `z.number().int()` instead of `z.number()` in Zod schemas

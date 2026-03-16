@@ -34,6 +34,13 @@ import { ensureDirs, writeFilesIfChanged, deleteStaleFiles } from "./utils";
 import type { Config } from "./types";
 import { normalizeAuthConfig, getAuthStrategy } from "./types";
 
+/** Resolves the effective soft delete column for a given table, respecting per-table overrides. */
+export function resolveSoftDeleteColumn(cfg: Pick<Config, "softDeleteColumn" | "softDeleteColumnOverrides">, tableName: string): string | null {
+  const overrides = cfg.softDeleteColumnOverrides;
+  if (overrides && tableName in overrides) return overrides[tableName] ?? null;
+  return cfg.softDeleteColumn ?? null;
+}
+
 export async function generate(configPath: string) {
   // Check if config file exists
   if (!existsSync(configPath)) {
@@ -189,7 +196,7 @@ export async function generate(configPath: string) {
     let routeContent: string;
     if (serverFramework === "hono") {
       routeContent = emitHonoRoutes(table, graph, {
-        softDeleteColumn: cfg.softDeleteColumn || null,
+        softDeleteColumn: resolveSoftDeleteColumn(cfg, table.name),
         includeMethodsDepth: cfg.includeMethodsDepth || 2,
         authStrategy: getAuthStrategy(normalizedAuth),
         useJsExtensions: cfg.useJsExtensions,

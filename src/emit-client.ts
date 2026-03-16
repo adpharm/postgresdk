@@ -441,14 +441,14 @@ ${hasJsonbColumns ? `  /**
    * @param options - Select specific fields to return
    * @returns The record with only selected fields if found, null otherwise
    */
-  async getByPk<TJsonb extends Partial<Select${Type}> = {}>(pk: ${pkType}, options: { select: string[] }): Promise<Partial<Select${Type}<TJsonb>> | null>;
+  async getByPk<TJsonb extends Partial<Select${Type}> = {}>(pk: ${pkType}, options: { select: string[]; includeSoftDeleted?: boolean }): Promise<Partial<Select${Type}<TJsonb>> | null>;
   /**
    * Get a ${table.name} record by primary key with field exclusion
    * @param pk - The primary key value${hasCompositePk ? 's' : ''}
    * @param options - Exclude specific fields from return
    * @returns The record without excluded fields if found, null otherwise
    */
-  async getByPk<TJsonb extends Partial<Select${Type}> = {}>(pk: ${pkType}, options: { exclude: string[] }): Promise<Partial<Select${Type}<TJsonb>> | null>;
+  async getByPk<TJsonb extends Partial<Select${Type}> = {}>(pk: ${pkType}, options: { exclude: string[]; includeSoftDeleted?: boolean }): Promise<Partial<Select${Type}<TJsonb>> | null>;
   /**
    * Get a ${table.name} record by primary key
    * @param pk - The primary key value${hasCompositePk ? 's' : ''}
@@ -457,15 +457,16 @@ ${hasJsonbColumns ? `  /**
    * // With JSONB type override:
    * const user = await client.getByPk<{ metadata: Metadata }>('user-id');
    */
-  async getByPk<TJsonb extends Partial<Select${Type}> = {}>(pk: ${pkType}, options?: Omit<{ select?: string[]; exclude?: string[] }, 'select' | 'exclude'>): Promise<Select${Type}<TJsonb> | null>;
+  async getByPk<TJsonb extends Partial<Select${Type}> = {}>(pk: ${pkType}, options?: { includeSoftDeleted?: boolean }): Promise<Select${Type}<TJsonb> | null>;
   async getByPk<TJsonb extends Partial<Select${Type}> = {}>(
     pk: ${pkType},
-    options?: { select?: string[]; exclude?: string[] }
+    options?: { select?: string[]; exclude?: string[]; includeSoftDeleted?: boolean }
   ): Promise<Select${Type}<TJsonb> | Partial<Select${Type}<TJsonb>> | null> {
     const path = ${pkPathExpr};
     const queryParams = new URLSearchParams();
     if (options?.select) queryParams.set('select', options.select.join(','));
     if (options?.exclude) queryParams.set('exclude', options.exclude.join(','));
+    if (options?.includeSoftDeleted) queryParams.set('includeSoftDeleted', 'true');
     const query = queryParams.toString();
     const url = query ? \`\${this.resource}/\${path}?\${query}\` : \`\${this.resource}/\${path}\`;
     return this.get<Select${Type}<TJsonb> | null>(url);
@@ -475,28 +476,29 @@ ${hasJsonbColumns ? `  /**
    * @param options - Select specific fields to return
    * @returns The record with only selected fields if found, null otherwise
    */
-  async getByPk(pk: ${pkType}, options: { select: string[] }): Promise<Partial<Select${Type}> | null>;
+  async getByPk(pk: ${pkType}, options: { select: string[]; includeSoftDeleted?: boolean }): Promise<Partial<Select${Type}> | null>;
   /**
    * Get a ${table.name} record by primary key with field exclusion
    * @param pk - The primary key value${hasCompositePk ? 's' : ''}
    * @param options - Exclude specific fields from return
    * @returns The record without excluded fields if found, null otherwise
    */
-  async getByPk(pk: ${pkType}, options: { exclude: string[] }): Promise<Partial<Select${Type}> | null>;
+  async getByPk(pk: ${pkType}, options: { exclude: string[]; includeSoftDeleted?: boolean }): Promise<Partial<Select${Type}> | null>;
   /**
    * Get a ${table.name} record by primary key
    * @param pk - The primary key value${hasCompositePk ? 's' : ''}
    * @returns The record with all fields if found, null otherwise
    */
-  async getByPk(pk: ${pkType}, options?: Omit<{ select?: string[]; exclude?: string[] }, 'select' | 'exclude'>): Promise<Select${Type} | null>;
+  async getByPk(pk: ${pkType}, options?: { includeSoftDeleted?: boolean }): Promise<Select${Type} | null>;
   async getByPk(
     pk: ${pkType},
-    options?: { select?: string[]; exclude?: string[] }
+    options?: { select?: string[]; exclude?: string[]; includeSoftDeleted?: boolean }
   ): Promise<Select${Type} | Partial<Select${Type}> | null> {
     const path = ${pkPathExpr};
     const queryParams = new URLSearchParams();
     if (options?.select) queryParams.set('select', options.select.join(','));
     if (options?.exclude) queryParams.set('exclude', options.exclude.join(','));
+    if (options?.includeSoftDeleted) queryParams.set('includeSoftDeleted', 'true');
     const query = queryParams.toString();
     const url = query ? \`\${this.resource}/\${path}?\${query}\` : \`\${this.resource}/\${path}\`;
     return this.get<Select${Type} | null>(url);
@@ -523,6 +525,7 @@ ${hasJsonbColumns ? `  /**
     orderBy?: string | string[];
     order?: "asc" | "desc" | ("asc" | "desc")[];
     distinctOn?: string | string[];
+    includeSoftDeleted?: boolean;
   }): Promise<PaginatedResponse<Partial<Select${Type}<TJsonb>> & { _similarity?: number }${hasVectorColumns ? ' & { _distance?: number }' : ''}>>;
   /**
    * List ${table.name} records with field exclusion
@@ -545,6 +548,7 @@ ${hasJsonbColumns ? `  /**
     orderBy?: string | string[];
     order?: "asc" | "desc" | ("asc" | "desc")[];
     distinctOn?: string | string[];
+    includeSoftDeleted?: boolean;
   }): Promise<PaginatedResponse<Partial<Select${Type}<TJsonb>> & { _similarity?: number }${hasVectorColumns ? ' & { _distance?: number }' : ''}>>;
   /**
    * List ${table.name} records with pagination and filtering
@@ -578,6 +582,7 @@ ${hasJsonbColumns ? `  /**
     orderBy?: string | string[];
     order?: "asc" | "desc" | ("asc" | "desc")[];
     distinctOn?: string | string[];
+    includeSoftDeleted?: boolean;
   }): Promise<PaginatedResponse<${Type}WithIncludes<TInclude> & { _similarity?: number }${hasVectorColumns ? ' & { _distance?: number }' : ''}>>;
   async list<TJsonb extends Partial<Select${Type}> = {}>(params?: {
     include?: ${Type}IncludeSpec;
@@ -596,6 +601,7 @@ ${hasJsonbColumns ? `  /**
     orderBy?: string | string[];
     order?: "asc" | "desc" | ("asc" | "desc")[];
     distinctOn?: string | string[];
+    includeSoftDeleted?: boolean;
   }): Promise<PaginatedResponse<Select${Type}<TJsonb> | Partial<Select${Type}<TJsonb>>>> {
     return this.post<PaginatedResponse<Select${Type}<TJsonb> & { _similarity?: number }${hasVectorColumns ? ' & { _distance?: number }' : ''}>>(\`\${this.resource}/list\`, params ?? {});
   }` : `  /**
@@ -619,6 +625,7 @@ ${hasJsonbColumns ? `  /**
     orderBy?: string | string[];
     order?: "asc" | "desc" | ("asc" | "desc")[];
     distinctOn?: string | string[];
+    includeSoftDeleted?: boolean;
   }): Promise<PaginatedResponse<Partial<Select${Type}> & { _similarity?: number }${hasVectorColumns ? ' & { _distance?: number }' : ''}>>;
   /**
    * List ${table.name} records with field exclusion
@@ -641,6 +648,7 @@ ${hasJsonbColumns ? `  /**
     orderBy?: string | string[];
     order?: "asc" | "desc" | ("asc" | "desc")[];
     distinctOn?: string | string[];
+    includeSoftDeleted?: boolean;
   }): Promise<PaginatedResponse<Partial<Select${Type}> & { _similarity?: number }${hasVectorColumns ? ' & { _distance?: number }' : ''}>>;
   /**
    * List ${table.name} records with pagination and filtering
@@ -668,6 +676,7 @@ ${hasJsonbColumns ? `  /**
     orderBy?: string | string[];
     order?: "asc" | "desc" | ("asc" | "desc")[];
     distinctOn?: string | string[];
+    includeSoftDeleted?: boolean;
   }): Promise<PaginatedResponse<${Type}WithIncludes<TInclude> & { _similarity?: number }${hasVectorColumns ? ' & { _distance?: number }' : ''}>>;
   async list(params?: {
     include?: ${Type}IncludeSpec;
@@ -686,6 +695,7 @@ ${hasJsonbColumns ? `  /**
     orderBy?: string | string[];
     order?: "asc" | "desc" | ("asc" | "desc")[];
     distinctOn?: string | string[];
+    includeSoftDeleted?: boolean;
   }): Promise<PaginatedResponse<Select${Type} | Partial<Select${Type}>>> {
     return this.post<PaginatedResponse<Select${Type} & { _similarity?: number }${hasVectorColumns ? ' & { _distance?: number }' : ''}>>(\`\${this.resource}/list\`, params ?? {});
   }`}

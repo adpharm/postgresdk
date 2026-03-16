@@ -158,7 +158,8 @@ export async function createRecord(
  */
 export async function getByPk(
   ctx: OperationContext,
-  pkValues: any[]
+  pkValues: any[],
+  opts?: { includeSoftDeleted?: boolean }
 ): Promise<{ data?: any; error?: string; status: number }> {
   try {
     const hasCompositePk = ctx.pkColumns.length > 1;
@@ -167,7 +168,8 @@ export async function getByPk(
       : \`"\${ctx.pkColumns[0]}" = $1\`;
 
     const columns = buildColumnList(ctx.select, ctx.exclude, ctx.allColumnNames);
-    const text = \`SELECT \${columns} FROM "\${ctx.table}" WHERE \${wherePkSql} LIMIT 1\`;
+    const softDeleteFilter = ctx.softDeleteColumn && !opts?.includeSoftDeleted ? \` AND "\${ctx.softDeleteColumn}" IS NULL\` : "";
+    const text = \`SELECT \${columns} FROM "\${ctx.table}" WHERE \${wherePkSql}\${softDeleteFilter} LIMIT 1\`;
     log.debug(\`GET \${ctx.table} by PK:\`, pkValues, "SQL:", text);
 
     const { rows } = await ctx.pg.query(text, pkValues);
@@ -540,6 +542,7 @@ export async function listRecords(
     orderBy?: string | string[];
     order?: "asc" | "desc" | ("asc" | "desc")[];
     distinctOn?: string | string[];
+    includeSoftDeleted?: boolean;
     vector?: {
       field: string;
       query: number[];
@@ -550,7 +553,7 @@ export async function listRecords(
   }
 ): Promise<{ data?: any; total?: number; limit?: number; offset?: number; hasMore?: boolean; error?: string; issues?: any; needsIncludes?: boolean; includeSpec?: any; status: number }> {
   try {
-    const { where: whereClause, limit = 50, offset = 0, include, orderBy, order, vector, trigram, distinctOn } = params;
+    const { where: whereClause, limit = 50, offset = 0, include, orderBy, order, vector, trigram, distinctOn, includeSoftDeleted } = params;
 
     // DISTINCT ON support
     const distinctCols: string[] | null = distinctOn ? (Array.isArray(distinctOn) ? distinctOn : [distinctOn]) : null;
@@ -586,8 +589,8 @@ export async function listRecords(
     const whereParts: string[] = [];
     let whereParams: any[] = [];
 
-    // Add soft delete filter if applicable
-    if (ctx.softDeleteColumn) {
+    // Add soft delete filter if applicable (skip if caller opts into seeing soft-deleted records)
+    if (ctx.softDeleteColumn && !includeSoftDeleted) {
       whereParts.push(\`"\${ctx.softDeleteColumn}" IS NULL\`);
     }
 
@@ -625,7 +628,7 @@ export async function listRecords(
 
     if (hasQueryParam && !hasThreshold && whereParams.length > 0) {
       const countWhereParts: string[] = [];
-      if (ctx.softDeleteColumn) {
+      if (ctx.softDeleteColumn && !includeSoftDeleted) {
         countWhereParts.push(\`"\${ctx.softDeleteColumn}" IS NULL\`);
       }
       if (whereClause) {

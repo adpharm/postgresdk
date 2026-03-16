@@ -86,7 +86,8 @@ const deleteSchema = z.object({
 
 const getByPkQuerySchema = z.object({
   select: z.array(z.string()).min(1).optional(),
-  exclude: z.array(z.string()).min(1).optional()
+  exclude: z.array(z.string()).min(1).optional(),
+  includeSoftDeleted: z.boolean().optional()
 }).strict().refine(
   (data) => !(data.select && data.exclude),
   { message: "Cannot specify both 'select' and 'exclude' parameters" }
@@ -101,7 +102,8 @@ const listSchema = z.object({
   offset: z.number().int().min(0).optional(),
   orderBy: z.union([columnEnum, z.array(columnEnum)]).optional(),
   order: z.union([z.enum(["asc", "desc"]), z.array(z.enum(["asc", "desc"]))]).optional(),
-  distinctOn: z.union([columnEnum, z.array(columnEnum)]).optional(),${hasVectorColumns ? `
+  distinctOn: z.union([columnEnum, z.array(columnEnum)]).optional(),
+  includeSoftDeleted: z.boolean().optional(),${hasVectorColumns ? `
   vector: z.object({
     field: z.string(),
     query: z.array(z.number()),
@@ -198,12 +200,15 @@ ${hasAuth ? `
   app.get(\`\${base}/${pkPath}\`, async (c) => {
     ${getPkParams}
 
-    // Parse query params for select/exclude
+    // Parse query params — coerce includeSoftDeleted string to boolean before Zod validation
+    // (avoids Boolean("false")=true pitfall while keeping schema as single source of truth)
     const selectParam = c.req.query("select");
     const excludeParam = c.req.query("exclude");
+    const includeSoftDeletedParam = c.req.query("includeSoftDeleted");
     const queryData: any = {};
     if (selectParam) queryData.select = selectParam.split(",");
     if (excludeParam) queryData.exclude = excludeParam.split(",");
+    if (includeSoftDeletedParam !== undefined) queryData.includeSoftDeleted = includeSoftDeletedParam === "true";
 
     const queryParsed = getByPkQuerySchema.safeParse(queryData);
     if (!queryParsed.success) {
@@ -216,7 +221,7 @@ ${hasAuth ? `
     }
 
     const ctx = { ...baseCtx, select: queryParsed.data.select, exclude: queryParsed.data.exclude };
-    const result = await coreOps.getByPk(ctx, pkValues);
+    const result = await coreOps.getByPk(ctx, pkValues, { includeSoftDeleted: queryParsed.data.includeSoftDeleted });
 
     if (result.error) {
       return c.json({ error: result.error }, result.status as any);
