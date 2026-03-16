@@ -1,6 +1,7 @@
 import { writeFile, mkdir, readFile } from "fs/promises";
 import { join, dirname, resolve } from "path";
 import { existsSync } from "fs";
+import { deleteStaleFiles, collectDirsRecursively } from "./utils";
 import { pathToFileURL } from "url";
 
 interface PullConfig {
@@ -125,9 +126,10 @@ export async function pullCommand(args: string[]) {
     let filesWritten = 0;
     let filesUnchanged = 0;
     const changedFiles: string[] = [];
+    const resolvedOutput = resolve(config.output!);
 
     for (const [path, content] of Object.entries(sdk.files)) {
-      const fullPath = join(config.output!, path);
+      const fullPath = join(resolvedOutput, path);
       await mkdir(dirname(fullPath), { recursive: true });
 
       // Check if file exists and content is the same
@@ -148,8 +150,18 @@ export async function pullCommand(args: string[]) {
       }
     }
 
+    // Delete stale files (present on disk but no longer in the SDK bundle)
+    const generatedPaths = new Set(
+      Object.keys(sdk.files).map(p => join(resolvedOutput, p))
+    );
+    const dirsToScan = await collectDirsRecursively(resolvedOutput);
+    const deleteResult = await deleteStaleFiles(generatedPaths, dirsToScan);
+    for (const f of deleteResult.filesDeleted) {
+      console.log(`  ✗ ${f}`);
+    }
+
     // Write metadata file (without timestamp for idempotency)
-    const metadataPath = join(config.output!, ".postgresdk.json");
+    const metadataPath = join(resolvedOutput, ".postgresdk.json");
     const metadata = {
       version: sdk.version,
       pulledFrom: config.from,
@@ -169,11 +181,15 @@ export async function pullCommand(args: string[]) {
     }
 
     // Log results
-    if (filesWritten === 0 && !metadataChanged) {
+    if (filesWritten === 0 && !metadataChanged && deleteResult.deleted === 0) {
       console.log(`✅ SDK up-to-date (${filesUnchanged} files unchanged)`);
     } else {
+      const parts = [];
+      if (filesWritten > 0) parts.push(`updated ${filesWritten} files`);
+      if (deleteResult.deleted > 0) parts.push(`deleted ${deleteResult.deleted} stale files`);
+      if (filesUnchanged > 0) parts.push(`${filesUnchanged} unchanged`);
       console.log(`✅ SDK pulled successfully to ${config.output}`);
-      console.log(`   Updated: ${filesWritten} files, Unchanged: ${filesUnchanged} files`);
+      console.log(`   ${parts.join(", ")}`);
     }
   } catch (err) {
     console.error(`❌ Pull failed:`, err);

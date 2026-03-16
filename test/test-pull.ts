@@ -180,8 +180,37 @@ async function main() {
     );
     console.log("✅ Pull with token works");
 
+    // Step 8: Test stale file cleanup
+    console.log("\n8) Testing stale file cleanup...");
+
+    // Plant stale files: one at root level, one in a nested subdir
+    const staleRoot = join(PULL_OUTPUT, "stale-table.ts");
+    const staleSubdir = join(PULL_OUTPUT, "stale-dir", "ghost.ts");
+    await Bun.write(staleRoot, "export const stale = true;");
+    await Bun.write(staleSubdir, "export const ghost = true;");
+
+    if (!existsSync(staleRoot)) throw new Error("Stale root file not written");
+    if (!existsSync(staleSubdir)) throw new Error("Stale subdir file not written");
+
+    // Re-pull — stale files should be deleted
+    execSync(
+      `bun src/cli.ts pull --from=http://localhost:${TEST_PORT} --output=${PULL_OUTPUT}`,
+      { stdio: "inherit" }
+    );
+
+    if (existsSync(staleRoot)) throw new Error("Stale root file was not deleted");
+    if (existsSync(staleSubdir)) throw new Error("Stale subdir file was not deleted");
+
+    // Verify legitimate files are untouched
+    for (const file of pulledFiles) {
+      if (!existsSync(join(PULL_OUTPUT, file))) {
+        throw new Error(`Legitimate file was incorrectly deleted: ${file}`);
+      }
+    }
+    console.log("✅ Stale file cleanup works (root + nested subdir)");
+
     // Cleanup
-    console.log("\n8) Cleaning up...");
+    console.log("\n9) Cleaning up...");
     serverProc.kill();
     
     // Leave the pulled SDK files for manual inspection

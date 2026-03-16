@@ -59,6 +59,23 @@ export async function ensureDirs(dirs: string[]) {
 }
 
 /**
+ * Recursively collect all subdirectory paths under `root`, including root itself.
+ * Returns an empty array if `root` does not exist.
+ */
+export async function collectDirsRecursively(root: string): Promise<string[]> {
+  if (!existsSync(root)) return [];
+
+  const dirs: string[] = [root];
+  const entries = await readdir(root, { withFileTypes: true });
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const sub = join(root, entry.name);
+    dirs.push(...await collectDirsRecursively(sub));
+  }
+  return dirs;
+}
+
+/**
  * Delete files in the given directories that are not in the set of generated paths.
  * Used to remove stale files for tables that no longer exist in the schema.
  */
