@@ -8,8 +8,6 @@ export function emitCoreOperations() {
  * These functions handle the actual database logic and can be used by any framework adapter.
  */
 
-import type { z } from "zod";
-
 export interface DatabaseClient {
   query: (text: string, params?: any[]) => Promise<{ rows: any[] }>;
 }

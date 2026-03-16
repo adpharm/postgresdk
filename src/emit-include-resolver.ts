@@ -38,8 +38,8 @@ export function emitIncludeResolver(graph: Graph, useJsExtensions?: boolean): st
     const edgeEntries = Object.entries(edges);
 
     if (edgeEntries.length === 0) {
-      // No relations - simple case
-      out += `export type ${Type}WithIncludes<TInclude extends ${Type}IncludeSpec> = Select${Type};\n\n`;
+      // No relations - _TInclude is intentionally unused; the generic is kept for API consistency
+      out += `export type ${Type}WithIncludes<_TInclude extends ${Type}IncludeSpec> = Select${Type};\n\n`;
       continue;
     }
 

@@ -100,6 +100,8 @@ async function typeCheckDirectory(dir: string, name: string): Promise<boolean> {
       moduleResolution: "bundler",
       lib: ["ES2022", "DOM"],
       strict: true,
+      noUnusedLocals: true,
+      noUnusedParameters: true,
       esModuleInterop: true,
       skipLibCheck: true,
       forceConsistentCasingInFileNames: true,

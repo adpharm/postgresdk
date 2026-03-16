@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- chore: enforce `noUnusedLocals` and `noUnusedParameters` in generated-code typecheck tests
+  - Removed unused `import type { z } from "zod"` from emitted core-operations template
+  - Renamed unused generic `TInclude` → `_TInclude` in the no-relations `WithIncludes` type to satisfy the stricter compiler options
+  - Fixed `IncludeSpec` import generation to only import types that are actually referenced (nested-pattern targets only), eliminating spurious unused-import errors in generated clients
+
 ## [v0.18.29] - 2026-03-16
 
 - fix: TTY detection for stale file prompts now checks `stdin` instead of `stdout`

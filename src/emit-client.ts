@@ -103,22 +103,26 @@ export function emitClient(
     skipJunctionTables: opts.skipJunctionTables ?? true
   }, allTables);
 
-  // Build import for types needed by include methods
+  // Build imports for types needed by include methods.
+  // importedTypes: all relation targets → Select* type imports
+  // usedIncludeSpecTypes: only nested-pattern targets → *IncludeSpec imports (others are unused)
   const importedTypes = new Set<string>();
-  importedTypes.add(table.name); // Always need base type
+  const usedIncludeSpecTypes = new Set<string>([table.name]);
+  importedTypes.add(table.name);
 
   for (const method of includeMethods) {
     for (const target of method.targets) {
       importedTypes.add(target);
     }
+    const pattern = analyzeIncludeSpec(method.includeSpec);
+    if (pattern.type === 'nested' && method.targets[0]) {
+      usedIncludeSpecTypes.add(method.targets[0]);
+    }
   }
 
   // Generate type imports - base types for this table
   const typeImports = `import type { Insert${Type}, Update${Type}, Select${Type} } from "./types/${table.name}${ext}";`;
-
-  // Import IncludeSpec types for type-safe includes (base table + all targets)
-  const includeSpecTypes = [table.name, ...Array.from(importedTypes).filter(t => t !== table.name)];
-  const includeSpecImport = `import type { ${includeSpecTypes.map(t => `${pascal(t)}IncludeSpec`).join(', ')} } from "./include-spec${ext}";`;
+  const includeSpecImport = `import type { ${Array.from(usedIncludeSpecTypes).map(t => `${pascal(t)}IncludeSpec`).join(', ')} } from "./include-spec${ext}";`;
 
   // Import WithIncludes type for automatic type inference
   const includeResolverImport = `import type { ${Type}WithIncludes } from "./include-resolver${ext}";`;
