@@ -71,8 +71,10 @@ function extractFn(output: string, fnName: string, nextFnName?: string): string 
 }
 
 describe("emitIncludeLoader — soft delete in nested includes", () => {
+  // Generate once; all tests in this describe share the same output.
+  const output = emitIncludeLoader(model, 2, { softDeleteCols });
+
   it("bakes SOFT_DELETE_COLS constant with correct per-table values into emitted code", () => {
-    const output = emitIncludeLoader(model, 2, { softDeleteCols });
     expect(output).toContain('"authors": "deleted_at"');
     expect(output).toContain('"books": null');
     expect(output).toContain('"book_tags": null');
@@ -80,50 +82,38 @@ describe("emitIncludeLoader — soft delete in nested includes", () => {
   });
 
   it("emits softDeleteFilter helper that returns IS NULL clause with optional alias", () => {
-    const output = emitIncludeLoader(model, 2, { softDeleteCols });
     const helper = extractFn(output, "softDeleteFilter", "buildOrAndPredicate");
     expect(helper).toContain("IS NULL");
     expect(helper).toContain("alias");
   });
 
-  it("applies softDeleteFilter(target) in loadBelongsTo SQL", () => {
-    const output = emitIncludeLoader(model, 2, { softDeleteCols });
+  it("applies softDeleteFilter(target) in loadBelongsTo SQL wrapped in parens to avoid OR/AND precedence bug", () => {
     const fn = extractFn(output, "loadBelongsTo", "loadHasOne");
-    expect(fn).toContain("softDeleteFilter(target)");
+    expect(fn).toContain("(${where})${softDeleteFilter(target)}");
   });
 
-  it("applies softDeleteFilter(target) in loadHasOne SQL", () => {
-    const output = emitIncludeLoader(model, 2, { softDeleteCols });
+  it("applies softDeleteFilter(target) in loadHasOne SQL wrapped in parens to avoid OR/AND precedence bug", () => {
     const fn = extractFn(output, "loadHasOne", "loadOneToMany");
-    expect(fn).toContain("softDeleteFilter(target)");
+    expect(fn).toContain("(${where})${softDeleteFilter(target)}");
   });
 
-  it("applies softDeleteFilter(target) in loadOneToMany SQL — both simple and window-function paths", () => {
-    const output = emitIncludeLoader(model, 2, { softDeleteCols });
+  it("applies softDeleteFilter(target) in loadOneToMany SQL — both simple and window-function paths, OR predicate wrapped in parens", () => {
     const fn = extractFn(output, "loadOneToMany", "loadManyToMany");
-    const occurrences = fn.split("softDeleteFilter(target)").length - 1;
+    const occurrences = fn.split("(${where})${softDeleteFilter(target)}").length - 1;
     expect(occurrences).toBe(2); // simple path + window-function inner WHERE
   });
 
-  it("applies softDeleteFilter(target, 't') in loadManyToMany JOIN path", () => {
-    const output = emitIncludeLoader(model, 2, { softDeleteCols });
+  it("applies softDeleteFilter in loadManyToMany — JOIN path uses aliased 't', simple path does not; both OR predicates wrapped in parens", () => {
     const fn = extractFn(output, "loadManyToMany");
-    expect(fn).toContain('softDeleteFilter(target, "t")');
-  });
-
-  it("applies softDeleteFilter(target) (no alias) in loadManyToMany simple path", () => {
-    const output = emitIncludeLoader(model, 2, { softDeleteCols });
-    const fn = extractFn(output, "loadManyToMany");
-    // Simple path uses no alias; JOIN path uses "t" alias — both must be present
-    expect(fn).toContain("softDeleteFilter(target)");
-    expect(fn).toContain('softDeleteFilter(target, "t")');
+    expect(fn).toContain('(${whereVia})${softDeleteFilter(target, "t")}'); // JOIN path
+    expect(fn).toContain("(${whereT})${softDeleteFilter(target)}");        // simple path
   });
 
   it("emits empty SOFT_DELETE_COLS and inert helper when no softDeleteCols provided", () => {
-    const output = emitIncludeLoader(model, 2, {});
-    expect(output).toContain("SOFT_DELETE_COLS: Record<string, string | null> = {}");
+    const noSdOutput = emitIncludeLoader(model, 2, {});
+    expect(noSdOutput).toContain("SOFT_DELETE_COLS: Record<string, string | null> = {}");
     // helper still emitted; callers get "" at runtime — no SQL change
-    const helper = extractFn(output, "softDeleteFilter", "buildOrAndPredicate");
+    const helper = extractFn(noSdOutput, "softDeleteFilter", "buildOrAndPredicate");
     expect(helper).toContain("if (!col) return");
   });
 });

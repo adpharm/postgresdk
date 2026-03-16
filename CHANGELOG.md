@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- fix: Soft-delete filter now correctly applied to all OR groups in batched include-loader queries
+  - Previously, `AND "col" IS NULL` was only applied to the last OR group due to SQL operator-precedence; the WHERE predicate is now wrapped in parentheses
+  - Added integration test (`test-soft-delete-nested-include`) covering multi-parent batch queries that would silently leak soft-deleted children
+
 ## [v0.18.24] - 2026-03-16
 
 - feat: Soft-delete filtering now applied in generated include-loader for all relation types
