@@ -30,7 +30,8 @@ import { emitSdkBundle } from "./emit-sdk-bundle";
 import { emitCoreOperations } from "./emit-core-operations";
 import { emitTableTest, emitTestSetup, emitDockerCompose, emitTestScript, emitVitestConfig, emitTestGitignore } from "./emit-tests";
 import { emitUnifiedContract } from "./emit-sdk-contract";
-import { ensureDirs, writeFilesIfChanged, deleteStaleFiles } from "./utils";
+import { ensureDirs, writeFilesIfChanged, findStaleFiles } from "./utils";
+import { confirmAndDeleteStaleFiles } from "./cli-utils";
 import type { Config } from "./types";
 import { normalizeAuthConfig, getAuthStrategy } from "./types";
 
@@ -41,7 +42,7 @@ export function resolveSoftDeleteColumn(cfg: Pick<Config, "softDeleteColumn" | "
   return cfg.softDeleteColumn ?? null;
 }
 
-export async function generate(configPath: string) {
+export async function generate(configPath: string, options?: { force?: boolean }) {
   // Check if config file exists
   if (!existsSync(configPath)) {
     throw new Error(
@@ -337,7 +338,7 @@ export async function generate(configPath: string) {
   const writeResult = await writeFilesIfChanged(files);
 
   // Clean up stale files (for tables no longer in schema) unless opted out
-  let deleteResult = { deleted: 0, filesDeleted: [] as string[] };
+  let deleteResult = { deleted: 0, skipped: 0, filesDeleted: [] as string[] };
   if (cfg.clean !== false) {
     const dirsToScan = [
       serverDir,
@@ -354,15 +355,17 @@ export async function generate(configPath: string) {
 
     // Normalize paths to match how we build file paths (resolve to absolute)
     const generatedPaths = new Set(files.map(f => f.path));
-    deleteResult = await deleteStaleFiles(generatedPaths, dirsToScan);
+    const staleFiles = await findStaleFiles(generatedPaths, dirsToScan);
+    deleteResult = await confirmAndDeleteStaleFiles(staleFiles, options?.force ?? false);
   }
 
-  if (writeResult.written === 0 && deleteResult.deleted === 0) {
+  if (writeResult.written === 0 && deleteResult.deleted === 0 && deleteResult.skipped === 0) {
     console.log(`✅ All ${writeResult.unchanged} files up-to-date (no changes)`);
   } else {
     const parts = [];
     if (writeResult.written > 0) parts.push(`updated ${writeResult.written} files`);
     if (deleteResult.deleted > 0) parts.push(`deleted ${deleteResult.deleted} stale files`);
+    if (deleteResult.skipped > 0) parts.push(`skipped ${deleteResult.skipped} stale files`);
     if (writeResult.unchanged > 0) parts.push(`${writeResult.unchanged} unchanged`);
     console.log(`✅ ${parts.join(", ")}`);
   }

@@ -1,7 +1,8 @@
 import { writeFile, mkdir, readFile } from "fs/promises";
 import { join, dirname, resolve } from "path";
 import { existsSync } from "fs";
-import { deleteStaleFiles, collectDirsRecursively } from "./utils";
+import { findStaleFiles, collectDirsRecursively } from "./utils";
+import { confirmAndDeleteStaleFiles, parseForceFlag } from "./cli-utils";
 import { pathToFileURL } from "url";
 
 interface PullConfig {
@@ -39,6 +40,7 @@ export async function pullCommand(args: string[]) {
   }
   
   // 3. Parse CLI arguments
+  const force = parseForceFlag(args);
   const cliConfig: PullConfig = {
     from: args.find(a => a.startsWith("--from="))?.split("=")[1],
     output: args.find(a => a.startsWith("--output="))?.split("=")[1],
@@ -155,10 +157,8 @@ export async function pullCommand(args: string[]) {
       Object.keys(sdk.files).map(p => join(resolvedOutput, p))
     );
     const dirsToScan = await collectDirsRecursively(resolvedOutput);
-    const deleteResult = await deleteStaleFiles(generatedPaths, dirsToScan);
-    for (const f of deleteResult.filesDeleted) {
-      console.log(`  ✗ ${f}`);
-    }
+    const staleFiles = await findStaleFiles(generatedPaths, dirsToScan);
+    const deleteResult = await confirmAndDeleteStaleFiles(staleFiles, force);
 
     // Write metadata file (without timestamp for idempotency)
     const metadataPath = join(resolvedOutput, ".postgresdk.json");
@@ -181,12 +181,13 @@ export async function pullCommand(args: string[]) {
     }
 
     // Log results
-    if (filesWritten === 0 && !metadataChanged && deleteResult.deleted === 0) {
+    if (filesWritten === 0 && !metadataChanged && deleteResult.deleted === 0 && deleteResult.skipped === 0) {
       console.log(`✅ SDK up-to-date (${filesUnchanged} files unchanged)`);
     } else {
       const parts = [];
       if (filesWritten > 0) parts.push(`updated ${filesWritten} files`);
       if (deleteResult.deleted > 0) parts.push(`deleted ${deleteResult.deleted} stale files`);
+      if (deleteResult.skipped > 0) parts.push(`skipped ${deleteResult.skipped} stale files`);
       if (filesUnchanged > 0) parts.push(`${filesUnchanged} unchanged`);
       console.log(`✅ SDK pulled successfully to ${config.output}`);
       console.log(`   ${parts.join(", ")}`);

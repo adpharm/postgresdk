@@ -192,9 +192,9 @@ async function main() {
     if (!existsSync(staleRoot)) throw new Error("Stale root file not written");
     if (!existsSync(staleSubdir)) throw new Error("Stale subdir file not written");
 
-    // Re-pull — stale files should be deleted
+    // Re-pull with --force — stale files should be deleted without prompting
     execSync(
-      `bun src/cli.ts pull --from=http://localhost:${TEST_PORT} --output=${PULL_OUTPUT}`,
+      `bun src/cli.ts pull --from=http://localhost:${TEST_PORT} --output=${PULL_OUTPUT} --force`,
       { stdio: "inherit" }
     );
 

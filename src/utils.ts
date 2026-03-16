@@ -76,15 +76,14 @@ export async function collectDirsRecursively(root: string): Promise<string[]> {
 }
 
 /**
- * Delete files in the given directories that are not in the set of generated paths.
- * Used to remove stale files for tables that no longer exist in the schema.
+ * Find files in the given directories that are not in the set of generated paths,
+ * without deleting them. Used to identify stale files before prompting for confirmation.
  */
-export async function deleteStaleFiles(
+export async function findStaleFiles(
   generatedPaths: Set<string>,
   dirsToScan: string[]
-): Promise<{ deleted: number; filesDeleted: string[] }> {
-  let deleted = 0;
-  const filesDeleted: string[] = [];
+): Promise<string[]> {
+  const stale: string[] = [];
 
   for (const dir of dirsToScan) {
     if (!existsSync(dir)) continue;
@@ -97,12 +96,27 @@ export async function deleteStaleFiles(
 
       const fullPath = join(dir, entry.name);
       if (!generatedPaths.has(fullPath)) {
-        await unlink(fullPath);
-        deleted++;
-        filesDeleted.push(fullPath);
+        stale.push(fullPath);
       }
     }
   }
 
-  return { deleted, filesDeleted };
+  return stale;
+}
+
+/**
+ * Delete files in the given directories that are not in the set of generated paths.
+ * Used to remove stale files for tables that no longer exist in the schema.
+ */
+export async function deleteStaleFiles(
+  generatedPaths: Set<string>,
+  dirsToScan: string[]
+): Promise<{ deleted: number; filesDeleted: string[] }> {
+  const stale = await findStaleFiles(generatedPaths, dirsToScan);
+
+  for (const fullPath of stale) {
+    await unlink(fullPath);
+  }
+
+  return { deleted: stale.length, filesDeleted: stale };
 }

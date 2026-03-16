@@ -8,6 +8,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { generate } from "./index";
+import { parseForceFlag } from "./cli-utils";
 
 // Get package.json version
 const __filename = fileURLToPath(import.meta.url);
@@ -44,11 +45,13 @@ Init Options:
 
 Generate Options:
   -c, --config <path>  Path to config file (default: postgresdk.config.ts)
+  --force, -y          Delete stale files without prompting
 
 Pull Options:
   --from <url>         API URL to pull SDK from
   --output <path>      Output directory (default: ./src/sdk)
   --token <token>      Authentication token
+  --force, -y          Delete stale files without prompting
   -c, --config <path>  Path to config file with pull settings
 
 Examples:
@@ -78,8 +81,9 @@ else if (command === "generate" || command === "gen") {
   }
 
   // Run generator
+  const force = parseForceFlag(args);
   try {
-    await generate(resolve(process.cwd(), configPath));
+    await generate(resolve(process.cwd(), configPath), { force });
   } catch (err) {
     console.error("❌ Generation failed:", err);
     process.exit(1);

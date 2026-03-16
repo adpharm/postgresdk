@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- feat: stale file deletion now prompts for confirmation in interactive terminals
+  - `generate` and `pull` commands prompt per-file before deleting stale files, with `--force` / `-y` flags to skip prompts
+  - In non-interactive (CI) environments, stale files are skipped with a warning unless `--force` is passed
+  - Summary output now reports "skipped N stale files" when deletions are declined
+
 ## [v0.18.27] - 2026-03-16
 
 - feat: `pull` command now deletes stale files from the output directory
