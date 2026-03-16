@@ -146,6 +146,10 @@ export default {
   schema: "public",                    // Database schema to introspect
   outDir: "./api",                     // Output directory (or { client: "./sdk", server: "./api" })
   softDeleteColumn: null,              // Column name for soft deletes (e.g., "deleted_at")
+  softDeleteColumnOverrides: {         // Per-table overrides (null = disable soft delete for that table)
+    // captures: "hidden_at",          //   different column name for a specific table
+    // audit_logs: null,               //   hard deletes only for this table
+  },
   numericMode: "auto",                 // "auto" | "number" | "string" - How to type numeric columns
   includeMethodsDepth: 2,              // Max depth for nested includes
   dateType: "date",                    // "date" | "string" - How to handle timestamps
@@ -737,6 +741,11 @@ const nested = await sdk.users.list({
     ]
   }
 });
+
+// Soft deletes — when softDeleteColumn is configured, deleted records are hidden by default.
+// Pass includeSoftDeleted: true to opt into seeing them (e.g., for admin/recovery UIs).
+const allUsers = await sdk.users.list({ includeSoftDeleted: true });
+const deletedUser = await sdk.users.getByPk("123", { includeSoftDeleted: true });
 
 // Pagination with filtered results
 let allResults = [];
