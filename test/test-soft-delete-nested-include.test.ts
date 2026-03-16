@@ -171,6 +171,48 @@ test("1:N nested include excludes soft-deleted rows for ALL parents in a multi-p
   }
 });
 
+test("1:N nested include surfaces soft-deleted rows when includeSoftDeleted: true is passed", async () => {
+  // Verifies that includeSoftDeleted propagates into the nested loader.
+  // Pre-fix: even with includeSoftDeleted: true the nested query still appended
+  // AND "deleted_at" IS NULL, so hidden rows never appeared.
+  const pg = new Client({ connectionString: CONNECTION_STRING });
+  await pg.connect();
+
+  try {
+    await pg.query("DELETE FROM sd_comment");
+    await pg.query("DELETE FROM sd_post");
+
+    const p1 = (await pg.query("INSERT INTO sd_post (title) VALUES ('Post 1') RETURNING *")).rows[0];
+    const p2 = (await pg.query("INSERT INTO sd_post (title) VALUES ('Post 2') RETURNING *")).rows[0];
+    const p3 = (await pg.query("INSERT INTO sd_post (title) VALUES ('Post 3') RETURNING *")).rows[0];
+
+    for (const p of [p1, p2, p3]) {
+      await pg.query("INSERT INTO sd_comment (body, post_id) VALUES ($1, $2)", [`${p.title} visible`, p.id]);
+      await pg.query(
+        "INSERT INTO sd_comment (body, post_id, deleted_at) VALUES ($1, $2, NOW())",
+        [`${p.title} deleted`, p.id],
+      );
+    }
+
+    const { loadIncludes } = await import("./.tmp-soft-delete-include/include-loader");
+    const result = await loadIncludes("sd_post", [p1, p2, p3], { sd_comments: true }, pg, 2, true);
+
+    // With includeSoftDeleted: true every parent should see both comments.
+    for (const post of result) {
+      expect(post.sd_comments).toHaveLength(2);
+    }
+    // Deleted comments must be present for all parents, not just the last.
+    const allBodies = result.flatMap((p: any) => p.sd_comments.map((c: any) => c.body)).sort();
+    expect(allBodies).toEqual([
+      "Post 1 deleted", "Post 1 visible",
+      "Post 2 deleted", "Post 2 visible",
+      "Post 3 deleted", "Post 3 visible",
+    ]);
+  } finally {
+    await pg.end();
+  }
+});
+
 test("1:N nested include excludes soft-deleted rows with a single parent (baseline)", async () => {
   const pg = new Client({ connectionString: CONNECTION_STRING });
   await pg.connect();

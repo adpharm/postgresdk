@@ -258,7 +258,8 @@ ${hasAuth ? `
           result.data,
           result.includeSpec,
           deps.pg,
-          ${opts.includeMethodsDepth}
+          ${opts.includeMethodsDepth},
+          body.data.includeSoftDeleted ?? false
         );
         return c.json({
           data: stitched,

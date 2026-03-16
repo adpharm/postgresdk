@@ -217,7 +217,8 @@ export async function loadIncludes(
   parents: any[],
   spec: IncludeSpec | undefined,
   pg: { query: (text: string, params?: any[]) => Promise<{ rows: any[] }> },
-  maxDepth: number = ${maxDepth}
+  maxDepth: number = ${maxDepth},
+  includeSoftDeleted: boolean = false
 ) {
   try {
     if (!spec || !parents.length) return parents;
@@ -337,7 +338,7 @@ export async function loadIncludes(
     const pkCols = pkOf(target);
     const where = buildOrAndPredicate(pkCols, tuples.length, 1);
     const params = tuples.flat();
-    const sql = \`SELECT * FROM "\${target}" WHERE (\${where})\${softDeleteFilter(target)}\`;
+    const sql = \`SELECT * FROM "\${target}" WHERE (\${where})\${includeSoftDeleted ? "" : softDeleteFilter(target)}\`;
     log.debug("belongsTo SQL", { curr, target, key, sql, paramsCount: params.length });
     const { rows: targets } = await pg.query(sql, params);
 
@@ -364,7 +365,7 @@ export async function loadIncludes(
     // SELECT target WHERE fk IN tuples
     const where = buildOrAndPredicate(fk.from, tuples.length, 1);
     const params = tuples.flat();
-    const sql = \`SELECT * FROM "\${target}" WHERE (\${where})\${softDeleteFilter(target)}\`;
+    const sql = \`SELECT * FROM "\${target}" WHERE (\${where})\${includeSoftDeleted ? "" : softDeleteFilter(target)}\`;
     log.debug("hasOne SQL", { curr, target, key, sql, paramsCount: params.length });
     const { rows: targets } = await pg.query(sql, params);
 
@@ -391,7 +392,7 @@ export async function loadIncludes(
     const params = tuples.flat();
 
     // Build SQL with optional ORDER BY, LIMIT, OFFSET
-    let sql = \`SELECT * FROM "\${target}" WHERE (\${where})\${softDeleteFilter(target)}\`;
+    let sql = \`SELECT * FROM "\${target}" WHERE (\${where})\${includeSoftDeleted ? "" : softDeleteFilter(target)}\`;
 
     // If limit/offset are needed, use window functions to limit per parent
     if (options.limit !== undefined || options.offset !== undefined) {
@@ -407,7 +408,7 @@ export async function loadIncludes(
         SELECT * FROM (
           SELECT *, ROW_NUMBER() OVER (PARTITION BY \${partitionCols} \${orderByClause}) as __rn
           FROM "\${target}"
-          WHERE (\${where})\${softDeleteFilter(target)}
+          WHERE (\${where})\${includeSoftDeleted ? "" : softDeleteFilter(target)}
         ) __sub
         WHERE __rn > \${offset} AND __rn <= \${offset + limit}
       \`;
@@ -471,7 +472,7 @@ export async function loadIncludes(
                  \${toCurr.from.map((c: string) => \`j."\${c}"\`).join(' || \\',\\' || ')} as __parent_fk
           FROM "\${via}" j
           INNER JOIN "\${target}" t ON \${joinConditions}
-          WHERE (\${whereVia})\${softDeleteFilter(target, "t")}
+          WHERE (\${whereVia})\${includeSoftDeleted ? "" : softDeleteFilter(target, "t")}
         ) __numbered
         WHERE __numbered.__rn > \${offset} AND __numbered.__rn <= \${offset + limit}
       \`;
@@ -515,7 +516,7 @@ export async function loadIncludes(
       // 2) Load targets by distinct target fk tuples in junction
       const tTuples = distinctTuples(jrows, toTarget.from);
       const whereT = buildOrAndPredicate(pkOf(target), tTuples.length, 1);
-      const sqlT = \`SELECT * FROM "\${target}" WHERE (\${whereT})\${softDeleteFilter(target)}\`;
+      const sqlT = \`SELECT * FROM "\${target}" WHERE (\${whereT})\${includeSoftDeleted ? "" : softDeleteFilter(target)}\`;
       const paramsT = tTuples.flat();
       log.debug("manyToMany target SQL", { curr, target, via, key, sql: sqlT, paramsCount: paramsT.length });
       const { rows: targets } = await pg.query(sqlT, paramsT);

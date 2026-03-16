@@ -87,26 +87,30 @@ describe("emitIncludeLoader — soft delete in nested includes", () => {
     expect(helper).toContain("alias");
   });
 
-  it("applies softDeleteFilter(target) in loadBelongsTo SQL wrapped in parens to avoid OR/AND precedence bug", () => {
+  it("applies conditional softDeleteFilter(target) in loadBelongsTo SQL — skipped when includeSoftDeleted, OR predicate wrapped in parens", () => {
     const fn = extractFn(output, "loadBelongsTo", "loadHasOne");
-    expect(fn).toContain("(${where})${softDeleteFilter(target)}");
+    expect(fn).toContain('(${where})${includeSoftDeleted ? "" : softDeleteFilter(target)}');
   });
 
-  it("applies softDeleteFilter(target) in loadHasOne SQL wrapped in parens to avoid OR/AND precedence bug", () => {
+  it("applies conditional softDeleteFilter(target) in loadHasOne SQL — skipped when includeSoftDeleted, OR predicate wrapped in parens", () => {
     const fn = extractFn(output, "loadHasOne", "loadOneToMany");
-    expect(fn).toContain("(${where})${softDeleteFilter(target)}");
+    expect(fn).toContain('(${where})${includeSoftDeleted ? "" : softDeleteFilter(target)}');
   });
 
-  it("applies softDeleteFilter(target) in loadOneToMany SQL — both simple and window-function paths, OR predicate wrapped in parens", () => {
+  it("applies conditional softDeleteFilter(target) in loadOneToMany SQL — both simple and window-function paths, OR predicate wrapped in parens", () => {
     const fn = extractFn(output, "loadOneToMany", "loadManyToMany");
-    const occurrences = fn.split("(${where})${softDeleteFilter(target)}").length - 1;
+    const occurrences = fn.split('(${where})${includeSoftDeleted ? "" : softDeleteFilter(target)}').length - 1;
     expect(occurrences).toBe(2); // simple path + window-function inner WHERE
   });
 
-  it("applies softDeleteFilter in loadManyToMany — JOIN path uses aliased 't', simple path does not; both OR predicates wrapped in parens", () => {
+  it("applies conditional softDeleteFilter in loadManyToMany — JOIN path uses aliased 't', simple path does not; both OR predicates wrapped in parens", () => {
     const fn = extractFn(output, "loadManyToMany");
-    expect(fn).toContain('(${whereVia})${softDeleteFilter(target, "t")}'); // JOIN path
-    expect(fn).toContain("(${whereT})${softDeleteFilter(target)}");        // simple path
+    expect(fn).toContain('(${whereVia})${includeSoftDeleted ? "" : softDeleteFilter(target, "t")}'); // JOIN path
+    expect(fn).toContain('(${whereT})${includeSoftDeleted ? "" : softDeleteFilter(target)}');        // simple path
+  });
+
+  it("loadIncludes signature includes includeSoftDeleted parameter defaulting to false", () => {
+    expect(output).toContain("includeSoftDeleted: boolean = false");
   });
 
   it("emits empty SOFT_DELETE_COLS and inert helper when no softDeleteCols provided", () => {
