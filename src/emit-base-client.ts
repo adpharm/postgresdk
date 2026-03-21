@@ -155,7 +155,7 @@ export abstract class BaseClient {
  */
 export type TxOp<T = unknown> = {
   readonly _table: string;
-  readonly _op: "create" | "update" | "delete";
+  readonly _op: "create" | "update" | "delete" | "upsert";
   readonly _data?: Record<string, unknown>;
   readonly _pk?: string | Record<string, unknown>;
   /** @internal */

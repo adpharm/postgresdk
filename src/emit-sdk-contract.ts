@@ -325,6 +325,29 @@ function generateResourceWithSDK(table: Table, model: Model, graph?: Graph, conf
     });
   }
   
+  // UPSERT method (only if single PK — composite PK tables are typically junction tables)
+  if (hasSinglePK) {
+    sdkMethods.push({
+      name: "upsert",
+      signature: `upsert(args: { where: Update${Type}; create: Insert${Type}; update: Update${Type} }): Promise<${Type}>`,
+      description: `Insert or update a ${tableName} based on a conflict target. The 'where' keys define the unique conflict columns (must be a unique constraint). 'create' is used if no conflict; 'update' is applied if a conflict occurs.`,
+      example: `const result = await sdk.${tableName}.upsert({
+  where: { ${pkField}: 'some-id' },
+  create: { ${generateExampleFields(table, 'create')} },
+  update: { ${generateExampleFields(table, 'update')} },
+});`,
+      correspondsTo: `POST ${basePath}/upsert`
+    });
+
+    endpoints.push({
+      method: "POST",
+      path: `${basePath}/upsert`,
+      description: `Upsert ${tableName} — insert if no conflict on 'where' columns, update otherwise`,
+      requestBody: `{ where: Update${Type}; create: Insert${Type}; update: Update${Type} }`,
+      responseBody: `${Type}`
+    });
+  }
+
   // DELETE method(s)
   if (hasSinglePK) {
     if (softDeleteCol) {

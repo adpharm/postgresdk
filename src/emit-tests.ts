@@ -877,12 +877,27 @@ function generateTestCases(table: Table, sampleData: string, updateData: string,
       console.warn('No ID from create test, skipping update test');
       return;
     }
-    
+
     const updateData: Update${Type} = ${updateData};
     const updated = await sdk.${table.name}.update(createdId, updateData);
     expect(updated).toBeDefined();
+  });
+
+  it('should upsert (update path) ${table.name}', async () => {
+    if (!createdId) {
+      console.warn('No ID from create test, skipping upsert test');
+      return;
+    }
+    // where: use PK as conflict target; create includes PK so conflict is guaranteed
+    const result = await sdk.${table.name}.upsert({
+      where: { ${table.pk[0]}: createdId },
+      create: { ${table.pk[0]}: createdId, ...${sampleData} },
+      update: ${updateData},
+    });
+    expect(result).toBeDefined();
+    expect(result.${table.pk[0]}).toBe(createdId);
   });` : ''}
-  
+
   it('should delete ${table.name}', async () => {
     if (!createdId) {
       console.warn('No ID from create test, skipping delete test');

@@ -55,7 +55,7 @@ export function emitHonoRoutes(
 import { Hono } from "hono";
 import type { Context } from "hono";
 import { z } from "zod";
-import { Insert${Type}Schema, Update${Type}Schema } from "../zod/${fileTableName}${ext}";
+import { Insert${Type}Schema, Update${Type}Schema, Upsert${Type}Schema } from "../zod/${fileTableName}${ext}";
 import { loadIncludes } from "../include-loader${ext}";
 import * as coreOps from "../core/operations${ext}";
 ${authImport}
@@ -64,6 +64,7 @@ const columnEnum = z.enum([${columnNames}]);
 
 const createSchema = Insert${Type}Schema;
 const updateSchema = Update${Type}Schema;
+const upsertSchema = Upsert${Type}Schema;
 
 const deleteSchema = z.object({
   select: z.array(z.string()).min(1).optional(),
@@ -289,6 +290,39 @@ ${hasAuth ? `
       offset: result.offset,
       hasMore: result.hasMore
     }, result.status as any);
+  });
+
+  // UPSERT
+  app.post(\`\${base}/upsert\`, async (c) => {
+    const body = await c.req.json().catch(() => ({}));
+    const parsed = upsertSchema.safeParse(body);
+
+    if (!parsed.success) {
+      const issues = parsed.error.flatten();
+      return c.json({ error: "Invalid body", issues }, 400);
+    }
+
+    const selectParam = c.req.query("select");
+    const excludeParam = c.req.query("exclude");
+    const select = selectParam ? selectParam.split(",") : undefined;
+    const exclude = excludeParam ? excludeParam.split(",") : undefined;
+
+    if (select && exclude) {
+      return c.json({ error: "Cannot specify both 'select' and 'exclude' parameters" }, 400);
+    }
+
+    if (deps.onRequest) {
+      await deps.onRequest(c, deps.pg);
+    }
+
+    const ctx = { ...baseCtx, select, exclude };
+    const result = await coreOps.upsertRecord(ctx, parsed.data);
+
+    if (result.error) {
+      return c.json({ error: result.error }, result.status as any);
+    }
+
+    return c.json(result.data, result.status as any);
   });
 
   // UPDATE

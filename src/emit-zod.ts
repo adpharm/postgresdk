@@ -67,5 +67,17 @@ ${insertFields}
 });
 
 export const Update${Type}Schema = Insert${Type}Schema.partial();
+
+export const Upsert${Type}Schema = z.object({
+  where: Update${Type}Schema.refine(
+    (d) => Object.keys(d).length > 0,
+    { message: "where must specify at least one column" }
+  ),
+  create: Insert${Type}Schema,
+  update: Update${Type}Schema.refine(
+    (d) => Object.keys(d).length > 0,
+    { message: "update must specify at least one column" }
+  ),
+});
 `;
 }

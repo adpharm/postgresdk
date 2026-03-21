@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- feat: Add upsert operation — `sdk.table.upsert({ where, create, update })`
+  - `where` keys define the unique conflict target (must be a unique constraint); `create` is used if no conflict, `update` if one occurs
+  - Supports field selection/exclusion via `options.select` / `options.exclude` like other write methods
+  - `$upsert()` lazy builder available for use inside `sdk.$transaction([...])`
+  - Generates `POST /table/upsert` endpoint on the server with Zod-validated `UpsertSchema`
+  - Generated test suite includes an upsert test (update path) for each table
+
 - feat: Add atomic transaction support via `sdk.$transaction([...ops])`
   - Each table client exposes `$create(data)`, `$update(pk, data)`, and `$delete(pk)` to build lazy `TxOp` descriptors
   - `sdk.$transaction(ops)` sends a single `POST /_psdk/transaction` request and executes all ops atomically (BEGIN/COMMIT/ROLLBACK)

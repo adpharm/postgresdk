@@ -481,6 +481,78 @@ ${hasJsonbColumns ? `  /**
   }`}
 
 ${hasJsonbColumns ? `  /**
+   * Upsert a ${table.name} record with field selection
+   */
+  async upsert<TJsonb extends Partial<Select${Type}> = {}>(
+    args: { where: Update${Type}<TJsonb>; create: NoInfer<Insert${Type}<TJsonb>>; update: NoInfer<Update${Type}<TJsonb>> },
+    options: { select: string[] }
+  ): Promise<Partial<Select${Type}<TJsonb>>>;
+  /**
+   * Upsert a ${table.name} record with field exclusion
+   */
+  async upsert<TJsonb extends Partial<Select${Type}> = {}>(
+    args: { where: Update${Type}<TJsonb>; create: NoInfer<Insert${Type}<TJsonb>>; update: NoInfer<Update${Type}<TJsonb>> },
+    options: { exclude: string[] }
+  ): Promise<Partial<Select${Type}<TJsonb>>>;
+  /**
+   * Upsert a ${table.name} record — insert if no conflict on 'where' columns, update otherwise.
+   * @param args.where - Conflict target column(s) (must be a unique constraint)
+   * @param args.create - Full insert data used when no conflict occurs
+   * @param args.update - Partial data applied when a conflict occurs
+   * @returns The resulting record
+   */
+  async upsert<TJsonb extends Partial<Select${Type}> = {}>(
+    args: { where: Update${Type}<TJsonb>; create: NoInfer<Insert${Type}<TJsonb>>; update: NoInfer<Update${Type}<TJsonb>> },
+    options?: Omit<{ select?: string[]; exclude?: string[] }, 'select' | 'exclude'>
+  ): Promise<Select${Type}<TJsonb>>;
+  async upsert<TJsonb extends Partial<Select${Type}> = {}>(
+    args: { where: Update${Type}<TJsonb>; create: NoInfer<Insert${Type}<TJsonb>>; update: NoInfer<Update${Type}<TJsonb>> },
+    options?: { select?: string[]; exclude?: string[] }
+  ): Promise<Select${Type}<TJsonb> | Partial<Select${Type}<TJsonb>>> {
+    const queryParams = new URLSearchParams();
+    if (options?.select) queryParams.set('select', options.select.join(','));
+    if (options?.exclude) queryParams.set('exclude', options.exclude.join(','));
+    const query = queryParams.toString();
+    const url = query ? \`\${this.resource}/upsert?\${query}\` : \`\${this.resource}/upsert\`;
+    return this.post<Select${Type}<TJsonb>>(url, args);
+  }` : `  /**
+   * Upsert a ${table.name} record with field selection
+   */
+  async upsert(
+    args: { where: Update${Type}; create: Insert${Type}; update: Update${Type} },
+    options: { select: string[] }
+  ): Promise<Partial<Select${Type}>>;
+  /**
+   * Upsert a ${table.name} record with field exclusion
+   */
+  async upsert(
+    args: { where: Update${Type}; create: Insert${Type}; update: Update${Type} },
+    options: { exclude: string[] }
+  ): Promise<Partial<Select${Type}>>;
+  /**
+   * Upsert a ${table.name} record — insert if no conflict on 'where' columns, update otherwise.
+   * @param args.where - Conflict target column(s) (must be a unique constraint)
+   * @param args.create - Full insert data used when no conflict occurs
+   * @param args.update - Partial data applied when a conflict occurs
+   * @returns The resulting record
+   */
+  async upsert(
+    args: { where: Update${Type}; create: Insert${Type}; update: Update${Type} },
+    options?: Omit<{ select?: string[]; exclude?: string[] }, 'select' | 'exclude'>
+  ): Promise<Select${Type}>;
+  async upsert(
+    args: { where: Update${Type}; create: Insert${Type}; update: Update${Type} },
+    options?: { select?: string[]; exclude?: string[] }
+  ): Promise<Select${Type} | Partial<Select${Type}>> {
+    const queryParams = new URLSearchParams();
+    if (options?.select) queryParams.set('select', options.select.join(','));
+    if (options?.exclude) queryParams.set('exclude', options.exclude.join(','));
+    const query = queryParams.toString();
+    const url = query ? \`\${this.resource}/upsert?\${query}\` : \`\${this.resource}/upsert\`;
+    return this.post<Select${Type}>(url, args);
+  }`}
+
+${hasJsonbColumns ? `  /**
    * Get a ${table.name} record by primary key with field selection
    * @param pk - The primary key value${hasCompositePk ? 's' : ''}
    * @param options - Select specific fields to return
@@ -835,6 +907,11 @@ ${deleteMethodsCode}
   /** Build a lazy DELETE descriptor for use with sdk.$transaction([...]) */
   $delete(pk: ${pkType}): TxOp<Select${Type} | null> {
     return { _table: "${table.name}", _op: "delete", _pk: ${hasCompositePk ? 'pk as Record<string, unknown>' : 'pk'} };
+  }
+
+  /** Build a lazy UPSERT descriptor for use with sdk.$transaction([...]) */
+  $upsert(args: { where: Update${Type}; create: Insert${Type}; update: Update${Type} }): TxOp<Select${Type}> {
+    return { _table: "${table.name}", _op: "upsert", _data: args as Record<string, unknown> };
   }
 ${includeMethodsCode}}
 `;

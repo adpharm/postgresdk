@@ -152,6 +152,96 @@ export async function createRecord(
 }
 
 /**
+ * UPSERT operation - Insert or update a record based on a conflict target
+ */
+export async function upsertRecord(
+  ctx: OperationContext,
+  args: {
+    where: Record<string, any>;   // conflict target columns (keys only matter)
+    create: Record<string, any>;  // full insert data
+    update: Record<string, any>;  // update data on conflict
+  }
+): Promise<{ data?: any; error?: string; issues?: any; status: number }> {
+  try {
+    const { where, create: createData, update: updateData } = args;
+
+    const conflictCols = Object.keys(where);
+    if (!conflictCols.length) {
+      return { error: "where must specify at least one column", status: 400 };
+    }
+
+    const insertCols = Object.keys(createData);
+    const insertVals = Object.values(createData);
+    if (!insertCols.length) {
+      return { error: "No fields provided in create", status: 400 };
+    }
+
+    // Filter PK columns from update (mirrors updateRecord behaviour)
+    const filteredUpdate = Object.fromEntries(
+      Object.entries(updateData).filter(([k]) => !ctx.pkColumns.includes(k))
+    );
+    if (!Object.keys(filteredUpdate).length) {
+      return { error: "update must include at least one non-PK field", status: 400 };
+    }
+
+    // Serialise JSONB/vector values for create (same pattern as createRecord)
+    const preparedInsertVals = insertVals.map((v, i) =>
+      v !== null && v !== undefined && typeof v === 'object' &&
+      (ctx.jsonbColumns?.includes(insertCols[i]!) || ctx.vectorColumns?.includes(insertCols[i]!))
+        ? JSON.stringify(v) : v
+    );
+
+    // Serialise JSONB/vector values for update
+    const updateCols = Object.keys(filteredUpdate);
+    const updateVals = Object.values(filteredUpdate);
+    const preparedUpdateVals = updateVals.map((v, i) =>
+      v !== null && v !== undefined && typeof v === 'object' &&
+      (ctx.jsonbColumns?.includes(updateCols[i]!) || ctx.vectorColumns?.includes(updateCols[i]!))
+        ? JSON.stringify(v) : v
+    );
+
+    const placeholders  = insertCols.map((_, i) => \`$\${i + 1}\`).join(', ');
+    const conflictSQL   = conflictCols.map(c => \`"\${c}"\`).join(', ');
+    const setSql        = updateCols.map((k, i) => \`"\${k}" = $\${insertCols.length + i + 1}\`).join(', ');
+    const returningClause = buildColumnList(ctx.select, ctx.exclude, ctx.allColumnNames);
+
+    const text = \`INSERT INTO "\${ctx.table}" (\${insertCols.map(c => \`"\${c}"\`).join(', ')})
+                  VALUES (\${placeholders})
+                  ON CONFLICT (\${conflictSQL}) DO UPDATE SET \${setSql}
+                  RETURNING \${returningClause}\`;
+    const params = [...preparedInsertVals, ...preparedUpdateVals];
+
+    log.debug("UPSERT SQL:", text, "params:", params);
+    const { rows } = await ctx.pg.query(text, params);
+    const parsedRows = parseVectorColumns(rows, ctx.vectorColumns);
+
+    if (!parsedRows[0]) {
+      return { data: null, status: 500 };
+    }
+
+    return { data: parsedRows[0], status: 200 };
+  } catch (e: any) {
+    const errorMsg = e?.message ?? "";
+    const isJsonError = errorMsg.includes("invalid input syntax for type json");
+    if (isJsonError) {
+      log.error(\`UPSERT \${ctx.table} - Invalid JSON input detected!\`);
+      log.error("Input args that caused error:", JSON.stringify(args, null, 2));
+      log.error("Filtered update data (sent to DB):", JSON.stringify(Object.fromEntries(
+        Object.entries(args.update).filter(([k]) => !ctx.pkColumns.includes(k))
+      ), null, 2));
+      log.error("PostgreSQL error:", errorMsg);
+    } else {
+      log.error(\`UPSERT \${ctx.table} error:\`, e?.stack ?? e);
+    }
+    return {
+      error: e?.message ?? "Internal error",
+      ...(DEBUG ? { stack: e?.stack } : {}),
+      status: 500
+    };
+  }
+}
+
+/**
  * READ operation - Get a record by primary key
  */
 export async function getByPk(
@@ -879,7 +969,8 @@ export interface TransactionTableMetadata {
 export type TransactionOperation =
   | { op: "create"; table: string; data: Record<string, unknown> }
   | { op: "update"; table: string; pk: string | Record<string, unknown>; data: Record<string, unknown> }
-  | { op: "delete"; table: string; pk: string | Record<string, unknown> };
+  | { op: "delete"; table: string; pk: string | Record<string, unknown> }
+  | { op: "upsert"; table: string; data: { where: Record<string, unknown>; create: Record<string, unknown>; update: Record<string, unknown> } };
 
 /**
  * Executes a list of operations atomically inside a single PostgreSQL transaction.
@@ -936,6 +1027,8 @@ export async function executeTransaction(
 
       if (op.op === "create") {
         result = await createRecord(ctx, op.data);
+      } else if (op.op === "upsert") {
+        result = await upsertRecord(ctx, op.data);
       } else {
         const pkValues = Array.isArray(op.pk)
           ? op.pk

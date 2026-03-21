@@ -570,6 +570,13 @@ const users = result.data;  // Array of users
 // Update
 const updated = await sdk.users.update(123, { name: "Robert" });
 
+// Upsert — insert if no conflict, update otherwise (Prisma-style)
+const upserted = await sdk.users.upsert({
+  where:  { email: "alice@example.com" },       // conflict target (must be a unique constraint)
+  create: { email: "alice@example.com", name: "Alice" },
+  update: { name: "Alice Updated" },
+});
+
 // Delete
 const deleted = await sdk.users.hardDelete(123);     // permanent deletion
 // await sdk.users.softDelete(123);                  // soft-delete (when softDeleteColumn is configured)
@@ -587,7 +594,7 @@ const [order, updatedUser] = await sdk.$transaction([
 // TypeScript infers: [SelectOrders, SelectUsers | null]
 ```
 
-- `$create`, `$update`, `$delete` are **lazy builders** — nothing executes until `$transaction` is called
+- `$create`, `$update`, `$delete`, `$upsert` are **lazy builders** — nothing executes until `$transaction` is called
 - All ops are Zod-validated **before** `BEGIN` is issued (fail-fast, no partial state)
 - On any failure the transaction rolls back; an error is thrown with a `.failedAt` index
 
@@ -597,6 +604,12 @@ try {
     sdk.inventory.$update(itemId, { stock: newStock }),
     sdk.orders.$create({ item_id: itemId, qty: 1 }),
     sdk.audit_log.$create({ action: "purchase", item_id: itemId }),
+    // $upsert also works inside transactions:
+    sdk.users.$upsert({
+      where:  { email: "alice@example.com" },
+      create: { email: "alice@example.com", name: "Alice" },
+      update: { name: "Alice Updated" },
+    }),
   ]);
 } catch (err: any) {
   console.error(`Failed at op ${err.failedAt}:`, err.message);
