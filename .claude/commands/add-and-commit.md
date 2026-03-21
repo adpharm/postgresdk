@@ -6,6 +6,8 @@ Make sure to:
 - [ ] read & update the changelog, if needed
 - [ ] read & update the readme, if needed
 
+File locations: @CHANGELOG.md , @README.md
+
 ## Changelog Guidelines
 
 When updating CHANGELOG.md, focus on **outcomes and capabilities**, not implementation details.

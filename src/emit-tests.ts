@@ -483,7 +483,7 @@ function generateForeignKeySetup(table: Table, model: Model, clientPath: string)
     // Clean up parent ${foreignTableName} record
     if (${foreignTableName}Id) {
       try {
-        await sdk.${foreignTableName}.delete(${foreignTableName}Id);
+        await sdk.${foreignTableName}.hardDelete(${foreignTableName}Id);
       } catch (e) {
         // Parent might already be deleted due to cascading
       }
@@ -504,7 +504,7 @@ function generateForeignKeySetup(table: Table, model: Model, clientPath: string)
     // Clean up parent ${foreignTableName} record
     if (${foreignTableName}Key) {
       try {
-        await sdk.${foreignTableName}.delete(${foreignTableName}Key);
+        await sdk.${foreignTableName}.hardDelete(${foreignTableName}Key);
       } catch (e) {
         // Parent might already be deleted due to cascading
       }
@@ -889,7 +889,7 @@ function generateTestCases(table: Table, sampleData: string, updateData: string,
       return;
     }
     
-    const deleted = await sdk.${table.name}.delete(createdId);
+    const deleted = await sdk.${table.name}.hardDelete(createdId);
     expect(deleted).toBeDefined();
     
     // Verify deletion

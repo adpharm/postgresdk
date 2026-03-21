@@ -28,6 +28,15 @@ export type AuthConfigInput = AuthConfig | {
   apiKeyHeader?: string;
 }
 
+export interface DeleteConfig {
+  /** Column name for soft deletes (e.g. "deleted_at"). Absence = hard deletes only. */
+  softDeleteColumn?: string;
+  /** Whether to also expose hardDelete when soft delete is configured. @default true */
+  exposeHardDelete?: boolean;
+  /** Per-table overrides. Use null to disable soft delete for a specific table. */
+  softDeleteColumnOverrides?: Record<string, string | null>;
+}
+
 export interface Config {
   // Required
   connectionString: string;
@@ -35,9 +44,8 @@ export interface Config {
   // Optional
   schema?: string;
   outDir?: string | { client: string; server: string };
-  softDeleteColumn?: string | null;
-  /** Per-table overrides for soft delete column. Use `null` to disable soft deletes for a specific table. */
-  softDeleteColumnOverrides?: Record<string, string | null>;
+  /** Delete configuration (soft/hard delete behavior). */
+  delete?: DeleteConfig;
   dateType?: "date" | "string";
   numericMode?: "string" | "number" | "auto";  // How to type numeric columns (default: "auto" - int2/int4→number, int8/numeric→string)
   

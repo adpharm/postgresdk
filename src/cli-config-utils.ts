@@ -79,17 +79,18 @@ export function extractConfigFields(configContent: string): ConfigField[] {
     });
   }
   
-  // Extract softDeleteColumn
-  const softDeleteMatch = configContent.match(/^\s*(\/\/)?\s*softDeleteColumn:\s*(.+),?$/m);
-  if (softDeleteMatch) {
+  // Extract delete configuration block
+  const deleteBlock = extractComplexBlock(configContent, "delete");
+  if (deleteBlock) {
     fields.push({
-      key: "softDeleteColumn",
-      value: softDeleteMatch[2]?.trim().replace(/,$/, '').replace(/["']/g, ''),
-      description: "Column name for soft deletes",
-      isCommented: !!softDeleteMatch[1],
+      key: "delete",
+      value: deleteBlock.content,
+      description: "Delete configuration (soft/hard delete behavior)",
+      isCommented: deleteBlock.isCommented,
     });
   }
-  
+
+
   // Extract includeMethodsDepth (also check for old name includeDepthLimit)
   const depthMatch = configContent.match(/^\s*(\/\/)?\s*(includeMethodsDepth|includeDepthLimit):\s*(\d+)/m);
   if (depthMatch) {
@@ -312,12 +313,12 @@ export default {
   // ========== ADVANCED OPTIONS ==========
   
   /**
-   * Column name for soft deletes. When set, DELETE operations will update
-   * this column instead of removing rows.
-   * @default null (hard deletes)
-   * @example "deleted_at"
+   * Delete configuration (soft/hard delete behavior).
+   * When softDeleteColumn is set, DELETE operations update that column instead of removing rows.
+   * Set exposeHardDelete: false to prevent permanent deletion via the API.
+   * @default undefined (hard deletes only)
    */
-  ${getFieldLine("softDeleteColumn", existingFields, mergeStrategy, 'null', userChoices)}
+  ${getComplexBlockLine("delete", existingFields, mergeStrategy, userChoices)}
 
   /**
    * How to type numeric columns in TypeScript
@@ -511,6 +512,13 @@ function getComplexBlockLine(
 
 function getDefaultComplexBlock(key: string): string {
   switch (key) {
+    case "delete":
+      return `// delete: {
+  //   softDeleteColumn: "deleted_at",
+  //   exposeHardDelete: true,       // default: true
+  //   // softDeleteColumnOverrides: { audit_logs: null }
+  // },`;
+
     case "tests":
       return `// tests: {
   //   generate: true,

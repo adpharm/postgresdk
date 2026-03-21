@@ -639,7 +639,7 @@ async function main() {
     console.log("  ✓ GetByPk with select: returns only selected fields");
 
     // Test delete with select
-    const deletedWithSelect = await sdk.authors.delete(
+    const deletedWithSelect = await sdk.authors.hardDelete(
       createdWithSelect.id,
       { select: ["id", "name"] }
     );
@@ -697,7 +697,7 @@ async function main() {
     console.log("\n🗑️  Testing Delete Operations:");
 
     // Delete a book
-    const deletedBook = await sdk.books.delete(book3.id);
+    const deletedBook = await sdk.books.hardDelete(book3.id);
     console.log("  ✓ Deleted book:", deletedBook.title);
 
     // Verify it's deleted
@@ -706,7 +706,7 @@ async function main() {
     console.log("  ✓ Confirmed book is deleted (returns null)");
 
     // Delete an author (should work since we deleted their book)
-    const deletedAuthor = await sdk.authors.delete(author2.id);
+    const deletedAuthor = await sdk.authors.hardDelete(author2.id);
     console.log("  ✓ Deleted author:", deletedAuthor.name);
 
     // ===== FINAL SUMMARY =====
@@ -1057,7 +1057,7 @@ async function main() {
     const fetchedAuthor = await sdkSameDir.authors.getByPk(testAuthor.id);
     assert(fetchedAuthor?.name === "Test Author Same Dir", "Should fetch author");
     
-    await sdkSameDir.authors.delete(testAuthor.id);
+    await sdkSameDir.authors.hardDelete(testAuthor.id);
     console.log("  ✓ SDK from same-dir configuration works correctly");
     
   } finally {

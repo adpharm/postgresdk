@@ -9,7 +9,7 @@ import { pascal, isVectorType, isJsonbType } from "./utils";
 export function emitHonoRoutes(
   table: Table,
   _graph: Graph,
-  opts: { softDeleteColumn: string | null; includeMethodsDepth: number; authStrategy?: string; useJsExtensions?: boolean; apiPathPrefix: string }
+  opts: { softDeleteColumn: string | null; exposeHardDelete: boolean; includeMethodsDepth: number; authStrategy?: string; useJsExtensions?: boolean; apiPathPrefix: string }
 ) {
   const fileTableName = table.name;
   const Type = pascal(table.name);
@@ -28,9 +28,10 @@ export function emitHonoRoutes(
   const hasCompositePk = safePkCols.length > 1;
   const pkPath = hasCompositePk ? safePkCols.map((c) => `:${c}`).join("/") : `:${safePkCols[0]}`;
   
-  const softDel = opts.softDeleteColumn && table.columns.some((c) => c.name === opts.softDeleteColumn) 
-    ? opts.softDeleteColumn 
+  const softDel = opts.softDeleteColumn && table.columns.some((c) => c.name === opts.softDeleteColumn)
+    ? opts.softDeleteColumn
     : null;
+  const exposeHard = !!(softDel && opts.exposeHardDelete);
   
   const getPkParams = hasCompositePk
     ? `const pkValues = [${safePkCols.map((c) => `c.req.param("${c}")`).join(", ")}];`
@@ -66,7 +67,8 @@ const updateSchema = Update${Type}Schema;
 
 const deleteSchema = z.object({
   select: z.array(z.string()).min(1).optional(),
-  exclude: z.array(z.string()).min(1).optional()
+  exclude: z.array(z.string()).min(1).optional(),${exposeHard ? `
+  hard: z.boolean().optional(),` : ""}
 }).strict().refine(
   (data) => !(data.select && data.exclude),
   { message: "Cannot specify both 'select' and 'exclude' parameters" }
@@ -328,13 +330,15 @@ ${hasAuth ? `
   app.delete(\`\${base}/${pkPath}\`, async (c) => {
     ${getPkParams}
 
-    // Parse query params for select/exclude
+    // Parse query params for select/exclude${exposeHard ? " and hard" : ""}
     const selectParam = c.req.query("select");
     const excludeParam = c.req.query("exclude");
     const queryData: any = {};
     if (selectParam) queryData.select = selectParam.split(",");
     if (excludeParam) queryData.exclude = excludeParam.split(",");
-
+${exposeHard ? `    const hardParam = c.req.query("hard");
+    if (hardParam !== undefined) queryData.hard = hardParam === "true";
+` : ""}
     const queryParsed = deleteSchema.safeParse(queryData);
     if (!queryParsed.success) {
       const issues = queryParsed.error.flatten();
@@ -346,7 +350,7 @@ ${hasAuth ? `
     }
 
     const ctx = { ...baseCtx, select: queryParsed.data.select, exclude: queryParsed.data.exclude };
-    const result = await coreOps.deleteRecord(ctx, pkValues);
+    const result = await coreOps.deleteRecord(ctx, pkValues${exposeHard ? ', { hard: queryParsed.data.hard }' : ''});
 
     if (result.error) {
       return c.json({ error: result.error }, result.status as any);

@@ -827,7 +827,8 @@ export async function updateRecord(
  */
 export async function deleteRecord(
   ctx: OperationContext,
-  pkValues: any[]
+  pkValues: any[],
+  opts?: { hard?: boolean }
 ): Promise<{ data?: any; error?: string; status: number }> {
   try {
     const hasCompositePk = ctx.pkColumns.length > 1;
@@ -836,11 +837,12 @@ export async function deleteRecord(
       : \`"\${ctx.pkColumns[0]}" = $1\`;
 
     const returningClause = buildColumnList(ctx.select, ctx.exclude, ctx.allColumnNames);
-    const text = ctx.softDeleteColumn
+    const doSoftDelete = ctx.softDeleteColumn && !opts?.hard;
+    const text = doSoftDelete
       ? \`UPDATE "\${ctx.table}" SET "\${ctx.softDeleteColumn}" = NOW() WHERE \${wherePkSql} RETURNING \${returningClause}\`
       : \`DELETE FROM "\${ctx.table}" WHERE \${wherePkSql} RETURNING \${returningClause}\`;
 
-    log.debug(\`DELETE \${ctx.softDeleteColumn ? '(soft)' : ''} \${ctx.table} SQL:\`, text, "pk:", pkValues);
+    log.debug(\`DELETE \${doSoftDelete ? '(soft)' : ''} \${ctx.table} SQL:\`, text, "pk:", pkValues);
     const { rows } = await ctx.pg.query(text, pkValues);
     const parsedRows = parseVectorColumns(rows, ctx.vectorColumns);
 

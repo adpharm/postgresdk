@@ -58,13 +58,14 @@ export default {
   // ========== ADVANCED OPTIONS ==========
 
   /**
-   * Column name for soft deletes. When set, DELETE operations will update
-   * this column instead of removing rows.
-   *
-   * Default: null (hard deletes)
-   * Example: "deleted_at"
+   * Delete configuration (soft/hard delete behavior).
+   * When softDeleteColumn is set, DELETE operations update that column instead of removing rows.
+   * Set exposeHardDelete: false to prevent permanent deletion via the API.
    */
-  // softDeleteColumn: null,
+  // delete: {
+  //   softDeleteColumn: "deleted_at",
+  //   exposeHardDelete: true,
+  // },
 
   /**
    * How to type numeric columns in TypeScript

@@ -125,7 +125,7 @@ const sdk = new SDK({ baseUrl: "http://localhost:3000" });
 const user = await sdk.users.create({ name: "Alice", email: "alice@example.com" });
 const users = await sdk.users.list({ include: { posts: true } });
 await sdk.users.update(user.id, { name: "Alice Smith" });
-await sdk.users.delete(user.id);
+await sdk.users.hardDelete(user.id);
 ```
 
 ---
@@ -146,10 +146,12 @@ export default {
   // Optional (with defaults)
   schema: "public",                    // Database schema to introspect
   outDir: "./api",                     // Output directory (or { client: "./sdk", server: "./api" })
-  softDeleteColumn: null,              // Column name for soft deletes (e.g., "deleted_at")
-  softDeleteColumnOverrides: {         // Per-table overrides (null = disable soft delete for that table)
-    // captures: "hidden_at",          //   different column name for a specific table
-    // audit_logs: null,               //   hard deletes only for this table
+  delete: {                            // Soft/hard delete configuration (optional)
+    softDeleteColumn: "deleted_at",    //   Column name for soft deletes (omit = hard deletes only)
+    exposeHardDelete: true,            //   Also expose hardDelete() — set false to disable (default: true)
+    softDeleteColumnOverrides: {       //   Per-table overrides
+      // audit_logs: null,             //     hard deletes only for this table
+    },
   },
   numericMode: "auto",                 // "auto" | "number" | "string" - How to type numeric columns
   includeMethodsDepth: 2,              // Max depth for nested includes
@@ -569,7 +571,36 @@ const users = result.data;  // Array of users
 const updated = await sdk.users.update(123, { name: "Robert" });
 
 // Delete
-const deleted = await sdk.users.delete(123);
+const deleted = await sdk.users.hardDelete(123);     // permanent deletion
+// await sdk.users.softDelete(123);                  // soft-delete (when softDeleteColumn is configured)
+```
+
+#### Atomic Transactions
+
+Execute multiple operations in a single PostgreSQL transaction — all succeed or all roll back:
+
+```typescript
+const [order, updatedUser] = await sdk.$transaction([
+  sdk.orders.$create({ user_id: user.id, total: 99 }),
+  sdk.users.$update(user.id, { last_order_at: new Date().toISOString() }),
+]);
+// TypeScript infers: [SelectOrders, SelectUsers | null]
+```
+
+- `$create`, `$update`, `$delete` are **lazy builders** — nothing executes until `$transaction` is called
+- All ops are Zod-validated **before** `BEGIN` is issued (fail-fast, no partial state)
+- On any failure the transaction rolls back; an error is thrown with a `.failedAt` index
+
+```typescript
+try {
+  const results = await sdk.$transaction([
+    sdk.inventory.$update(itemId, { stock: newStock }),
+    sdk.orders.$create({ item_id: itemId, qty: 1 }),
+    sdk.audit_log.$create({ action: "purchase", item_id: itemId }),
+  ]);
+} catch (err: any) {
+  console.error(`Failed at op ${err.failedAt}:`, err.message);
+}
 ```
 
 #### Relationships & Eager Loading
@@ -745,7 +776,13 @@ const nested = await sdk.users.list({
   }
 });
 
-// Soft deletes — when softDeleteColumn is configured, deleted records are hidden by default.
+// Soft deletes — when `delete.softDeleteColumn` is configured in postgresdk.config.ts,
+// the SDK exposes softDelete() and hardDelete() instead of a single delete():
+//
+//   softDelete(id)   → sets the soft-delete column (e.g. deleted_at = NOW())
+//   hardDelete(id)   → permanent DELETE (available unless exposeHardDelete: false)
+//
+// Soft-deleted rows are hidden from list/getByPk by default.
 // Pass includeSoftDeleted: true to opt into seeing them (e.g., for admin/recovery UIs).
 const allUsers = await sdk.users.list({ includeSoftDeleted: true });
 const deletedUser = await sdk.users.getByPk("123", { includeSoftDeleted: true });
@@ -787,7 +824,7 @@ const updated = await sdk.users.update(
 );
 
 const fetched = await sdk.users.getByPk(userId, { select: ['id', 'name'] });
-const deleted = await sdk.users.delete(userId, { select: ['id', 'email'] });
+const deleted = await sdk.users.hardDelete(userId, { select: ['id', 'email'] });
 
 // Nested select/exclude in includes
 const withNestedSelect = await sdk.authors.list({

@@ -231,14 +231,15 @@ function generateResourceWithSDK(table: Table, model: Model, graph?: Graph, conf
   const enums = model.enums || {};
 
   // Resolve effective soft delete column for this table (mirrors route emitter logic)
-  const overrides = config?.softDeleteColumnOverrides;
+  const overrides = config?.delete?.softDeleteColumnOverrides;
   const resolvedSoftDeleteCol = overrides && tableName in overrides
     ? (overrides[tableName] ?? null)
-    : (config?.softDeleteColumn ?? null);
+    : (config?.delete?.softDeleteColumn ?? null);
   // Only emit soft delete docs if the column actually exists on this table
   const softDeleteCol = resolvedSoftDeleteCol && table.columns.some(c => c.name === resolvedSoftDeleteCol)
     ? resolvedSoftDeleteCol
     : null;
+  const exposeHardDelete = config?.delete?.exposeHardDelete ?? true;
 
   const sdkMethods: SDKMethod[] = [];
   const endpoints: EndpointContract[] = [];
@@ -324,20 +325,35 @@ function generateResourceWithSDK(table: Table, model: Model, graph?: Graph, conf
     });
   }
   
-  // DELETE method
+  // DELETE method(s)
   if (hasSinglePK) {
-    sdkMethods.push({
-      name: "delete",
-      signature: `delete(${pkField}: string): Promise<${Type}>`,
-      description: `Delete a ${tableName}`,
-      example: `const deleted = await sdk.${tableName}.delete('id');`,
-      correspondsTo: `DELETE ${basePath}/:${pkField}`
-    });
-    
+    if (softDeleteCol) {
+      sdkMethods.push({
+        name: "softDelete",
+        signature: `softDelete(${pkField}: string): Promise<${Type}>`,
+        description: `Soft-delete a ${tableName} (sets ${softDeleteCol})`,
+        example: `const deleted = await sdk.${tableName}.softDelete('id');`,
+        correspondsTo: `DELETE ${basePath}/:${pkField}`
+      });
+    }
+    if (!softDeleteCol || exposeHardDelete) {
+      sdkMethods.push({
+        name: "hardDelete",
+        signature: `hardDelete(${pkField}: string): Promise<${Type}>`,
+        description: `Permanently delete a ${tableName}`,
+        example: `const deleted = await sdk.${tableName}.hardDelete('id');`,
+        correspondsTo: softDeleteCol
+          ? `DELETE ${basePath}/:${pkField}?hard=true`
+          : `DELETE ${basePath}/:${pkField}`
+      });
+    }
+
     endpoints.push({
       method: "DELETE",
       path: `${basePath}/:${pkField}`,
-      description: `Delete ${tableName}`,
+      description: softDeleteCol
+        ? `Delete ${tableName} (soft-delete by default${exposeHardDelete ? '; add ?hard=true for permanent deletion' : ''})`
+        : `Delete ${tableName}`,
       responseBody: `${Type}`
     });
   }

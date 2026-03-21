@@ -44,6 +44,8 @@ export function emitClient(
   table: Table,
   graph: Graph,
   opts: {
+    softDeleteColumn?: string | null;
+    exposeHardDelete?: boolean;
     useJsExtensions?: boolean;
     includeMethodsDepth?: number;
     skipJunctionTables?: boolean;
@@ -59,6 +61,10 @@ export function emitClient(
 
   // Check if table has any JSONB columns
   const hasJsonbColumns = table.columns.some(c => isJsonbType(c.pgType));
+
+  // Determine soft/hard delete configuration
+  const hasSoftDelete = !!opts.softDeleteColumn;
+  const exposeHard = !hasSoftDelete || (opts.exposeHardDelete ?? true);
 
   // Debug: log vector detection
   if (process.env.SDK_DEBUG) {
@@ -333,6 +339,56 @@ export function emitClient(
 `;
     }
   }
+
+  // Build delete methods based on soft/hard delete config.
+  // G/RBase/RPart vary only by whether the table has JSONB columns (TJsonb generic support).
+  const buildDeleteMethod = (methodName: string, setHardTrue: boolean): string => {
+    const actionName = methodName === 'softDelete' ? 'Soft-delete' : 'Hard-delete (permanently remove)';
+    const hardLine = setHardTrue ? "\n    queryParams.set('hard', 'true');" : '';
+    const pksLabel = hasCompositePk ? 's' : '';
+    const G     = hasJsonbColumns ? `<TJsonb extends Partial<Select${Type}> = {}>` : '';
+    const RBase = hasJsonbColumns ? `Select${Type}<TJsonb>` : `Select${Type}`;
+    const RPart = hasJsonbColumns ? `Partial<Select${Type}<TJsonb>>` : `Partial<Select${Type}>`;
+    return (
+      `  /**\n` +
+      `   * ${actionName} a ${table.name} record by primary key with field selection\n` +
+      `   * @param pk - The primary key value${pksLabel}\n` +
+      `   * @param options - Select specific fields to return\n` +
+      `   * @returns The deleted record with only selected fields if found, null otherwise\n` +
+      `   */\n` +
+      `  async ${methodName}${G}(pk: ${pkType}, options: { select: string[] }): Promise<${RPart} | null>;\n` +
+      `  /**\n` +
+      `   * ${actionName} a ${table.name} record by primary key with field exclusion\n` +
+      `   * @param pk - The primary key value${pksLabel}\n` +
+      `   * @param options - Exclude specific fields from return\n` +
+      `   * @returns The deleted record without excluded fields if found, null otherwise\n` +
+      `   */\n` +
+      `  async ${methodName}${G}(pk: ${pkType}, options: { exclude: string[] }): Promise<${RPart} | null>;\n` +
+      `  /**\n` +
+      `   * ${actionName} a ${table.name} record by primary key\n` +
+      `   * @param pk - The primary key value${pksLabel}\n` +
+      `   * @returns The deleted record with all fields if found, null otherwise\n` +
+      `   */\n` +
+      `  async ${methodName}${G}(pk: ${pkType}, options?: Omit<{ select?: string[]; exclude?: string[] }, 'select' | 'exclude'>): Promise<${RBase} | null>;\n` +
+      `  async ${methodName}${G}(\n` +
+      `    pk: ${pkType},\n` +
+      `    options?: { select?: string[]; exclude?: string[] }\n` +
+      `  ): Promise<${RBase} | ${RPart} | null> {\n` +
+      `    const path = ${pkPathExpr};\n` +
+      `    const queryParams = new URLSearchParams();${hardLine}\n` +
+      `    if (options?.select) queryParams.set('select', options.select.join(','));\n` +
+      `    if (options?.exclude) queryParams.set('exclude', options.exclude.join(','));\n` +
+      `    const query = queryParams.toString();\n` +
+      "    const url = query ? `${this.resource}/${path}?${query}` : `${this.resource}/${path}`;\n" +
+      `    return this.del<${RBase} | null>(url);\n` +
+      `  }`
+    );
+  };
+
+  const deleteMethodParts: string[] = [];
+  if (hasSoftDelete) deleteMethodParts.push(buildDeleteMethod('softDelete', false));
+  if (exposeHard) deleteMethodParts.push(buildDeleteMethod('hardDelete', hasSoftDelete));
+  const deleteMethodsCode = deleteMethodParts.join('\n\n');
 
   return `/**
  * AUTO-GENERATED FILE - DO NOT EDIT
@@ -764,72 +820,7 @@ ${hasJsonbColumns ? `  /**
     return this.patch<Select${Type} | null>(url, patch);
   }`}
 
-${hasJsonbColumns ? `  /**
-   * Delete a ${table.name} record by primary key with field selection
-   * @param pk - The primary key value${hasCompositePk ? 's' : ''}
-   * @param options - Select specific fields to return
-   * @returns The deleted record with only selected fields if found, null otherwise
-   */
-  async delete<TJsonb extends Partial<Select${Type}> = {}>(pk: ${pkType}, options: { select: string[] }): Promise<Partial<Select${Type}<TJsonb>> | null>;
-  /**
-   * Delete a ${table.name} record by primary key with field exclusion
-   * @param pk - The primary key value${hasCompositePk ? 's' : ''}
-   * @param options - Exclude specific fields from return
-   * @returns The deleted record without excluded fields if found, null otherwise
-   */
-  async delete<TJsonb extends Partial<Select${Type}> = {}>(pk: ${pkType}, options: { exclude: string[] }): Promise<Partial<Select${Type}<TJsonb>> | null>;
-  /**
-   * Delete a ${table.name} record by primary key
-   * @param pk - The primary key value${hasCompositePk ? 's' : ''}
-   * @returns The deleted record with all fields if found, null otherwise
-   * @example
-   * // With JSONB type override:
-   * const user = await client.delete<{ metadata: Metadata }>('user-id');
-   */
-  async delete<TJsonb extends Partial<Select${Type}> = {}>(pk: ${pkType}, options?: Omit<{ select?: string[]; exclude?: string[] }, 'select' | 'exclude'>): Promise<Select${Type}<TJsonb> | null>;
-  async delete<TJsonb extends Partial<Select${Type}> = {}>(
-    pk: ${pkType},
-    options?: { select?: string[]; exclude?: string[] }
-  ): Promise<Select${Type}<TJsonb> | Partial<Select${Type}<TJsonb>> | null> {
-    const path = ${pkPathExpr};
-    const queryParams = new URLSearchParams();
-    if (options?.select) queryParams.set('select', options.select.join(','));
-    if (options?.exclude) queryParams.set('exclude', options.exclude.join(','));
-    const query = queryParams.toString();
-    const url = query ? \`\${this.resource}/\${path}?\${query}\` : \`\${this.resource}/\${path}\`;
-    return this.del<Select${Type}<TJsonb> | null>(url);
-  }` : `  /**
-   * Delete a ${table.name} record by primary key with field selection
-   * @param pk - The primary key value${hasCompositePk ? 's' : ''}
-   * @param options - Select specific fields to return
-   * @returns The deleted record with only selected fields if found, null otherwise
-   */
-  async delete(pk: ${pkType}, options: { select: string[] }): Promise<Partial<Select${Type}> | null>;
-  /**
-   * Delete a ${table.name} record by primary key with field exclusion
-   * @param pk - The primary key value${hasCompositePk ? 's' : ''}
-   * @param options - Exclude specific fields from return
-   * @returns The deleted record without excluded fields if found, null otherwise
-   */
-  async delete(pk: ${pkType}, options: { exclude: string[] }): Promise<Partial<Select${Type}> | null>;
-  /**
-   * Delete a ${table.name} record by primary key
-   * @param pk - The primary key value${hasCompositePk ? 's' : ''}
-   * @returns The deleted record with all fields if found, null otherwise
-   */
-  async delete(pk: ${pkType}, options?: Omit<{ select?: string[]; exclude?: string[] }, 'select' | 'exclude'>): Promise<Select${Type} | null>;
-  async delete(
-    pk: ${pkType},
-    options?: { select?: string[]; exclude?: string[] }
-  ): Promise<Select${Type} | Partial<Select${Type}> | null> {
-    const path = ${pkPathExpr};
-    const queryParams = new URLSearchParams();
-    if (options?.select) queryParams.set('select', options.select.join(','));
-    if (options?.exclude) queryParams.set('exclude', options.exclude.join(','));
-    const query = queryParams.toString();
-    const url = query ? \`\${this.resource}/\${path}?\${query}\` : \`\${this.resource}/\${path}\`;
-    return this.del<Select${Type} | null>(url);
-  }`}
+${deleteMethodsCode}
 
   /** Build a lazy CREATE descriptor for use with sdk.$transaction([...]) */
   $create(data: Insert${Type}): TxOp<Select${Type}> {

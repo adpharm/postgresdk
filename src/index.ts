@@ -36,10 +36,17 @@ import type { Config } from "./types";
 import { normalizeAuthConfig, getAuthStrategy } from "./types";
 
 /** Resolves the effective soft delete column for a given table, respecting per-table overrides. */
-export function resolveSoftDeleteColumn(cfg: Pick<Config, "softDeleteColumn" | "softDeleteColumnOverrides">, tableName: string): string | null {
-  const overrides = cfg.softDeleteColumnOverrides;
+export function resolveSoftDeleteColumn(cfg: Pick<Config, "delete">, tableName: string): string | null {
+  const del = cfg.delete;
+  if (!del) return null;
+  const overrides = del.softDeleteColumnOverrides;
   if (overrides && tableName in overrides) return overrides[tableName] ?? null;
-  return cfg.softDeleteColumn ?? null;
+  return del.softDeleteColumn ?? null;
+}
+
+/** Returns whether the hard delete endpoint/method should be exposed when soft deletes are configured. */
+export function resolveExposeHardDelete(cfg: Pick<Config, "delete">): boolean {
+  return cfg.delete?.exposeHardDelete ?? true;
 }
 
 export async function generate(configPath: string, options?: { force?: boolean }) {
@@ -182,6 +189,7 @@ export async function generate(configPath: string, options?: { force?: boolean }
   });
 
   // per-table outputs
+  const exposeHardDelete = resolveExposeHardDelete(cfg);
   if (process.env.SDK_DEBUG) {
     console.log(`[Index] About to process ${Object.keys(model.tables || {}).length} tables for generation`);
   }
@@ -206,6 +214,7 @@ export async function generate(configPath: string, options?: { force?: boolean }
     if (serverFramework === "hono") {
       routeContent = emitHonoRoutes(table, graph, {
         softDeleteColumn: softDeleteCols[table.name] ?? null,
+        exposeHardDelete,
         includeMethodsDepth: cfg.includeMethodsDepth || 2,
         authStrategy: getAuthStrategy(normalizedAuth),
         useJsExtensions: cfg.useJsExtensions,
@@ -225,6 +234,8 @@ export async function generate(configPath: string, options?: { force?: boolean }
     files.push({
       path: join(clientDir, `${table.name}.ts`),
       content: emitClient(table, graph, {
+        softDeleteColumn: softDeleteCols[table.name] ?? null,
+        exposeHardDelete,
         useJsExtensions: cfg.useJsExtensionsClient,
         includeMethodsDepth: cfg.includeMethodsDepth ?? 2,
         skipJunctionTables: cfg.skipJunctionTables ?? true

@@ -48,16 +48,25 @@ export default {
   // ========== ADVANCED OPTIONS ==========
 
   /**
-   * Column name for soft deletes. When set, DELETE operations will update
-   * this column with the current timestamp instead of removing rows.
-   * The column must exist in your tables and be of timestamp/datetime type.
+   * Delete configuration (soft/hard delete behavior).
    *
-   * Soft-deleted rows are automatically excluded from GET and LIST operations.
-   * @default null (hard deletes)
-   * @example "deleted_at"
-   * @example "deleted"
+   * When softDeleteColumn is set, DELETE operations update that column with the
+   * current timestamp instead of removing rows. Soft-deleted rows are automatically
+   * excluded from GET and LIST operations.
+   *
+   * exposeHardDelete (default: true) controls whether a ?hard=true escape hatch is
+   * available for permanent deletion when soft deletes are configured.
+   *
+   * softDeleteColumnOverrides lets you override per-table (use null to disable soft
+   * deletes for a specific table).
+   *
+   * @default undefined (hard deletes only)
    */
-  softDeleteColumn: null,
+  // delete: {
+  //   softDeleteColumn: "deleted_at",
+  //   exposeHardDelete: true,
+  //   // softDeleteColumnOverrides: { audit_logs: null },
+  // },
 
   /**
    * Maximum depth for generating typed include methods to prevent infinite loops
