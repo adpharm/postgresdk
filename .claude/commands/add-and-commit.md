@@ -1,4 +1,4 @@
-Add and commit all of our changes and if we have other changes elsewhere, include those. You can look at the diff to figure out what the changes are if you don't know.
+Add and commit all of our changes and if we have other changes elsewhere, include those. You can look at the diff to figure out what the changes are if you don't know. Your job is add and commit, not to run tests or typechecks.
 
 Make sure to:
 
