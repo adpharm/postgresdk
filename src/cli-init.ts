@@ -3,7 +3,7 @@ import { existsSync, writeFileSync, readFileSync, copyFileSync } from "fs";
 import { resolve } from "path";
 import prompts from "prompts";
 import { extractConfigFields, generateMergedConfig } from "./cli-config-utils";
-import type { ConfigField } from "./cli-config-utils";
+import type { ConfigField, MergeChoice } from "./cli-config-utils";
 
 const CONFIG_TEMPLATE_API = `/**
  * PostgreSDK Configuration (API-Side)
@@ -280,7 +280,7 @@ export async function initCommand(args: string[]): Promise<void> {
       process.exit(0);
     }
     
-    let userChoices: Map<string, any> | undefined;
+    let userChoices: Map<string, MergeChoice> | undefined;
     
     // Interactive merge
     if (mergeStrategy === "interactive") {
@@ -307,34 +307,6 @@ export async function initCommand(args: string[]): Promise<void> {
         }
         
         userChoices.set(field.key, choice);
-      }
-      
-      // Ask about new options that weren't in the existing config
-      const newOptions = [
-        { key: "tests", description: "Enable test generation" },
-        { key: "auth", description: "Add authentication" },
-        { key: "pullToken", description: "Add SDK endpoint protection" },
-        { key: "pull", description: "Configure SDK distribution" }
-      ];
-      
-      const existingKeys = new Set(existingFields.map(f => f.key));
-      const missingOptions = newOptions.filter(opt => !existingKeys.has(opt.key));
-      
-      if (missingOptions.length > 0) {
-        console.log("\n📦 New configuration options available:\n");
-        
-        for (const option of missingOptions) {
-          const { addOption } = await prompts({
-            type: "confirm",
-            name: "addOption",
-            message: `Add ${option.description} configuration? (commented out by default)`,
-            initial: false
-          });
-          
-          if (addOption) {
-            userChoices.set(option.key, "add-commented");
-          }
-        }
       }
     }
     

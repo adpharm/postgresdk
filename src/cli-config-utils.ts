@@ -30,7 +30,7 @@ export function extractConfigFields(configContent: string): ConfigField[] {
   if (connectionMatch) {
     fields.push({
       key: "connectionString",
-      value: connectionMatch[1]?.trim(),
+      value: connectionMatch[1]?.trim().replace(/\s*\/\/.*$/, ''),
       description: "PostgreSQL connection string",
       isRequired: true,
       isCommented: false,
@@ -56,8 +56,8 @@ export function extractConfigFields(configContent: string): ConfigField[] {
   if (outDirMatch) {
     // New format - extract the value
     let value = outDirMatch[2]?.trim() || "";
-    // Remove trailing comma if present
-    value = value.replace(/,\s*$/, '');
+    // Strip inline comment, then trailing comma
+    value = value.replace(/\s*\/\/.*$/, '').replace(/,\s*$/, '');
 
     fields.push({
       key: "outDir",
@@ -180,11 +180,12 @@ export function extractConfigFields(configContent: string): ConfigField[] {
   }
 
   // Extract pullToken
-  const pullTokenMatch = configContent.match(/^\s*(\/\/)?\s*pullToken:\s*(.+),?$/m);
+  // Use [ \t]{0,3} instead of \s* to avoid matching pullToken indented inside pull: {}
+  const pullTokenMatch = configContent.match(/^[ \t]{0,3}(\/\/)?\s*pullToken:\s*(.+),?$/m);
   if (pullTokenMatch) {
     fields.push({
       key: "pullToken",
-      value: pullTokenMatch[2]?.trim().replace(/,$/, ''),
+      value: pullTokenMatch[2]?.trim().replace(/\s*\/\/.*$/, '').replace(/,$/, ''),
       description: "Token for protecting /_psdk/* endpoints",
       isCommented: !!pullTokenMatch[1],
     });
@@ -267,10 +268,12 @@ function extractComplexBlock(configContent: string, blockName: string): { conten
   return null;
 }
 
+export type MergeChoice = "keep" | "new";
+
 export function generateMergedConfig(
   existingFields: ConfigField[],
   mergeStrategy: "keep-existing" | "use-defaults" | "interactive",
-  userChoices: Map<string, any> | undefined = undefined
+  userChoices: Map<string, MergeChoice> | undefined = undefined
 ): string {
   // This will generate the new config based on merge strategy
   const template = `/**
@@ -409,11 +412,19 @@ export default {
   return template;
 }
 
+/** Wraps a plain string value in quotes; passes through already-quoted/object/array values. */
+function wrapValue(value: unknown): string {
+  if (typeof value === "string" && !value.startsWith('"') && !value.startsWith('{') && !value.startsWith('[')) {
+    return `"${value}"`;
+  }
+  return String(value);
+}
+
 function getFieldValue(
   key: string,
   existingFields: ConfigField[],
   mergeStrategy: "keep-existing" | "use-defaults" | "interactive",
-  userChoices?: Map<string, any>
+  userChoices?: Map<string, MergeChoice>
 ): string {
   const existing = existingFields.find(f => f.key === key);
   
@@ -449,42 +460,35 @@ function getFieldLine(
   existingFields: ConfigField[],
   mergeStrategy: "keep-existing" | "use-defaults" | "interactive",
   defaultValue: string,
-  userChoices?: Map<string, any>
+  userChoices?: Map<string, MergeChoice>
 ): string {
   const existing = existingFields.find(f => f.key === key);
-  
-  const shouldUseExisting = 
+
+  const shouldUseExisting =
     (mergeStrategy === "keep-existing" && existing && !existing.isCommented) ||
     (mergeStrategy === "interactive" && userChoices?.get(key) === "keep" && existing && !existing.isCommented);
-  
-  const shouldUseNew = 
+
+  const shouldUseNew =
     (mergeStrategy === "use-defaults") ||
     (mergeStrategy === "interactive" && userChoices?.get(key) === "new");
-  
+
   if (shouldUseExisting && existing) {
-    let value = existing.value;
-
-    // Only wrap in quotes if it's a plain string (not already quoted, not an object/array)
-    if (typeof value === "string" && !value.startsWith('"') && !value.startsWith('{') && !value.startsWith('[')) {
-      value = `"${value}"`;
-    }
-
-    return `${key}: ${value},`;
+    return `${key}: ${wrapValue(existing.value)},`;
   }
-  
+
   if (shouldUseNew) {
     return `${key}: ${defaultValue},`;
   }
-  
-  // Comment out by default
-  return `// ${key}: ${defaultValue},`;
+
+  // Comment out — but preserve the user's custom commented value if it exists
+  return `// ${key}: ${existing ? wrapValue(existing.value) : defaultValue},`;
 }
 
 function getComplexBlockLine(
   key: string,
   existingFields: ConfigField[],
   mergeStrategy: "keep-existing" | "use-defaults" | "interactive",
-  userChoices?: Map<string, any>
+  userChoices?: Map<string, MergeChoice>
 ): string {
   const existing = existingFields.find(f => f.key === key);
   
@@ -492,21 +496,12 @@ function getComplexBlockLine(
     (mergeStrategy === "keep-existing" && existing && !existing.isCommented) ||
     (mergeStrategy === "interactive" && userChoices?.get(key) === "keep" && existing && !existing.isCommented);
   
-  const shouldUseNew = 
-    (mergeStrategy === "use-defaults") ||
-    (mergeStrategy === "interactive" && userChoices?.get(key) === "new");
-  
   if (shouldUseExisting && existing) {
     // Use the existing block content
     return `${key}: ${existing.value},`;
   }
-  
-  if (shouldUseNew) {
-    // Return commented default blocks
-    return getDefaultComplexBlock(key);
-  }
-  
-  // Comment out by default
+
+  // Comment out by default (shouldUseNew and fallback both use the same default block)
   return getDefaultComplexBlock(key);
 }
 

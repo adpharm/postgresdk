@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - SDK class now extends `BaseClient` so auth/fetch config is shared with per-table clients
 - refactor: Extract `isVectorType` and `isJsonbType` into shared `utils.ts`
   - Previously duplicated across three emitter files; now imported from a single source
+- fix: Config parser now strips inline comments from field values (connectionString, outDir, pullToken)
+  - `pullToken` regex anchored at low indentation to avoid false matches when `pullToken` appears inside `pull: {}` block
 - feat: Soft/hard delete config consolidated under `delete` block; `hardDelete()` method added
   - **Breaking:** `softDeleteColumn` and `softDeleteColumnOverrides` top-level config options are removed; use `delete: { softDeleteColumn, softDeleteColumnOverrides }` instead
   - New `exposeHardDelete` option (default `true`): when soft deletes are configured, the API also exposes `hardDelete(pk)` on the client for permanent removal
