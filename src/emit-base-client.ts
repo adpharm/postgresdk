@@ -138,14 +138,28 @@ export abstract class BaseClient {
       method: "DELETE",
       headers: await this.headers(),
     });
-    
+
     if (res.status === 404) {
       return null as T;
     }
-    
+
     await this.okOrThrow(res, "DELETE", path);
     return (await res.json()) as T;
   }
 }
+
+/**
+ * Lazy operation descriptor returned by \$create/\$update/\$delete.
+ * \`__resultType\` is a phantom field — never assigned at runtime, exists only
+ * so TypeScript can infer the correct tuple element type inside \`\$transaction\`.
+ */
+export type TxOp<T = unknown> = {
+  readonly _table: string;
+  readonly _op: "create" | "update" | "delete";
+  readonly _data?: Record<string, unknown>;
+  readonly _pk?: string | Record<string, unknown>;
+  /** @internal */
+  readonly __resultType?: T;
+};
 `;
 }

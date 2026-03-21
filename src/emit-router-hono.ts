@@ -1,12 +1,25 @@
 import type { Table } from "./introspect";
-import { pascal } from "./utils";
+import { pascal, isVectorType, isJsonbType } from "./utils";
 
 /**
  * Emits the Hono server router file that exports helper functions for route registration
  */
-export function emitHonoRouter(tables: Table[], hasAuth: boolean, useJsExtensions?: boolean, pullToken?: string) {
+export function emitHonoRouter(
+  tables: Table[],
+  hasAuth: boolean,
+  useJsExtensions?: boolean,
+  pullToken?: string,
+  opts?: {
+    apiPathPrefix?: string;
+    softDeleteCols?: Record<string, string | null>;
+    includeMethodsDepth?: number;
+  }
+) {
   const tableNames = tables.map(t => t.name).sort();
   const ext = useJsExtensions ? ".js" : "";
+  const apiPathPrefix = opts?.apiPathPrefix ?? "/v1";
+  const softDeleteCols = opts?.softDeleteCols ?? {};
+  const includeMethodsDepth = opts?.includeMethodsDepth ?? 2;
 
   // Resolve pullToken if it uses "env:" syntax
   let resolvedPullToken: string | undefined;
@@ -43,6 +56,98 @@ export function emitHonoRouter(tables: Table[], hasAuth: boolean, useJsExtension
     })
     .join("\n");
 
+  // Zod schema imports for transaction validation (one per table)
+  const txSchemaImports = tableNames
+    .map(name => {
+      const Type = pascal(name);
+      return `import { Insert${Type}Schema, Update${Type}Schema } from "./zod/${name}${ext}";`;
+    })
+    .join("\n");
+
+  /** Generates the transaction route block for a given Hono app variable name. */
+  function txRouteBlock(appVar: string): string {
+    const authLine = hasAuth ? `  ${appVar}.use(\`${apiPathPrefix}/transaction\`, authMiddleware);\n` : "";
+    // Single-escape: \` → backtick, \${ → literal ${ in generated TypeScript
+    return `${authLine}  ${appVar}.post(\`${apiPathPrefix}/transaction\`, async (c) => {
+    const body = await c.req.json().catch(() => ({}));
+    const rawOps: unknown[] = Array.isArray(body.ops) ? body.ops : [];
+
+    if (rawOps.length === 0) {
+      return c.json({ error: "ops must be a non-empty array" }, 400);
+    }
+
+    // Validate all ops against their table schemas BEFORE opening a transaction
+    const validatedOps: coreOps.TransactionOperation[] = [];
+    for (let i = 0; i < rawOps.length; i++) {
+      const item = rawOps[i] as any;
+      const entry = TABLE_TX_METADATA[item?.table as string];
+      if (!entry) {
+        return c.json({ error: \`Unknown table "\${item?.table}" at index \${i}\`, failedAt: i }, 400);
+      }
+      if (item.op === "create") {
+        const parsed = entry.insertSchema.safeParse(item.data ?? {});
+        if (!parsed.success) {
+          return c.json({ error: "Validation failed", issues: parsed.error.flatten(), failedAt: i }, 400);
+        }
+        validatedOps.push({ op: "create", table: item.table, data: parsed.data });
+      } else if (item.op === "update") {
+        const parsed = entry.updateSchema.safeParse(item.data ?? {});
+        if (!parsed.success) {
+          return c.json({ error: "Validation failed", issues: parsed.error.flatten(), failedAt: i }, 400);
+        }
+        if (item.pk == null) {
+          return c.json({ error: \`Missing pk at index \${i}\`, failedAt: i }, 400);
+        }
+        validatedOps.push({ op: "update", table: item.table, pk: item.pk, data: parsed.data });
+      } else if (item.op === "delete") {
+        if (item.pk == null) {
+          return c.json({ error: \`Missing pk at index \${i}\`, failedAt: i }, 400);
+        }
+        validatedOps.push({ op: "delete", table: item.table, pk: item.pk });
+      } else {
+        return c.json({ error: \`Unknown op "\${item?.op}" at index \${i}\`, failedAt: i }, 400);
+      }
+    }
+
+    const onBegin = deps.onRequest
+      ? (txClient: typeof deps.pg) => deps.onRequest!(c, txClient)
+      : undefined;
+
+    const result = await coreOps.executeTransaction(deps.pg, validatedOps, TABLE_TX_METADATA, onBegin);
+
+    if (!result.ok) {
+      return c.json({ error: result.error, failedAt: result.failedAt }, 400);
+    }
+    return c.json({ results: result.results.map(r => r.data) }, 200);
+  });`;
+  }
+
+  // TABLE_TX_METADATA constant entries
+  const txMetadataEntries = tables
+    .slice()
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map(t => {
+      const rawPk = (t as any).pk;
+      const pkCols: string[] = Array.isArray(rawPk) ? rawPk : rawPk ? [rawPk] : ["id"];
+      const softDel = softDeleteCols[t.name] ?? null;
+      const allCols = t.columns.map(c => `"${c.name}"`).join(", ");
+      const vecCols = t.columns.filter(c => isVectorType(c.pgType)).map(c => `"${c.name}"`).join(", ");
+      const jsonCols = t.columns.filter(c => isJsonbType(c.pgType)).map(c => `"${c.name}"`).join(", ");
+      const Type = pascal(t.name);
+      return `  "${t.name}": {
+    table: "${t.name}",
+    pkColumns: ${JSON.stringify(pkCols)},
+    softDeleteColumn: ${softDel ? `"${softDel}"` : "null"},
+    allColumnNames: [${allCols}],
+    vectorColumns: [${vecCols}],
+    jsonbColumns: [${jsonCols}],
+    includeMethodsDepth: ${includeMethodsDepth},
+    insertSchema: Insert${Type}Schema,
+    updateSchema: Update${Type}Schema,
+  }`;
+    })
+    .join(",\n");
+
   return `/**
  * AUTO-GENERATED FILE - DO NOT EDIT
  *
@@ -55,8 +160,26 @@ import { Hono } from "hono";
 import type { Context } from "hono";
 import { SDK_MANIFEST } from "./sdk-bundle${ext}";
 import { getContract } from "./contract${ext}";
+import * as coreOps from "./core/operations${ext}";
+${txSchemaImports}
 ${imports}
-${hasAuth ? `export { authMiddleware } from "./auth${ext}";` : ""}
+${hasAuth ? `import { authMiddleware } from "./auth${ext}";\nexport { authMiddleware };` : ""}
+
+/** Discriminated result from safeParse — mirrors Zod's actual return shape */
+type SchemaParseResult =
+  | { success: true; data: Record<string, unknown> }
+  | { success: false; error: { flatten: () => unknown } };
+
+/** Registry entry — core metadata + Zod schemas for request validation */
+interface TxTableRegistry extends coreOps.TransactionTableMetadata {
+  insertSchema: { safeParse: (v: unknown) => SchemaParseResult };
+  updateSchema: { safeParse: (v: unknown) => SchemaParseResult };
+}
+
+// Registry used by POST /v1/transaction — maps table name to metadata + Zod schemas
+const TABLE_TX_METADATA: Record<string, TxTableRegistry> = {
+${txMetadataEntries}
+};
 
 /**
  * Creates a Hono router with all generated routes that can be mounted into your existing app.
@@ -126,7 +249,7 @@ ${pullToken ? `
     if (!expectedToken) {
       // Token not configured in environment - reject request
       return c.json({
-        error: "SDK endpoints are protected but pullToken environment variable not set. ${pullTokenEnvVar ? `Set ${pullTokenEnvVar} in your environment or remove pullToken from config.` : 'Set the pullToken environment variable or remove pullToken from config.'}"
+        error: "SDK endpoints are protected but pullToken environment variable not set. ${pullTokenEnvVar ? `Set ${pullTokenEnvVar} in your environment, or remove pullToken from config.` : 'Remove pullToken from config or set the expected environment variable.'}"
       }, 500);
     }
 
@@ -143,6 +266,9 @@ ${pullToken ? `
     await next();
   });
 ` : ""}
+  // Transaction endpoint — executes multiple operations atomically
+${txRouteBlock('router')}
+
   // SDK distribution endpoints
   router.get("/_psdk/sdk/manifest", (c) => {
     return c.json({
@@ -226,6 +352,7 @@ export function registerAllRoutes(
   }
 ) {
 ${registrations.replace(/router/g, 'app')}
+${txRouteBlock('app')}
 }
 
 // Individual route registrations (for selective use)

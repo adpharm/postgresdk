@@ -3,6 +3,18 @@ import { dirname, join } from "path";
 import { existsSync } from "fs";
 import { createHash } from "crypto";
 
+/** Returns true if the pg type is a vector/embedding type */
+export function isVectorType(pgType: string): boolean {
+  const t = pgType.toLowerCase();
+  return t === "vector" || t === "halfvec" || t === "sparsevec" || t === "bit";
+}
+
+/** Returns true if the pg type is JSON/JSONB */
+export function isJsonbType(pgType: string): boolean {
+  const t = pgType.toLowerCase();
+  return t === "json" || t === "jsonb";
+}
+
 export const pascal = (s: string) =>
   s
     .split(/[_\s-]+/)

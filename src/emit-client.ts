@@ -1,23 +1,7 @@
 import type { Table, Model } from "./introspect";
 import type { Graph } from "./rel-classify";
-import { pascal } from "./utils";
+import { pascal, isVectorType, isJsonbType } from "./utils";
 import { generateIncludeMethods } from "./emit-include-methods";
-
-/**
- * Check if a PostgreSQL type is a vector type (vector, halfvec, sparsevec, bit)
- */
-function isVectorType(pgType: string): boolean {
-  const t = pgType.toLowerCase();
-  return t === "vector" || t === "halfvec" || t === "sparsevec" || t === "bit";
-}
-
-/**
- * Check if a PostgreSQL type is a JSONB/JSON type
- */
-function isJsonbType(pgType: string): boolean {
-  const t = pgType.toLowerCase();
-  return t === "json" || t === "jsonb";
-}
 
 /**
  * Convert relation name to include param name
@@ -359,6 +343,7 @@ export function emitClient(
  * To make changes, modify your schema or configuration and regenerate.
  */
 import { BaseClient } from "./base-client${ext}";
+import type { TxOp } from "./base-client${ext}";
 import type { Where } from "./where-types${ext}";
 import type { PaginatedResponse } from "./types/shared${ext}";
 ${typeImports}
@@ -845,6 +830,21 @@ ${hasJsonbColumns ? `  /**
     const url = query ? \`\${this.resource}/\${path}?\${query}\` : \`\${this.resource}/\${path}\`;
     return this.del<Select${Type} | null>(url);
   }`}
+
+  /** Build a lazy CREATE descriptor for use with sdk.$transaction([...]) */
+  $create(data: Insert${Type}): TxOp<Select${Type}> {
+    return { _table: "${table.name}", _op: "create", _data: data as Record<string, unknown> };
+  }
+
+  /** Build a lazy UPDATE descriptor for use with sdk.$transaction([...]) */
+  $update(pk: ${pkType}, data: Update${Type}): TxOp<Select${Type} | null> {
+    return { _table: "${table.name}", _op: "update", _pk: ${hasCompositePk ? 'pk as Record<string, unknown>' : 'pk'}, _data: data as Record<string, unknown> };
+  }
+
+  /** Build a lazy DELETE descriptor for use with sdk.$transaction([...]) */
+  $delete(pk: ${pkType}): TxOp<Select${Type} | null> {
+    return { _table: "${table.name}", _op: "delete", _pk: ${hasCompositePk ? 'pk as Record<string, unknown>' : 'pk'} };
+  }
 ${includeMethodsCode}}
 `;
 }
@@ -866,8 +866,9 @@ export function emitClientIndex(
  */
 `;
   
-  // Import auth types
-  out += `import type { AuthConfig } from "./base-client${ext}";\n`;
+  // Import BaseClient (for SDK to extend) + auth/TxOp types
+  out += `import { BaseClient } from "./base-client${ext}";\n`;
+  out += `import type { AuthConfig, TxOp } from "./base-client${ext}";\n`;
   
   // Import all table clients
   for (const t of tables) {
@@ -881,20 +882,62 @@ export function emitClientIndex(
   out += `/**\n`;
   out += ` * Main SDK class that provides access to all table clients\n`;
   out += ` */\n`;
-  out += `export class SDK {\n`;
+  out += `export class SDK extends BaseClient {\n`;
   for (const t of tables) {
     out += `  public ${t.name}: ${pascal(t.name)}Client;\n`;
   }
   out += `\n  constructor(cfg: { baseUrl: string; fetch?: typeof fetch; auth?: AuthConfig }) {\n`;
   out += `    const f = cfg.fetch ?? fetch;\n`;
+  out += `    super(cfg.baseUrl, f, cfg.auth);\n`;
   for (const t of tables) {
     out += `    this.${t.name} = new ${pascal(t.name)}Client(cfg.baseUrl, f, cfg.auth);\n`;
   }
   out += `  }\n`;
+  out += `\n`;
+  out += `  /**\n`;
+  out += `   * Execute multiple operations atomically in one PostgreSQL transaction.\n`;
+  out += `   * All ops are validated before BEGIN is issued — fail-fast on bad input.\n`;
+  out += `   *\n`;
+  out += `   * @example\n`;
+  out += `   * const [order, user] = await sdk.$transaction([\n`;
+  out += `   *   sdk.orders.$create({ user_id: 1, total: 99 }),\n`;
+  out += `   *   sdk.users.$update('1', { last_order_at: new Date().toISOString() }),\n`;
+  out += `   * ]);\n`;
+  out += `   */\n`;
+  out += `  async $transaction<const T extends readonly TxOp<unknown>[]>(\n`;
+  out += `    ops: [...T]\n`;
+  out += `  ): Promise<{ [K in keyof T]: T[K] extends TxOp<infer R> ? R : never }> {\n`;
+  out += `    const payload = ops.map(op => ({\n`;
+  out += `      op: op._op,\n`;
+  out += `      table: op._table,\n`;
+  out += `      ...(op._data !== undefined ? { data: op._data } : {}),\n`;
+  out += `      ...(op._pk !== undefined ? { pk: op._pk } : {}),\n`;
+  out += `    }));\n`;
+  out += `\n`;
+  out += `    const res = await this.fetchFn(\`\${this.baseUrl}/v1/transaction\`, {\n`;
+  out += `      method: "POST",\n`;
+  out += `      headers: await this.headers(true),\n`;
+  out += `      body: JSON.stringify({ ops: payload }),\n`;
+  out += `    });\n`;
+  out += `\n`;
+  out += `    if (!res.ok) {\n`;
+  out += `      let errBody: Record<string, unknown> = {};\n`;
+  out += `      try { errBody = await res.json() as Record<string, unknown>; } catch {}\n`;
+  out += `      const err = Object.assign(\n`;
+  out += `        new Error((errBody.error as string | undefined) ?? \`$transaction failed: \${res.status}\`),\n`;
+  out += `        { failedAt: errBody.failedAt as number | undefined, issues: errBody.issues }\n`;
+  out += `      );\n`;
+  out += `      throw err;\n`;
+  out += `    }\n`;
+  out += `\n`;
+  out += `    const json = await res.json() as { results: unknown[] };\n`;
+  out += `    return json.results as unknown as { [K in keyof T]: T[K] extends TxOp<infer R> ? R : never };\n`;
+  out += `  }\n`;
   out += `}\n\n`;
   
-  // Export base client for extension
+  // Export base client + TxOp for extension/advanced usage
   out += `export { BaseClient } from "./base-client${ext}";\n`;
+  out += `export type { TxOp } from "./base-client${ext}";\n`;
 
   // Export IncludeSpec types for advanced usage
   out += `\n// Include specification types for custom queries\n`;

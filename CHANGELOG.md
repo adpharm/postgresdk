@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- feat: Add atomic transaction support via `sdk.$transaction([...ops])`
+  - Each table client exposes `$create(data)`, `$update(pk, data)`, and `$delete(pk)` to build lazy `TxOp` descriptors
+  - `sdk.$transaction(ops)` sends a single `POST /_psdk/transaction` request and executes all ops atomically (BEGIN/COMMIT/ROLLBACK)
+  - Server-side `executeTransaction` handles Pool vs Client detection, `onBegin` callback, and returns `{ ok, results }` or `{ ok: false, error, failedAt }`
+  - SDK class now extends `BaseClient` so auth/fetch config is shared with per-table clients
+- refactor: Extract `isVectorType` and `isJsonbType` into shared `utils.ts`
+  - Previously duplicated across three emitter files; now imported from a single source
+
 ## [v0.18.30] - 2026-03-16
 
 - chore: enforce `noUnusedLocals` and `noUnusedParameters` in generated-code typecheck tests

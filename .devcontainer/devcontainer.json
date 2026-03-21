@@ -66,7 +66,7 @@
   // "remoteUser": "node",
   "mounts": [
     "source=claude-code-bashhistory,target=/commandhistory,type=volume",
-    "source=claude-code-config,target=/home/vscode/.claude,type=volume",
+    "source=${localEnv:HOME}/Documents/ClaudeGlobalConfig,target=/home/vscode/.claude,type=bind,consistency=cached",
     // Mount the host's .aws directory into the container for AWS CLI access
     "source=${localEnv:HOME}/.aws,target=/home/vscode/.aws,type=bind,consistency=cached",
     // Mount the host's ssh directory into the container for SSH access

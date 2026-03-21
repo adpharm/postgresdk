@@ -4,19 +4,7 @@
 
 import type { Table } from "./introspect";
 import type { Graph } from "./rel-classify";
-import { pascal } from "./utils";
-
-/**
- * Check if a PostgreSQL type is a vector type (vector, halfvec, sparsevec, bit)
- */
-function isVectorType(pgType: string): boolean {
-  const t = pgType.toLowerCase();
-  return t === "vector" || t === "halfvec" || t === "sparsevec" || t === "bit";
-}
-
-function isJsonbType(pgType: string): boolean {
-  return pgType.toLowerCase() === "json" || pgType.toLowerCase() === "jsonb";
-}
+import { pascal, isVectorType, isJsonbType } from "./utils";
 
 export function emitHonoRoutes(
   table: Table,

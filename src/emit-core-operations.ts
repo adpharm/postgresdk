@@ -851,11 +851,119 @@ export async function deleteRecord(
     return { data: parsedRows[0], status: 200 };
   } catch (e: any) {
     log.error(\`DELETE \${ctx.table} error:\`, e?.stack ?? e);
-    return { 
-      error: e?.message ?? "Internal error", 
+    return {
+      error: e?.message ?? "Internal error",
       ...(DEBUG ? { stack: e?.stack } : {}),
-      status: 500 
+      status: 500
     };
+  }
+}
+
+/**
+ * Static metadata for a table used during transaction execution.
+ * Mirrors the fields needed to construct an OperationContext (minus the pg client,
+ * which is injected at transaction time).
+ */
+export interface TransactionTableMetadata {
+  table: string;
+  pkColumns: string[];
+  softDeleteColumn: string | null;
+  allColumnNames: string[];
+  vectorColumns: string[];
+  jsonbColumns: string[];
+  includeMethodsDepth: number;
+}
+
+export type TransactionOperation =
+  | { op: "create"; table: string; data: Record<string, unknown> }
+  | { op: "update"; table: string; pk: string | Record<string, unknown>; data: Record<string, unknown> }
+  | { op: "delete"; table: string; pk: string | Record<string, unknown> };
+
+/**
+ * Executes a list of operations atomically inside a single PostgreSQL transaction.
+ *
+ * - When \`pg\` has a \`.connect()\` method (Pool), acquires a dedicated connection.
+ * - Otherwise uses \`pg\` directly (already a single connected Client).
+ * - Calls \`onBegin(txClient)\` after BEGIN and before any operations (for SET LOCAL etc.).
+ * - Any status >= 400 or thrown error triggers ROLLBACK.
+ * - \`failedAt: -1\` indicates an unexpected exception (e.g. connectivity failure).
+ */
+export async function executeTransaction(
+  pg: DatabaseClient & { connect?: () => Promise<DatabaseClient & { release?: () => void }> },
+  ops: TransactionOperation[],
+  metadata: Record<string, TransactionTableMetadata>,
+  onBegin?: (txClient: DatabaseClient) => Promise<void>
+): Promise<
+  | { ok: true; results: Array<{ data: unknown }> }
+  | { ok: false; error: string; failedAt: number }
+> {
+  // Fail-fast: validate all table names before touching the DB
+  for (let i = 0; i < ops.length; i++) {
+    if (!metadata[ops[i]!.table]) {
+      return { ok: false, error: \`Unknown table "\${ops[i]!.table}"\`, failedAt: i };
+    }
+  }
+
+  // Pool gives a dedicated connection; plain Client is used directly
+  const isPool = typeof (pg as any).connect === "function";
+  const txClient: DatabaseClient & { release?: () => void } = isPool
+    ? await (pg as any).connect()
+    : pg;
+
+  try {
+    await txClient.query("BEGIN");
+    if (onBegin) await onBegin(txClient);
+
+    const results: Array<{ data: unknown }> = [];
+
+    for (let i = 0; i < ops.length; i++) {
+      const op = ops[i]!;
+      const meta = metadata[op.table]!;
+      const ctx: OperationContext = {
+        pg: txClient,
+        table: meta.table,
+        pkColumns: meta.pkColumns,
+        softDeleteColumn: meta.softDeleteColumn,
+        allColumnNames: meta.allColumnNames,
+        vectorColumns: meta.vectorColumns,
+        jsonbColumns: meta.jsonbColumns,
+        includeMethodsDepth: meta.includeMethodsDepth,
+      };
+
+      let result: { data?: unknown; error?: string; status: number };
+
+      if (op.op === "create") {
+        result = await createRecord(ctx, op.data);
+      } else {
+        const pkValues = Array.isArray(op.pk)
+          ? op.pk
+          : typeof op.pk === "object" && op.pk !== null
+          ? meta.pkColumns.map(c => (op.pk as Record<string, unknown>)[c])
+          : [op.pk];
+        result = op.op === "update"
+          ? await updateRecord(ctx, pkValues as string[], op.data)
+          : await deleteRecord(ctx, pkValues as string[]);
+      }
+
+      if (result.status >= 400) {
+        try { await txClient.query("ROLLBACK"); } catch {}
+        txClient.release?.();
+        return {
+          ok: false,
+          error: result.error ?? \`Op \${i} returned status \${result.status}\`,
+          failedAt: i,
+        };
+      }
+      results.push({ data: result.data ?? null });
+    }
+
+    await txClient.query("COMMIT");
+    txClient.release?.();
+    return { ok: true, results };
+  } catch (e: unknown) {
+    try { await txClient.query("ROLLBACK"); } catch {}
+    txClient.release?.();
+    return { ok: false, error: (e instanceof Error ? e.message : String(e)) ?? "Transaction error", failedAt: -1 };
   }
 }`;
 }

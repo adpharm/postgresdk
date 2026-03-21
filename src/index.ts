@@ -247,7 +247,19 @@ export async function generate(configPath: string, options?: { force?: boolean }
   if (serverFramework === "hono") {
     files.push({
       path: join(serverDir, "router.ts"),
-      content: emitHonoRouter(Object.values(model.tables), getAuthStrategy(normalizedAuth) !== "none", cfg.useJsExtensions, cfg.pullToken),
+      content: emitHonoRouter(
+        Object.values(model.tables),
+        getAuthStrategy(normalizedAuth) !== "none",
+        cfg.useJsExtensions,
+        cfg.pullToken,
+        {
+          apiPathPrefix: cfg.apiPathPrefix || "/v1",
+          softDeleteCols: Object.fromEntries(
+            Object.values(model.tables).map(t => [t.name, resolveSoftDeleteColumn(cfg, t.name)])
+          ),
+          includeMethodsDepth: cfg.includeMethodsDepth ?? 2,
+        }
+      ),
     });
   }
   // Future: Add emitExpressRouter, emitFastifyRouter, etc.

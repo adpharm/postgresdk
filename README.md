@@ -55,6 +55,7 @@ const filtered = await sdk.users.list({
 - ✅ **Runtime Validation** - Zod schemas for request/response validation
 - 🔗 **Smart Relationships** - Automatic handling of 1:N and M:N relationships with eager loading
 - 🔍 **Vector Search** - Built-in pgvector support for similarity search with multiple distance metrics
+- ⚡ **Atomic Transactions** - Execute multiple operations atomically via `sdk.$transaction([...])`
 - 🔐 **Built-in Auth** - API key and JWT authentication
 - 🎯 **Zero Config** - Works out of the box with sensible defaults
 - 📦 **Lightweight** - Minimal dependencies, optimized bundle size
