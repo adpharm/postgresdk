@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- feat: Align transaction delete descriptors with soft/hard delete config
+  - `$delete(pk)` transaction builder is replaced by `$softDelete(pk)` and `$hardDelete(pk)`, mirroring the HTTP method naming
+  - When a table has no soft-delete column, only `$hardDelete` is generated; when soft-delete is configured, `$softDelete` is generated (and `$hardDelete` if `exposeHardDelete: true`)
+  - `TransactionOperation` type updated: `"delete"` op replaced with `"softDelete"` | `"hardDelete"`
+  - Router and `executeTransaction` updated to dispatch the correct delete path per op type
+  - **Breaking:** any existing `sdk.table.$delete(pk)` calls in transactions must be updated to `$softDelete(pk)` or `$hardDelete(pk)`
+
 ## [v0.19.0] - 2026-03-21
 
 - feat: Add upsert operation — `sdk.table.upsert({ where, create, update })`

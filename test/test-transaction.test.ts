@@ -45,6 +45,19 @@ function makeClientMock(rowsByCall: Array<any[] | Error> = []) {
   return { pg, queries };
 }
 
+/** Shared metadata for a "posts" table with soft delete */
+const postsMetadata = {
+  posts: {
+    table: "posts",
+    pkColumns: ["id"],
+    softDeleteColumn: "deleted_at",
+    allColumnNames: ["id", "title", "deleted_at"],
+    vectorColumns: [],
+    jsonbColumns: [],
+    includeMethodsDepth: 0,
+  },
+};
+
 /** Shared metadata for a single "users" table */
 const usersMetadata = {
   users: {
@@ -190,7 +203,62 @@ test("executeTransaction: Pool — calls connect() and release() around transact
 });
 
 // ──────────────────────────────────────────────────────────────────────────────
-// Test 6: onBegin callback — called after BEGIN, receives tx client
+// Test 6: softDelete op — issues UPDATE SET deleted_at = NOW()
+// ──────────────────────────────────────────────────────────────────────────────
+test("executeTransaction: softDelete op issues UPDATE (soft delete) when softDeleteColumn set", async () => {
+  const { pg, queries } = makeClientMock([[], [{ id: "1", title: "hi", deleted_at: new Date() }], []]);
+
+  const result = await executeTransaction(
+    pg,
+    [{ op: "softDelete", table: "posts", pk: "1" }],
+    postsMetadata
+  );
+
+  expect(result.ok).toBe(true);
+  // Soft delete should issue an UPDATE, not a DELETE
+  const opQuery = queries.find(q => q.text.trim().toUpperCase().startsWith("UPDATE"));
+  expect(opQuery).toBeDefined();
+  expect(queries.find(q => q.text.trim().toUpperCase().startsWith("DELETE"))).toBeUndefined();
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Test 7: hardDelete op — issues DELETE even when softDeleteColumn is set
+// ──────────────────────────────────────────────────────────────────────────────
+test("executeTransaction: hardDelete op issues DELETE even when softDeleteColumn set", async () => {
+  const { pg, queries } = makeClientMock([[], [{ id: "1", title: "hi" }], []]);
+
+  const result = await executeTransaction(
+    pg,
+    [{ op: "hardDelete", table: "posts", pk: "1" }],
+    postsMetadata
+  );
+
+  expect(result.ok).toBe(true);
+  // Hard delete should issue a DELETE, not an UPDATE
+  const opQuery = queries.find(q => q.text.trim().toUpperCase().startsWith("DELETE"));
+  expect(opQuery).toBeDefined();
+  expect(queries.find(q => q.text.trim().toUpperCase().startsWith("UPDATE"))).toBeUndefined();
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Test 8: hardDelete without softDeleteColumn — issues DELETE
+// ──────────────────────────────────────────────────────────────────────────────
+test("executeTransaction: hardDelete without softDeleteColumn issues DELETE", async () => {
+  const { pg, queries } = makeClientMock([[], [{ id: "1", name: "alice" }], []]);
+
+  const result = await executeTransaction(
+    pg,
+    [{ op: "hardDelete", table: "users", pk: "1" }],
+    usersMetadata
+  );
+
+  expect(result.ok).toBe(true);
+  const opQuery = queries.find(q => q.text.trim().toUpperCase().startsWith("DELETE"));
+  expect(opQuery).toBeDefined();
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Test 9: onBegin callback — called after BEGIN, receives tx client
 // ──────────────────────────────────────────────────────────────────────────────
 test("executeTransaction: onBegin called after BEGIN with the transaction client", async () => {
   const { pg, queries } = makeClientMock([[], [{ id: "1", name: "dave" }], []]);

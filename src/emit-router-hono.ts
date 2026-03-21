@@ -99,11 +99,16 @@ export function emitHonoRouter(
           return c.json({ error: \`Missing pk at index \${i}\`, failedAt: i }, 400);
         }
         validatedOps.push({ op: "update", table: item.table, pk: item.pk, data: parsed.data });
-      } else if (item.op === "delete") {
+      } else if (item.op === "softDelete") {
         if (item.pk == null) {
           return c.json({ error: \`Missing pk at index \${i}\`, failedAt: i }, 400);
         }
-        validatedOps.push({ op: "delete", table: item.table, pk: item.pk });
+        validatedOps.push({ op: "softDelete", table: item.table, pk: item.pk });
+      } else if (item.op === "hardDelete") {
+        if (item.pk == null) {
+          return c.json({ error: \`Missing pk at index \${i}\`, failedAt: i }, 400);
+        }
+        validatedOps.push({ op: "hardDelete", table: item.table, pk: item.pk });
       } else {
         return c.json({ error: \`Unknown op "\${item?.op}" at index \${i}\`, failedAt: i }, 400);
       }

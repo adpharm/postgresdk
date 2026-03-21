@@ -212,3 +212,43 @@ describe("emitClient — delete method naming", () => {
     expect(output).not.toContain("queryParams.set('hard', 'true')");
   });
 });
+
+describe("emitClient — transaction $softDelete/$hardDelete methods", () => {
+  const clientBase = { includeMethodsDepth: 2, skipJunctionTables: true };
+
+  it("emits only $hardDelete when no softDeleteColumn", () => {
+    const output = emitClient(mockTable, mockGraph, {
+      softDeleteColumn: null,
+      exposeHardDelete: true,
+      ...clientBase,
+    });
+    expect(output).toContain('$hardDelete(');
+    expect(output).not.toContain('$softDelete(');
+    expect(output).not.toContain('$delete(');
+  });
+
+  it("emits $softDelete and $hardDelete when softDeleteColumn set and exposeHardDelete true", () => {
+    const output = emitClient(mockTable, mockGraph, {
+      softDeleteColumn: "deleted_at",
+      exposeHardDelete: true,
+      ...clientBase,
+    });
+    expect(output).toContain('$softDelete(');
+    expect(output).toContain('$hardDelete(');
+    expect(output).not.toContain('$delete(');
+    // Verify correct _op values are emitted
+    expect(output).toContain('_op: "softDelete"');
+    expect(output).toContain('_op: "hardDelete"');
+  });
+
+  it("emits only $softDelete when exposeHardDelete false", () => {
+    const output = emitClient(mockTable, mockGraph, {
+      softDeleteColumn: "deleted_at",
+      exposeHardDelete: false,
+      ...clientBase,
+    });
+    expect(output).toContain('$softDelete(');
+    expect(output).not.toContain('$hardDelete(');
+    expect(output).not.toContain('$delete(');
+  });
+});

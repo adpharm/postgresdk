@@ -594,7 +594,7 @@ const [order, updatedUser] = await sdk.$transaction([
 // TypeScript infers: [SelectOrders, SelectUsers | null]
 ```
 
-- `$create`, `$update`, `$delete`, `$upsert` are **lazy builders** — nothing executes until `$transaction` is called
+- `$create`, `$update`, `$softDelete`, `$hardDelete`, `$upsert` are **lazy builders** — nothing executes until `$transaction` is called
 - All ops are Zod-validated **before** `BEGIN` is issued (fail-fast, no partial state)
 - On any failure the transaction rolls back; an error is thrown with a `.failedAt` index
 

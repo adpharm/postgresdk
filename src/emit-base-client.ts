@@ -149,13 +149,13 @@ export abstract class BaseClient {
 }
 
 /**
- * Lazy operation descriptor returned by \$create/\$update/\$delete.
+ * Lazy operation descriptor returned by \$create/\$update/\$softDelete/\$hardDelete/\$upsert.
  * \`__resultType\` is a phantom field — never assigned at runtime, exists only
  * so TypeScript can infer the correct tuple element type inside \`\$transaction\`.
  */
 export type TxOp<T = unknown> = {
   readonly _table: string;
-  readonly _op: "create" | "update" | "delete" | "upsert";
+  readonly _op: "create" | "update" | "softDelete" | "hardDelete" | "upsert";
   readonly _data?: Record<string, unknown>;
   readonly _pk?: string | Record<string, unknown>;
   /** @internal */

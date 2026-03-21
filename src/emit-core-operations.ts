@@ -969,7 +969,8 @@ export interface TransactionTableMetadata {
 export type TransactionOperation =
   | { op: "create"; table: string; data: Record<string, unknown> }
   | { op: "update"; table: string; pk: string | Record<string, unknown>; data: Record<string, unknown> }
-  | { op: "delete"; table: string; pk: string | Record<string, unknown> }
+  | { op: "softDelete"; table: string; pk: string | Record<string, unknown> }
+  | { op: "hardDelete"; table: string; pk: string | Record<string, unknown> }
   | { op: "upsert"; table: string; data: { where: Record<string, unknown>; create: Record<string, unknown>; update: Record<string, unknown> } };
 
 /**
@@ -1037,6 +1038,8 @@ export async function executeTransaction(
           : [op.pk];
         result = op.op === "update"
           ? await updateRecord(ctx, pkValues as string[], op.data)
+          : op.op === "hardDelete"
+          ? await deleteRecord(ctx, pkValues as string[], { hard: true })
           : await deleteRecord(ctx, pkValues as string[]);
       }
 

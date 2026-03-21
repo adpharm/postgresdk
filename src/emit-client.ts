@@ -390,6 +390,22 @@ export function emitClient(
   if (exposeHard) deleteMethodParts.push(buildDeleteMethod('hardDelete', hasSoftDelete));
   const deleteMethodsCode = deleteMethodParts.join('\n\n');
 
+  // Transaction delete descriptors — same conditional logic as the HTTP delete methods above
+  const txDeleteParts: string[] = [];
+  if (hasSoftDelete) txDeleteParts.push(
+    `  /** Build a lazy soft-DELETE descriptor for use with sdk.$transaction([...]) */\n` +
+    `  $softDelete(pk: ${pkType}): TxOp<Select${Type} | null> {\n` +
+    `    return { _table: "${table.name}", _op: "softDelete", _pk: ${hasCompositePk ? 'pk as Record<string, unknown>' : 'pk'} };\n` +
+    `  }`
+  );
+  if (exposeHard) txDeleteParts.push(
+    `  /** Build a lazy hard-DELETE descriptor for use with sdk.$transaction([...]) */\n` +
+    `  $hardDelete(pk: ${pkType}): TxOp<Select${Type} | null> {\n` +
+    `    return { _table: "${table.name}", _op: "hardDelete", _pk: ${hasCompositePk ? 'pk as Record<string, unknown>' : 'pk'} };\n` +
+    `  }`
+  );
+  const txDeleteMethodsCode = txDeleteParts.join('\n\n');
+
   return `/**
  * AUTO-GENERATED FILE - DO NOT EDIT
  *
@@ -904,10 +920,7 @@ ${deleteMethodsCode}
     return { _table: "${table.name}", _op: "update", _pk: ${hasCompositePk ? 'pk as Record<string, unknown>' : 'pk'}, _data: data as Record<string, unknown> };
   }
 
-  /** Build a lazy DELETE descriptor for use with sdk.$transaction([...]) */
-  $delete(pk: ${pkType}): TxOp<Select${Type} | null> {
-    return { _table: "${table.name}", _op: "delete", _pk: ${hasCompositePk ? 'pk as Record<string, unknown>' : 'pk'} };
-  }
+${txDeleteMethodsCode}
 
   /** Build a lazy UPSERT descriptor for use with sdk.$transaction([...]) */
   $upsert(args: { where: Update${Type}; create: Insert${Type}; update: Update${Type} }): TxOp<Select${Type}> {
