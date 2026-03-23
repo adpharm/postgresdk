@@ -565,7 +565,7 @@ function generateExampleValue(column: Column): string {
 
 function generateQueryParams(table: Table, enums: Record<string, string[]>): Record<string, string> {
   const params: Record<string, string> = {
-    limit: "number - Max records to return (default: 50)",
+    limit: "number - Max records to return (omit for all)",
     offset: "number - Records to skip",
     orderBy: "string | string[] - Field(s) to sort by",
     order: "'asc' | 'desc' | ('asc' | 'desc')[] - Sort direction(s)"

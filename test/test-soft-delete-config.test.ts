@@ -122,6 +122,7 @@ const baseOpts = {
   includeMethodsDepth: 2,
   authStrategy: "none" as const,
   apiPathPrefix: "/v1",
+  maxLimit: 1000,
 };
 
 describe("emitHonoRoutes — delete route hard param", () => {
@@ -157,7 +158,7 @@ describe("emitHonoRoutes — delete route hard param", () => {
 });
 
 describe("emitClient — delete method naming", () => {
-  const clientBase = { includeMethodsDepth: 2, skipJunctionTables: true };
+  const clientBase = { includeMethodsDepth: 2, skipJunctionTables: true, maxLimit: 1000 };
 
   it("emits only hardDelete when no softDeleteColumn", () => {
     const output = emitClient(mockTable, mockGraph, {
@@ -214,7 +215,7 @@ describe("emitClient — delete method naming", () => {
 });
 
 describe("emitClient — transaction $softDelete/$hardDelete methods", () => {
-  const clientBase = { includeMethodsDepth: 2, skipJunctionTables: true };
+  const clientBase = { includeMethodsDepth: 2, skipJunctionTables: true, maxLimit: 1000 };
 
   it("emits only $hardDelete when no softDeleteColumn", () => {
     const output = emitClient(mockTable, mockGraph, {

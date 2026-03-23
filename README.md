@@ -154,6 +154,7 @@ export default {
     },
   },
   numericMode: "auto",                 // "auto" | "number" | "string" - How to type numeric columns
+  maxLimit: 1000,                      // Max allowed `limit` value (0 = no cap)
   includeMethodsDepth: 2,              // Max depth for nested includes
   dateType: "date",                    // "date" | "string" - How to handle timestamps
   serverFramework: "hono",             // Currently only hono is supported
@@ -715,15 +716,15 @@ const result = await sdk.users.list({
 // Access results
 result.data;       // User[] - array of records
 result.total;      // number - total matching records
-result.limit;      // number - page size used
+result.limit;      // number | undefined - page size used (absent when no limit specified)
 result.offset;     // number - offset used
-result.hasMore;    // boolean - more pages available
+result.hasMore;    // boolean - more pages available (false when no limit)
 
-// Note: Maximum limit is 1000 records per request
+// Note: Omitting `limit` returns all matching records. Max limit is controlled by `maxLimit` config (default: 1000).
 
-// Calculate pagination info
-const totalPages = Math.ceil(result.total / result.limit);
-const currentPage = Math.floor(result.offset / result.limit) + 1;
+// Calculate pagination info (when using explicit limit)
+const totalPages = result.limit ? Math.ceil(result.total / result.limit) : 1;
+const currentPage = result.limit ? Math.floor(result.offset / result.limit) + 1 : 1;
 
 // Multi-column sorting
 const sorted = await sdk.users.list({

@@ -59,6 +59,9 @@ export interface Config {
   // API path prefix for table routes (default: "/v1")
   apiPathPrefix?: string;
 
+  /** Maximum allowed value for the `limit` parameter in list operations (default: 1000). Set to 0 to disable. */
+  maxLimit?: number;
+
   // Auth
   auth?: AuthConfigInput;
 

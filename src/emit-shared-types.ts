@@ -12,8 +12,8 @@ export interface PaginatedResponse<T> {
   data: T[];
   /** Total number of records matching the query (across all pages) */
   total: number;
-  /** Maximum number of records per page */
-  limit: number;
+  /** Maximum number of records per page (absent when no limit was specified) */
+  limit?: number;
   /** Number of records skipped (for pagination) */
   offset: number;
   /** Whether there are more records available after this page */

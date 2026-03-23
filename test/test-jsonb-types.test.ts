@@ -118,7 +118,7 @@ beforeAll(async () => {
   const graph = { inbound: {}, outbound: {} };
   writeFileSync(
     `${OUTPUT_DIR}/client/products.ts`,
-    emitClient(productsTable, graph, { includeMethodsDepth: 2 }, model)
+    emitClient(productsTable, graph, { includeMethodsDepth: 2, maxLimit: 1000 }, model)
   );
 
   // Generate index

@@ -100,6 +100,7 @@ export async function generate(configPath: string, options?: { force?: boolean }
     clientDir = join(originalClientDir, "sdk");
   }
   const serverFramework = cfg.serverFramework || "hono";
+  const maxLimit = cfg.maxLimit ?? 1000;
 
   // Test configuration
   const generateTests = cfg.tests?.generate ?? false;
@@ -143,7 +144,7 @@ export async function generate(configPath: string, options?: { force?: boolean }
   files.push({ path: join(clientDir, "include-resolver.ts"), content: includeResolver });
 
   // shared params zod (client only)
-  files.push({ path: join(clientDir, "params", "shared.ts"), content: emitSharedParamsZod() });
+  files.push({ path: join(clientDir, "params", "shared.ts"), content: emitSharedParamsZod({ maxLimit }) });
 
   // shared types (client only)
   files.push({ path: join(clientDir, "types", "shared.ts"), content: emitSharedTypes() });
@@ -185,7 +186,7 @@ export async function generate(configPath: string, options?: { force?: boolean }
   // core operations (server) - framework-agnostic database operations
   files.push({ 
     path: join(serverDir, "core", "operations.ts"), 
-    content: emitCoreOperations() 
+    content: emitCoreOperations()
   });
 
   // per-table outputs
@@ -206,7 +207,7 @@ export async function generate(configPath: string, options?: { force?: boolean }
     files.push({ path: join(clientDir, "zod", `${table.name}.ts`), content: zodSrc });
 
     // params zod (client only)
-    const paramsZodSrc = emitParamsZod(table, graph);
+    const paramsZodSrc = emitParamsZod(table, graph, { maxLimit });
     files.push({ path: join(clientDir, "params", `${table.name}.ts`), content: paramsZodSrc });
 
     // routes (based on selected framework)
@@ -219,6 +220,7 @@ export async function generate(configPath: string, options?: { force?: boolean }
         authStrategy: getAuthStrategy(normalizedAuth),
         useJsExtensions: cfg.useJsExtensions,
         apiPathPrefix: cfg.apiPathPrefix || "/v1",
+        maxLimit,
       });
     } else {
       // For future framework support (express, fastify, etc.)
@@ -238,7 +240,8 @@ export async function generate(configPath: string, options?: { force?: boolean }
         exposeHardDelete,
         useJsExtensions: cfg.useJsExtensionsClient,
         includeMethodsDepth: cfg.includeMethodsDepth ?? 2,
-        skipJunctionTables: cfg.skipJunctionTables ?? true
+        skipJunctionTables: cfg.skipJunctionTables ?? true,
+        maxLimit,
       }, model),
     });
   }

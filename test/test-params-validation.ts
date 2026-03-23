@@ -26,14 +26,24 @@ try {
   console.log("❌ Failed:", e);
 }
 
-// Test 2: Invalid limit (too large)
-console.log("\n2. Testing invalid limit (> 1000):");
+// Test 2: Invalid limit (exceeds configured maxLimit)
+console.log("\n2. Testing invalid limit (exceeds maxLimit):");
 const invalidLimit = { limit: 2000 };
 try {
   AuthorsListParamsSchema.parse(invalidLimit);
   console.log("❌ Should have failed with large limit");
 } catch (e: any) {
   console.log("✅ Correctly rejected large limit:", e.errors?.[0]?.message || e.message);
+}
+
+// Test 2b: Invalid limit (negative)
+console.log("\n2b. Testing invalid limit (negative):");
+const negativeLimit = { limit: -1 };
+try {
+  AuthorsListParamsSchema.parse(negativeLimit);
+  console.log("❌ Should have failed with negative limit");
+} catch (e: any) {
+  console.log("✅ Correctly rejected negative limit:", e.errors?.[0]?.message || e.message);
 }
 
 // Test 3: Invalid order direction

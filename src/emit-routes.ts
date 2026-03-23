@@ -27,7 +27,7 @@ function isVectorType(pgType: string): boolean {
 export function emitRoutes(
   table: Table,
   _graph: Graph,
-  opts: { softDeleteColumn: string | null; includeMethodsDepth: number; authStrategy?: string }
+  opts: { softDeleteColumn: string | null; includeMethodsDepth: number; authStrategy?: string; maxLimit: number }
 ) {
   const fileTableName = table.name; // SQL table name for file/route
   const Type = pascal(table.name); // PascalCase for type/schemas
@@ -94,7 +94,7 @@ const log = {
 const listSchema = z.object({
   where: z.any().optional(),           // TODO: typed where clause in later pass
   include: z.any().optional(),         // TODO: typed include spec in later pass
-  limit: z.number().int().positive().max(1000).optional(),
+  limit: z.number().int().positive()${opts.maxLimit > 0 ? `.max(${opts.maxLimit})` : ""}.optional(),
   offset: z.number().int().min(0).optional(),
   orderBy: z.any().optional(),         // TODO: typed orderBy in a later pass${hasVectorColumns ? `,
   vector: z.object({
@@ -166,7 +166,7 @@ ${hasAuth ? `
         log.debug("LIST ${fileTableName} invalid:", issues);
         return c.json({ error: "Invalid body", issues }, 400);
       }
-      const { include, limit = 50, offset = 0 } = body.data;
+      const { include, limit, offset = 0 } = body.data;
 
       const where = ${softDel ? `\`WHERE "${softDel}" IS NULL\`` : `""`};
 
@@ -176,11 +176,22 @@ ${hasAuth ? `
       const countResult = await deps.pg.query(countText);
       const total = parseInt(countResult.rows[0].count, 10);
 
-      const text = \`SELECT * FROM "${fileTableName}" \${where} LIMIT $1 OFFSET $2\`;
-      log.debug("LIST ${fileTableName} SQL:", text, "params:", [limit, offset]);
-      const { rows } = await deps.pg.query(text, [limit, offset]);
+      let text: string;
+      let queryParams: any[];
+      if (limit !== undefined) {
+        text = \`SELECT * FROM "${fileTableName}" \${where} LIMIT $1 OFFSET $2\`;
+        queryParams = [limit, offset];
+      } else if (offset > 0) {
+        text = \`SELECT * FROM "${fileTableName}" \${where} OFFSET $1\`;
+        queryParams = [offset];
+      } else {
+        text = \`SELECT * FROM "${fileTableName}" \${where}\`;
+        queryParams = [];
+      }
+      log.debug("LIST ${fileTableName} SQL:", text, "params:", queryParams);
+      const { rows } = await deps.pg.query(text, queryParams);
 
-      const hasMore = offset + limit < total;
+      const hasMore = limit !== undefined ? offset + limit < total : false;
 
       if (!include) {
         log.debug("LIST ${fileTableName} rows:", rows.length, "total:", total);

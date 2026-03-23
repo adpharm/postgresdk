@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- feat: List operations no longer apply a default limit — omitting `limit` now returns all matching records
+  - Previously, `limit` defaulted to 50; now omitting it skips the SQL `LIMIT` clause entirely
+  - `limit` field in list response metadata is now optional (absent when no limit was specified)
+  - `hasMore` returns `false` when no limit is set (all records are returned)
+- feat: New `maxLimit` config option controls the maximum allowed `limit` value (default: 1000, set to 0 to disable)
+  - Applies to Zod validation schemas across client params, route params, and shared pagination schema
+  - Configurable per-project in `postgresdk.config.ts`
+
 ## [v0.19.3] - 2026-03-22
 
 - fix: Nullable belongs-to relationships now correctly typed as `T | null` in generated SDK

@@ -635,7 +635,7 @@ export async function listRecords(
   }
 ): Promise<{ data?: any; total?: number; limit?: number; offset?: number; hasMore?: boolean; error?: string; issues?: any; needsIncludes?: boolean; includeSpec?: any; status: number }> {
   try {
-    const { where: whereClause, limit = 50, offset = 0, include, orderBy, order, vector, trigram, distinctOn, includeSoftDeleted } = params;
+    const { where: whereClause, limit, offset = 0, include, orderBy, order, vector, trigram, distinctOn, includeSoftDeleted } = params;
 
     // DISTINCT ON support
     const distinctCols: string[] | null = distinctOn ? (Array.isArray(distinctOn) ? distinctOn : [distinctOn]) : null;
@@ -771,10 +771,22 @@ export async function listRecords(
       orderBySQL = buildOrderBySQL(userOrderCols, userDirs);
     }
 
-    // Add limit and offset params
-    const limitParam = \`$\${paramIndex}\`;
-    const offsetParam = \`$\${paramIndex + 1}\`;
-    const allParams = [...queryParams, ...whereParams, limit, offset];
+    // Add limit and offset params (conditional — omit LIMIT clause when limit is undefined)
+    let limitOffsetSQL: string;
+    let allParams: any[];
+    if (limit !== undefined) {
+      const limitParam = \`$\${paramIndex}\`;
+      const offsetParam = \`$\${paramIndex + 1}\`;
+      limitOffsetSQL = \`LIMIT \${limitParam} OFFSET \${offsetParam}\`;
+      allParams = [...queryParams, ...whereParams, limit, offset];
+    } else if (offset > 0) {
+      const offsetParam = \`$\${paramIndex}\`;
+      limitOffsetSQL = \`OFFSET \${offsetParam}\`;
+      allParams = [...queryParams, ...whereParams, offset];
+    } else {
+      limitOffsetSQL = '';
+      allParams = [...queryParams, ...whereParams];
+    }
 
     // Get total count for pagination
     const countText = distinctCols
@@ -790,9 +802,9 @@ export async function listRecords(
       // Inner query: DISTINCT ON with only the distinctCols ORDER BY prefix (PG requirement).
       // Outer query: free ORDER BY from the user's full orderBy list, plus LIMIT/OFFSET.
       const innerQuery = \`SELECT DISTINCT ON (\${_distinctOnColsSQL}) \${baseColumns} FROM "\${ctx.table}" \${whereSQL} ORDER BY \${_distinctOnColsSQL}\`;
-      text = \`SELECT * FROM (\${innerQuery}) __distinct \${orderBySQL} LIMIT \${limitParam} OFFSET \${offsetParam}\`;
+      text = \`SELECT * FROM (\${innerQuery}) __distinct \${orderBySQL} \${limitOffsetSQL}\`.trim();
     } else {
-      text = \`SELECT \${selectClause} FROM "\${ctx.table}" \${whereSQL} \${orderBySQL} LIMIT \${limitParam} OFFSET \${offsetParam}\`;
+      text = \`SELECT \${selectClause} FROM "\${ctx.table}" \${whereSQL} \${orderBySQL} \${limitOffsetSQL}\`.trim();
     }
     log.debug(\`LIST \${ctx.table} SQL:\`, text, "params:", allParams);
 
@@ -800,7 +812,7 @@ export async function listRecords(
     const parsedRows = parseVectorColumns(rows, ctx.vectorColumns);
 
     // Calculate hasMore
-    const hasMore = offset + limit < total;
+    const hasMore = limit !== undefined ? offset + limit < total : false;
 
     const metadata = {
       data: parsedRows,

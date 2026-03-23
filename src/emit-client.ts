@@ -49,6 +49,7 @@ export function emitClient(
     useJsExtensions?: boolean;
     includeMethodsDepth?: number;
     skipJunctionTables?: boolean;
+    maxLimit: number;
   },
   model?: Model
 ) {
@@ -689,7 +690,7 @@ ${hasJsonbColumns ? `  /**
    * @param params.where - Filter conditions using operators like $eq, $gt, $in, $like, etc.
    * @param params.orderBy - Column(s) to sort by
    * @param params.order - Sort direction(s): "asc" or "desc"
-   * @param params.limit - Maximum number of records to return (default: 50, max: 1000)
+   * @param params.limit - Maximum number of records to return${opts.maxLimit > 0 ? ` (max: ${opts.maxLimit})` : ""}. Omit to return all matching records.
    * @param params.offset - Number of records to skip for pagination
    * @param params.include - Related records to include (return type automatically infers included relations)
    * @returns Paginated results with all fields (and included relations if specified)
@@ -789,7 +790,7 @@ ${hasJsonbColumns ? `  /**
    * @param params.where - Filter conditions using operators like $eq, $gt, $in, $like, etc.
    * @param params.orderBy - Column(s) to sort by
    * @param params.order - Sort direction(s): "asc" or "desc"
-   * @param params.limit - Maximum number of records to return (default: 50, max: 1000)
+   * @param params.limit - Maximum number of records to return${opts.maxLimit > 0 ? ` (max: ${opts.maxLimit})` : ""}. Omit to return all matching records.
    * @param params.offset - Number of records to skip for pagination
    * @param params.include - Related records to include (return type automatically infers included relations)
    * @returns Paginated results with all fields (and included relations if specified)

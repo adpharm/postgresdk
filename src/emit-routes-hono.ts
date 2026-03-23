@@ -9,7 +9,7 @@ import { pascal, isVectorType, isJsonbType } from "./utils";
 export function emitHonoRoutes(
   table: Table,
   _graph: Graph,
-  opts: { softDeleteColumn: string | null; exposeHardDelete: boolean; includeMethodsDepth: number; authStrategy?: string; useJsExtensions?: boolean; apiPathPrefix: string }
+  opts: { softDeleteColumn: string | null; exposeHardDelete: boolean; includeMethodsDepth: number; authStrategy?: string; useJsExtensions?: boolean; apiPathPrefix: string; maxLimit: number }
 ) {
   const fileTableName = table.name;
   const Type = pascal(table.name);
@@ -89,7 +89,7 @@ const listSchema = z.object({
   include: z.any().optional(),
   select: z.array(z.string()).min(1).optional(),
   exclude: z.array(z.string()).min(1).optional(),
-  limit: z.number().int().positive().max(1000).optional(),
+  limit: z.number().int().positive()${opts.maxLimit > 0 ? `.max(${opts.maxLimit})` : ""}.optional(),
   offset: z.number().int().min(0).optional(),
   orderBy: z.union([columnEnum, z.array(columnEnum)]).optional(),
   order: z.union([z.enum(["asc", "desc"]), z.array(z.enum(["asc", "desc"]))]).optional(),

@@ -132,7 +132,7 @@ beforeAll(async () => {
   const graph = { inbound: {}, outbound: {} };
   writeFileSync(
     `${OUTPUT_DIR}/client/jsonb_test.ts`,
-    emitClient(testTable, graph, { includeMethodsDepth: 2 }, model)
+    emitClient(testTable, graph, { includeMethodsDepth: 2, maxLimit: 1000 }, model)
   );
 
   // Generate index

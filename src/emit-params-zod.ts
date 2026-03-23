@@ -2,7 +2,7 @@ import type { Table } from "./introspect";
 import type { Graph } from "./rel-classify";
 import { pascal } from "./utils";
 
-export function emitParamsZod(table: Table, graph: Graph) {
+export function emitParamsZod(table: Table, graph: Graph, opts: { maxLimit: number }) {
   const Type = pascal(table.name);
   
   // Get column names for orderBy validation
@@ -35,7 +35,7 @@ export const ${Type}PkSchema = ${pkSchema};
 // Schema for list query parameters
 export const ${Type}ListParamsSchema = z.object({
   include: ${includeSpecSchema}.optional(),
-  limit: z.number().int().positive().max(1000).optional(),
+  limit: z.number().int().positive()${opts.maxLimit > 0 ? `.max(${opts.maxLimit})` : ""}.optional(),
   offset: z.number().int().nonnegative().optional(),
   where: z.any().optional(),
   vector: VectorSearchParamsSchema.optional(),
