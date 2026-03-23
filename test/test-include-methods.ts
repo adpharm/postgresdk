@@ -72,9 +72,9 @@ async function main() {
   const booksWithAuthorResult = await sdk.books.listWithAuthor();
   console.log(`   ✓ Found ${booksWithAuthorResult.data.length} books`);
   for (const book of booksWithAuthorResult.data) {
-    console.log(`   ✓ "${book.title}" by ${book.author.name}`);
-    // TypeScript knows book.author exists and is of type SelectAuthors
-    const authorName: string = book.author.name;
+    console.log(`   ✓ "${book.title}" by ${book.author!.name}`);
+    // TypeScript knows book.author may be null when FK is nullable; here we know it's set
+    const authorName: string = book.author!.name;
   }
 
   // Test listWithTags
@@ -92,14 +92,14 @@ async function main() {
   const booksWithBothResult = await sdk.books.listWithAuthorAndTags();
   console.log(`   ✓ Found ${booksWithBothResult.data.length} books`);
   for (const book of booksWithBothResult.data) {
-    console.log(`   ✓ "${book.title}" by ${book.author.name} [${book.tags.map((t: any) => t.name).join(", ")}]`);
+    console.log(`   ✓ "${book.title}" by ${book.author!.name} [${book.tags.map((t: any) => t.name).join(", ")}]`);
   }
 
   // Test getByPkWithAuthor
   console.log("\n4. Testing books.getByPkWithAuthor():");
   const singleBook = await sdk.books.getByPkWithAuthor(book1.rows[0].id);
   if (singleBook) {
-    console.log(`   ✓ Got "${singleBook.title}" by ${singleBook.author.name}`);
+    console.log(`   ✓ Got "${singleBook.title}" by ${singleBook.author!.name}`);
   }
 
   // Test getByPkWithTags

@@ -124,7 +124,7 @@ test("getByPkWith* methods return the correct record", async () => {
     expect(secondBook).not.toBeNull();
     expect(secondBook!.id).toBe(book2.rows[0].id);
     expect(secondBook!.title).toBe("Second Book");
-    expect(secondBook!.author.name).toBe("Author Two");
+    expect(secondBook!.author!.name).toBe("Author Two");
     
     // Test 2: Get THIRD book with tags (not first)
     const thirdBook = await sdk.books.getByPkWithTags(book3.rows[0].id);
@@ -138,7 +138,7 @@ test("getByPkWith* methods return the correct record", async () => {
     expect(firstBook).not.toBeNull();
     expect(firstBook!.id).toBe(book1.rows[0].id);
     expect(firstBook!.title).toBe("First Book");
-    expect(firstBook!.author.name).toBe("Author One");
+    expect(firstBook!.author!.name).toBe("Author One");
     
     // Test 4: Get author with books - verify correct author
     const secondAuthor = await sdk.authors.getByPkWithBooks(author2.rows[0].id);
