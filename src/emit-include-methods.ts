@@ -65,7 +65,8 @@ function buildReturnType(
     
     if (i === 0) {
       // First level
-      parts.push(`${key}: ${isMany[i] ? `${targetType}[]` : targetType}`);
+      const edgeNull = !isMany[i] && graph[baseTable]?.[key]?.nullable ? " | null" : "";
+      parts.push(`${key}: ${isMany[i] ? `${targetType}[]` : `${targetType}${edgeNull}`}`);
     } else {
       // Nested levels - need to build the nested structure
       let nestedType = targetType;
@@ -75,14 +76,27 @@ function buildReturnType(
           const nestedTarget = targets[j];
           if (!nestedKey || !nestedTarget) continue;
           const nestedTargetType = `Select${pascal(nestedTarget)}`;
-          nestedType = `${nestedType} & { ${nestedKey}: ${isMany[j] ? `${nestedTargetType}[]` : nestedTargetType} }`;
+          const nestedSource = targets[j - 1]!;
+          const nestedNull = !isMany[j] && graph[nestedSource]?.[nestedKey]?.nullable ? " | null" : "";
+          nestedType = `${nestedType} & { ${nestedKey}: ${isMany[j] ? `${nestedTargetType}[]` : `${nestedTargetType}${nestedNull}`} }`;
         }
       }
       // Update the previous part
       const prevKey = path[i-1];
       const prevTarget = targets[i-1];
       if (prevKey && prevTarget) {
-        parts[parts.length - 1] = `${prevKey}: ${isMany[i-1] ? `(Select${pascal(prevTarget)} & { ${key}: ${isMany[i] ? `${targetType}[]` : targetType} })[]` : `Select${pascal(prevTarget)} & { ${key}: ${isMany[i] ? `${targetType}[]` : targetType} }`}`;
+        const prevSource = i - 1 === 0 ? baseTable : targets[i - 2]!;
+        const innerNull = !isMany[i] && graph[prevTarget]?.[key]?.nullable ? " | null" : "";
+        const prevNullable = !isMany[i-1] && graph[prevSource]?.[prevKey]?.nullable;
+        const inner = isMany[i] ? `${targetType}[]` : `${targetType}${innerNull}`;
+        const composite = `Select${pascal(prevTarget)} & { ${key}: ${inner} }`;
+        if (isMany[i-1]) {
+          parts[parts.length - 1] = `${prevKey}: (${composite})[]`;
+        } else if (prevNullable) {
+          parts[parts.length - 1] = `${prevKey}: (${composite}) | null`;
+        } else {
+          parts[parts.length - 1] = `${prevKey}: ${composite}`;
+        }
       }
       break; // We've handled the rest
     }
@@ -227,8 +241,10 @@ export function generateIncludeMethods(
             
             const combinedPath = [key1, key2];
             const combinedSuffix = `With${pascal(key1)}And${pascal(key2)}`;
-            const type1 = `${key1}: ${edge1.kind === "many" ? `Select${pascal(edge1.target)}[]` : `Select${pascal(edge1.target)}`}`;
-            const type2 = `${key2}: ${edge2.kind === "many" ? `Select${pascal(edge2.target)}[]` : `Select${pascal(edge2.target)}`}`;
+            const null1 = edge1.kind === "one" && edge1.nullable ? " | null" : "";
+            const null2 = edge2.kind === "one" && edge2.nullable ? " | null" : "";
+            const type1 = `${key1}: ${edge1.kind === "many" ? `Select${pascal(edge1.target)}[]` : `Select${pascal(edge1.target)}${null1}`}`;
+            const type2 = `${key2}: ${edge2.kind === "many" ? `Select${pascal(edge2.target)}[]` : `Select${pascal(edge2.target)}${null2}`}`;
             const combinedBaseType = `Select${pascal(baseTableName)} & { ${type1}; ${type2} }`;
             const combinedTypeName = `Select${pascal(baseTableName)}${combinedSuffix}`;
 

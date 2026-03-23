@@ -67,11 +67,12 @@ export function emitIncludeResolver(graph: Graph, useJsExtensions?: boolean): st
           : Select${targetType}[]
       )`;
       } else {
-        // 1:1 relation - returns single object
+        // 1:1 relation - returns single object (nullable when FK column is nullable)
+        const nullSuffix = edge.nullable ? " | null" : "";
         out += `(
         TInclude[K] extends { include: infer U extends ${targetType}IncludeSpec }
-          ? ${targetType}WithIncludes<U>
-          : Select${targetType}
+          ? ${targetType}WithIncludes<U>${nullSuffix}
+          : Select${targetType}${nullSuffix}
       )`;
       }
 

@@ -6,6 +6,8 @@ export type Edge = {
   kind: "one" | "many";
   target: string;
   via?: string;
+  /** True when the FK column(s) are nullable (belongs-to may return null). */
+  nullable?: boolean;
 };
 
 export type Graph = Record<string, Record<string, Edge>>;
@@ -34,7 +36,13 @@ export function buildGraph(model: Model): Graph {
       const downKey = plural(child.name);
 
       if (!(upKey in childNode)) {
-        childNode[upKey] = { from: child.name, key: upKey, kind: "one", target: parent.name };
+        const fkNullable = fk.from.some(colName =>
+          child.columns.find(c => c.name === colName)?.nullable
+        );
+        childNode[upKey] = {
+          from: child.name, key: upKey, kind: "one", target: parent.name,
+          ...(fkNullable && { nullable: true }),
+        };
       }
       if (!(downKey in parentNode)) {
         parentNode[downKey] = { from: parent.name, key: downKey, kind: "many", target: child.name };
