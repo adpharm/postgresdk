@@ -13,7 +13,7 @@ export function emitZod(table: Table, opts: { numericMode: "string" | "number" |
       return `z.enum([${values}])`;
     }
 
-    if (t === "uuid") return `z.string()`;
+    if (t === "uuid") return `z.string().uuid()`;
     if (t === "bool" || t === "boolean") return `z.boolean()`;
     if (t === "int2" || t === "int4" || t === "int8") {
       if (opts.numericMode === "number") return `z.number().int()`;

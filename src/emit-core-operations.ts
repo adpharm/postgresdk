@@ -32,6 +32,18 @@ const log = {
 };
 
 /**
+ * Checks if a Postgres error is a client input error (invalid syntax, out of range, etc.)
+ * PG error class 22 = "data exception" — covers invalid input syntax for uuid, int, json, etc.
+ * PG error code 23502 = "not_null_violation", 23505 = "unique_violation", 23503 = "foreign_key_violation"
+ */
+function pgErrorStatus(e: any): number {
+  const code = e?.code;
+  if (typeof code === "string" && code.startsWith("22")) return 400;
+  if (code === "23502" || code === "23505" || code === "23503") return 409;
+  return 500;
+}
+
+/**
  * Builds SQL column list from select/exclude parameters
  * @param select - Columns to include (mutually exclusive with exclude)
  * @param exclude - Columns to exclude (mutually exclusive with select)
@@ -131,22 +143,13 @@ export async function createRecord(
 
     return { data: parsedRows[0] ?? null, status: parsedRows[0] ? 201 : 500 };
   } catch (e: any) {
-    // Enhanced logging for JSON validation errors
-    const errorMsg = e?.message ?? "";
-    const isJsonError = errorMsg.includes("invalid input syntax for type json");
-
-    if (isJsonError) {
-      log.error(\`POST \${ctx.table} - Invalid JSON input detected!\`);
-      log.error("Input data that caused error:", JSON.stringify(data, null, 2));
-      log.error("PostgreSQL error:", errorMsg);
-    } else {
-      log.error(\`POST \${ctx.table} error:\`, e?.stack ?? e);
-    }
+    const status = pgErrorStatus(e);
+    log.error(\`POST \${ctx.table} error:\`, e?.stack ?? e);
 
     return {
       error: e?.message ?? "Internal error",
       ...(DEBUG ? { stack: e?.stack } : {}),
-      status: 500
+      status
     };
   }
 }
@@ -221,22 +224,12 @@ export async function upsertRecord(
 
     return { data: parsedRows[0], status: 200 };
   } catch (e: any) {
-    const errorMsg = e?.message ?? "";
-    const isJsonError = errorMsg.includes("invalid input syntax for type json");
-    if (isJsonError) {
-      log.error(\`UPSERT \${ctx.table} - Invalid JSON input detected!\`);
-      log.error("Input args that caused error:", JSON.stringify(args, null, 2));
-      log.error("Filtered update data (sent to DB):", JSON.stringify(Object.fromEntries(
-        Object.entries(args.update).filter(([k]) => !ctx.pkColumns.includes(k))
-      ), null, 2));
-      log.error("PostgreSQL error:", errorMsg);
-    } else {
-      log.error(\`UPSERT \${ctx.table} error:\`, e?.stack ?? e);
-    }
+    const status = pgErrorStatus(e);
+    log.error(\`UPSERT \${ctx.table} error:\`, e?.stack ?? e);
     return {
       error: e?.message ?? "Internal error",
       ...(DEBUG ? { stack: e?.stack } : {}),
-      status: 500
+      status
     };
   }
 }
@@ -269,11 +262,12 @@ export async function getByPk(
 
     return { data: parsedRows[0], status: 200 };
   } catch (e: any) {
+    const status = pgErrorStatus(e);
     log.error(\`GET \${ctx.table} error:\`, e?.stack ?? e);
-    return { 
-      error: e?.message ?? "Internal error", 
+    return {
+      error: e?.message ?? "Internal error",
       ...(DEBUG ? { stack: e?.stack } : {}),
-      status: 500 
+      status
     };
   }
 }
@@ -822,22 +816,13 @@ export async function listRecords(
     log.debug(\`LIST \${ctx.table} result: \${rows.length} rows, \${total} total, hasMore=\${hasMore}\`);
     return metadata;
   } catch (e: any) {
-    // Enhanced logging for JSON validation errors
-    const errorMsg = e?.message ?? "";
-    const isJsonError = errorMsg.includes("invalid input syntax for type json");
-
-    if (isJsonError) {
-      log.error(\`LIST \${ctx.table} - Invalid JSON input detected in query!\`);
-      log.error("WHERE clause:", JSON.stringify(params.where, null, 2));
-      log.error("PostgreSQL error:", errorMsg);
-    } else {
-      log.error(\`LIST \${ctx.table} error:\`, e?.stack ?? e);
-    }
+    const status = pgErrorStatus(e);
+    log.error(\`LIST \${ctx.table} error:\`, e?.stack ?? e);
 
     return {
       error: e?.message ?? "Internal error",
       ...(DEBUG ? { stack: e?.stack } : {}),
-      status: 500
+      status
     };
   }
 }
@@ -889,25 +874,13 @@ export async function updateRecord(
 
     return { data: parsedRows[0], status: 200 };
   } catch (e: any) {
-    // Enhanced logging for JSON validation errors
-    const errorMsg = e?.message ?? "";
-    const isJsonError = errorMsg.includes("invalid input syntax for type json");
-
-    if (isJsonError) {
-      log.error(\`PATCH \${ctx.table} - Invalid JSON input detected!\`);
-      log.error("Input data that caused error:", JSON.stringify(updateData, null, 2));
-      log.error("Filtered data (sent to DB):", JSON.stringify(Object.fromEntries(
-        Object.entries(updateData).filter(([k]) => !ctx.pkColumns.includes(k))
-      ), null, 2));
-      log.error("PostgreSQL error:", errorMsg);
-    } else {
-      log.error(\`PATCH \${ctx.table} error:\`, e?.stack ?? e);
-    }
+    const status = pgErrorStatus(e);
+    log.error(\`PATCH \${ctx.table} error:\`, e?.stack ?? e);
 
     return {
       error: e?.message ?? "Internal error",
       ...(DEBUG ? { stack: e?.stack } : {}),
-      status: 500
+      status
     };
   }
 }
@@ -942,11 +915,12 @@ export async function deleteRecord(
 
     return { data: parsedRows[0], status: 200 };
   } catch (e: any) {
+    const status = pgErrorStatus(e);
     log.error(\`DELETE \${ctx.table} error:\`, e?.stack ?? e);
     return {
       error: e?.message ?? "Internal error",
       ...(DEBUG ? { stack: e?.stack } : {}),
-      status: 500
+      status
     };
   }
 }

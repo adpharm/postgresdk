@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- fix: Generated API now returns proper HTTP status codes for database errors instead of always returning 500
+  - PG data-exception errors (invalid UUID, bad JSON, out-of-range values) return 400
+  - Constraint violations (not-null, unique, foreign-key) return 409
+  - Removes redundant per-operation JSON error logging in favor of a single `pgErrorStatus` helper
+- fix: UUID columns now validate format via `z.string().uuid()` instead of bare `z.string()`
+
 ## [v0.19.1] - 2026-03-21
 
 - feat: Align transaction delete descriptors with soft/hard delete config
