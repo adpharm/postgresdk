@@ -37,6 +37,7 @@ Commands:
   init                 Create a postgresdk.config.ts file
   generate, gen        Generate SDK from database
   pull                 Pull SDK from API endpoint
+  install-skill        Install Claude Code skill for PostgreSDK
   version              Show version
   help                 Show help
 
@@ -54,6 +55,9 @@ Pull Options:
   --force, -y          Delete stale files without prompting
   -c, --config <path>  Path to config file with pull settings
 
+Install-skill Options:
+  --force, -y          Overwrite existing skill
+
 Examples:
   postgresdk init                        # Create config file
   postgresdk generate                    # Generate using postgresdk.config.ts
@@ -61,6 +65,7 @@ Examples:
   postgresdk generate -c custom.config.ts
   postgresdk pull --from=https://api.com --output=./src/sdk
   postgresdk pull                        # Pull using config file
+  postgresdk install-skill               # Install Claude Code skill
 `);
   process.exit(0);
 }
@@ -94,6 +99,12 @@ else if (command === "generate" || command === "gen") {
 else if (command === "pull") {
   const { pullCommand } = await import("./cli-pull");
   await pullCommand(args.slice(1));
+}
+
+// Handle install-skill command
+else if (command === "install-skill") {
+  const { installSkillCommand } = await import("./cli-install-skill");
+  await installSkillCommand(args.slice(1));
 }
 
 // Unknown command

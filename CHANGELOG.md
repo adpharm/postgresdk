@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- feat: New `install-skill` CLI command bundles a Claude Code skill for PostgreSDK
+  - Run `postgresdk install-skill` to copy the skill into `.claude/skills/postgresdk/SKILL.md`
+  - Claude Code will then use the skill to assist with generated API and SDK usage
+  - Supports `--force` flag to overwrite an existing skill
+
 ## [v0.19.4] - 2026-03-23
 
 - feat: List operations no longer apply a default limit — omitting `limit` now returns all matching records

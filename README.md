@@ -1063,12 +1063,13 @@ Commands:
   init                 Create a postgresdk.config.ts file
   generate             Generate SDK from database
   pull                 Pull SDK from API endpoint
+  install-skill        Install Claude Code skill for PostgreSDK
   version              Show version
   help                 Show help
 
 Options:
   -c, --config <path>  Path to config file (default: postgresdk.config.ts)
-  --force, -y          Delete stale files without prompting (generate & pull)
+  --force, -y          Delete stale files without prompting (generate & pull); overwrite existing skill (install-skill)
 
 Init subcommands/flags:
   init pull            Generate pull-only config (alias for --sdk)
@@ -1084,6 +1085,7 @@ Examples:
   npx postgresdk@latest generate --force                  # Skip stale file prompts
   npx postgresdk@latest pull --from=https://api.com --output=./src/sdk
   npx postgresdk@latest pull --from=https://api.com --output=./src/sdk --force
+  npx postgresdk@latest install-skill                      # Install Claude Code skill
 ```
 
 ### Generated Tests
