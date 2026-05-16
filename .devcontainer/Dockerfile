@@ -1,7 +1,7 @@
 ###############################################################################
-# Claude dev-container layer – Ubuntu 22.04 “Jammy” base image                #
+# Claude dev-container layer – Ubuntu 24.04 “Noble” base image                #
 ###############################################################################
-FROM mcr.microsoft.com/devcontainers/base:jammy
+FROM mcr.microsoft.com/devcontainers/base:noble
 
 # ── Environment ──────────────────────────────────────────────────────────────
 ARG TZ
@@ -17,7 +17,7 @@ USER root
 # 1. Extra OS packages the base image + features don't provide
 RUN apt-get update -y && \
     apt-get install -y --no-install-recommends \
-      iptables ipset iproute2 dnsutils aggregate jq less man-db procps
+      iptables ipset iproute2 dnsutils aggregate jq less man-db procps erofs-utils
 
 # 2. Persist shell history across sessions
 RUN install -d -m 0755 /commandhistory && \

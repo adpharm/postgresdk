@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Browser `fetch` requires `Window`/`globalThis` as `this`; previously it received the `BaseClient` instance and rejected the call
   - Applies to both the default `fetch` and any caller-supplied fetch implementation
   - Added regression test (`test-base-client-fetch-receiver`) covering both code paths
+- chore: Upgrade devcontainer base image from Ubuntu 22.04 (Jammy) to 24.04 (Noble)
+  - Adds `erofs-utils` to installed OS packages
 
 ## [v0.19.5] - 2026-04-06
 
