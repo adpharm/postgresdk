@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [v0.19.6] - 2026-05-16
 
 - fix: Generated `BaseClient` no longer throws "Illegal invocation" when calling browser `fetch`
   - Constructor now rebinds `fetchFn` so calls like `this.fetchFn(...)` don't pass the client instance as the receiver
