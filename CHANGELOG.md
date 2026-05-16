@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- fix: Generated `BaseClient` no longer throws "Illegal invocation" when calling browser `fetch`
+  - Constructor now rebinds `fetchFn` so calls like `this.fetchFn(...)` don't pass the client instance as the receiver
+  - Browser `fetch` requires `Window`/`globalThis` as `this`; previously it received the `BaseClient` instance and rejected the call
+  - Applies to both the default `fetch` and any caller-supplied fetch implementation
+  - Added regression test (`test-base-client-fetch-receiver`) covering both code paths
+
 ## [v0.19.5] - 2026-04-06
 
 - feat: New `install-skill` CLI command bundles a Claude Code skill for PostgreSDK

@@ -31,7 +31,13 @@ export abstract class BaseClient {
     protected baseUrl: string,
     protected fetchFn: typeof fetch = fetch,
     protected auth?: AuthConfig
-  ) {}
+  ) {
+    // Rebind so `this.fetchFn(...)` calls don't pass the client as the receiver.
+    // Browser `fetch` requires `window`/`globalThis` as `this` and throws
+    // "Illegal invocation" otherwise. Covers both the default and any caller-supplied fetch.
+    const f = this.fetchFn;
+    this.fetchFn = ((...args: Parameters<typeof fetch>) => f(...args)) as typeof fetch;
+  }
 
   protected async authHeaders(): Promise<HeaderMap> {
     if (!this.auth) return {};
