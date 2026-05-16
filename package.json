@@ -54,7 +54,8 @@
     "drizzle-kit": "^0.31.4",
     "drizzle-orm": "^0.44.4",
     "jose": "^6.0.12",
-    "typescript": "^5.5.0"
+    "typescript": "^5.5.0",
+    "vitest": "^4.1.6"
   },
   "author": "Ben Honda <ben@theadpharm.com>",
   "license": "MIT",
