@@ -1,0 +1,40 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash",
+      "Read",
+      "Edit",
+      "Write",
+      "WebFetch",
+      "WebSearch",
+      "Read(./.env.example)",
+      "Bash(bunx remotion *)",
+      "Edit(.claude/skills/**)",
+      "Write(.claude/skills/**)",
+      "Skill"
+    ],
+    "deny": [
+      "Bash(task push)",
+      "Bash(task push *)",
+      "Bash(task db:push)",
+      "Bash(task db-push *)",
+      "Bash(bunx drizzle-kit push)",
+      "Bash(bunx drizzle-kit push *)",
+      "Bash(task tfapply)",
+      "Bash(task tfapply *)",
+      "Bash(terragrunt apply)",
+      "Bash(terragrunt apply *)",
+      "Bash(terraform apply)",
+      "Bash(terraform apply *)",
+      "Bash(git stash)",
+      "Bash(git stash *)",
+      "Bash(git checkout)",
+      "Bash(git checkout *)",
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./secrets/**)",
+      "Read(node_modules/**)"
+    ],
+    "ask": ["Bash(rm *)", "Bash(rm -rf *)", "Bash(rm -rf)", "Bash(rm)"]
+  }
+}

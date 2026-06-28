@@ -1,10 +1,41 @@
 {
   "version": 1,
   "skills": {
+    "add-and-commit": {
+      "source": "git@github.com:adpharm/adpharm-skills.git",
+      "sourceType": "git",
+      "skillPath": "skills/engineering/add-and-commit/SKILL.md",
+      "computedHash": "3f4b95c8d0c16349fc71fae3e84b75e5f9564dac83eccac3875405d82fc2de85"
+    },
+    "adpharm-stack": {
+      "source": "git@github.com:adpharm/adpharm-skills.git",
+      "sourceType": "git",
+      "skillPath": "skills/engineering/adpharm-stack/SKILL.md",
+      "computedHash": "e6bd8c3e612db84aeb38a2f832e8d34ae79d57fc9f165cf7b89caac35bd8da4b"
+    },
+    "audit-code-quality": {
+      "source": "git@github.com:adpharm/adpharm-skills.git",
+      "sourceType": "git",
+      "skillPath": "skills/engineering/audit-code-quality/SKILL.md",
+      "computedHash": "11f6ab00b2ecf026542c199c3c7eb0beac5ef970863e10a0ad23af8f3bf4bd69"
+    },
     "skill-creator": {
-      "source": "anthropics/skills",
-      "sourceType": "github",
-      "computedHash": "b122f4d1e91aa1d83027e050b5b37c3156203ee85458d7b1360bc48167c9e02a"
+      "source": "git@github.com:adpharm/adpharm-skills.git",
+      "sourceType": "git",
+      "skillPath": "skills/vendor/skill-creator/SKILL.md",
+      "computedHash": "b176d15cccfec151f259779b323938e3fae9de1a39b78dbe8d0bef9f4df91840"
+    },
+    "skill-editor": {
+      "source": "git@github.com:adpharm/adpharm-skills.git",
+      "sourceType": "git",
+      "skillPath": "skills/misc/skill-editor/SKILL.md",
+      "computedHash": "57ca238d65c64e27cedb8977b8d793e65d5fbeaa1a3137908d22e4730ac4415f"
+    },
+    "typescript-advanced-types": {
+      "source": "git@github.com:adpharm/adpharm-skills.git",
+      "sourceType": "git",
+      "skillPath": "skills/vendor/typescript-advanced-types/SKILL.md",
+      "computedHash": "a87ca027f65d96d6cc471a67d39f7b0ba43618b1d88c305d3d8d9dbcb12d247d"
     }
   }
 }
