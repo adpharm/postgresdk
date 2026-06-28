@@ -1,0 +1,83 @@
+name: docs
+
+# Keeps the docs honest:
+#  - generated reference pages can't be committed stale (no-diff gate)
+#  - the site always builds (and emits llms.txt)
+#  - the documented SDK usage still typechecks against a freshly generated SDK
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  generated-and-build:
+    name: Generated pages current + site builds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - uses: arduino/setup-task@v2
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install deps
+        run: |
+          bun install
+          task docs:install
+
+      - name: Regenerate fast reference pages (CLI, config, operators)
+        run: task docs:gen
+
+      - name: Fail if generated reference pages are stale
+        run: |
+          git diff --exit-code -- docs/src/content/docs/reference/cli.md \
+            docs/src/content/docs/reference/configuration.md \
+            docs/src/content/docs/reference/filtering-operators.md \
+          || (echo "::error::Generated reference pages are out of date. Run 'task docs:gen' and commit." && exit 1)
+
+      - name: Build the docs site (emits llms.txt)
+        run: task docs:build
+
+  db-checks:
+    name: Docs usage typecheck + contract page current
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: user
+          POSTGRES_PASSWORD: pass
+          POSTGRES_DB: testdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U user"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # _fixture.ts uses this and skips Docker when it's set.
+      POSTGRESDK_DOCS_PG_URL: postgres://user:pass@localhost:5432/testdb
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - uses: arduino/setup-task@v2
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install deps
+        run: |
+          bun install
+          task docs:install
+
+      - name: Typecheck documented SDK usage against a generated SDK
+        run: task docs:check
+
+      - name: Regenerate the contract example page
+        run: task docs:gen:contract
+
+      - name: Fail if the contract example page is stale
+        run: |
+          git diff --exit-code -- docs/src/content/docs/reference/generated-api-example.md \
+          || (echo "::error::generated-api-example.md is out of date. Run 'task docs:gen:contract' and commit." && exit 1)

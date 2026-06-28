@@ -3,6 +3,8 @@ dist/
 .vercel/
 # generated types
 .astro/
+# fixture SDK generated for the docs usage typecheck (task docs:check)
+.generated/
 
 # dependencies
 node_modules/

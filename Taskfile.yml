@@ -58,6 +58,11 @@ tasks:
       - task: docs:gen
       - task: docs:gen:contract
 
+  docs:check:
+    desc: Typecheck the documented SDK usage against a freshly generated SDK (catches doc drift; needs Docker)
+    cmds:
+      - bun {{.DOCS_DIR}}/generators/check-usage.ts
+
   # ---- docs: dev / build ----
   docs:install:
     desc: Install the docs site dependencies

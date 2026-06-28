@@ -107,9 +107,14 @@ Not sure which task you need? Run `task start` for an interactive menu. Otherwis
 ```bash
 task docs:gen           # regenerate CLI, config, and operator references
 task docs:gen:contract  # regenerate the "generated API example" (needs Docker)
+task docs:check         # typecheck the documented SDK usage vs a generated SDK (needs Docker)
 task docs:dev           # run the docs site locally
 task docs:build         # build the static site (emits llms.txt)
 ```
+
+CI (`.github/workflows/docs.yml`) enforces all of this: generated pages can't be committed
+stale, the site must build, and the documented usage must still typecheck — so docs drift
+breaks the build instead of going unnoticed.
 
 ## License
 

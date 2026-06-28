@@ -15,6 +15,14 @@ project's fixture schema ([`test/schema.sql`](https://github.com/adpharm/postgre
 `pgvector` and `pg_trgm`). Use it to see exactly what tables, types, methods, and endpoints
 postgresdk emits for your own schema.
 
+:::note[Reading the examples below]
+- **Import paths are relative to the generated *client* directory** (e.g. `./client`). In the guides
+  we use the default `outDir` of `{ client: "./api/client", server: "./api/server" }`, so your
+  imports there would start `./api/client`. Adjust to wherever your `outDir` points.
+- Some feature snippets (e.g. vector search) use **placeholder table names** to illustrate the
+  shape of a call — match them to the real tables in *your* schema.
+:::
+
 ---
 
 ## API & SDK Contract

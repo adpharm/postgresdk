@@ -3,71 +3,15 @@
  * postgresdk against a fixture schema (test/schema.sql) and lifting the
  * generated CONTRACT.md. This makes the example impossible to fake or drift.
  *
- * Requires Docker. If Docker is unavailable, the generator skips (leaving the
- * previously committed page in place) so offline builds still work.
+ * Requires a fixture DB (Docker locally, or POSTGRESDK_DOCS_PG_URL in CI). If
+ * neither is available, the generator skips (leaving the committed page in place)
+ * so offline builds still work.
  */
-import { execFileSync } from "node:child_process";
-import { readFileSync, writeFileSync, mkdtempSync } from "node:fs";
+import { readFileSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { resolve, join } from "node:path";
-import { Client } from "pg";
-import { ROOT, SRC, writeReferencePage } from "./_shared";
-
-const CONTAINER = "postgresdk-test-db";
-const PG_URL = "postgres://user:pass@localhost:5432/testdb";
-const IMAGE = "pgvector/pgvector:pg17";
-
-function sh(cmd: string, args: string[]): string {
-  return execFileSync(cmd, args, { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] });
-}
-function quiet(cmd: string, args: string[]): boolean {
-  try {
-    execFileSync(cmd, args, { stdio: "ignore" });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-async function waitForPg(): Promise<void> {
-  for (let i = 0; i < 30; i++) {
-    try {
-      const pg = new Client({ connectionString: PG_URL });
-      await pg.connect();
-      await pg.query("SELECT 1");
-      await pg.end();
-      return;
-    } catch {
-      await new Promise((r) => setTimeout(r, 1000));
-    }
-  }
-  throw new Error("Postgres did not become ready in time");
-}
-
-async function ensurePostgres(): Promise<void> {
-  const running = sh("docker", ["ps", "--filter", `name=${CONTAINER}`, "--format", "{{.Names}}"]).trim();
-  if (running === CONTAINER) return;
-  const exists = sh("docker", ["ps", "-a", "--filter", `name=${CONTAINER}`, "--format", "{{.Names}}"]).trim();
-  if (exists === CONTAINER) {
-    sh("docker", ["start", CONTAINER]);
-  } else {
-    quiet("docker", ["pull", IMAGE]);
-    sh("docker", [
-      "run", "-d", "--name", CONTAINER,
-      "-e", "POSTGRES_USER=user", "-e", "POSTGRES_PASSWORD=pass", "-e", "POSTGRES_DB=testdb",
-      "-p", "5432:5432", IMAGE,
-    ]);
-  }
-  await waitForPg();
-}
-
-async function loadSchema(): Promise<void> {
-  const sql = readFileSync(resolve(ROOT, "test/schema.sql"), "utf-8");
-  const pg = new Client({ connectionString: PG_URL });
-  await pg.connect();
-  await pg.query(sql); // simple-protocol multi-statement
-  await pg.end();
-}
+import { join } from "node:path";
+import { writeReferencePage } from "./_shared";
+import { ensureFixtureDb, fixtureDbAvailable, generateFixtureSdk } from "./_fixture";
 
 /**
  * Demote ATX headings by one level (cap at h6) so the page keeps a single h1.
@@ -91,32 +35,15 @@ function demoteHeadings(md: string): string {
 }
 
 async function main() {
-  if (!quiet("docker", ["--version"])) {
-    console.warn("⚠ gen-contract: Docker not available — skipping (keeping committed page).");
+  if (!fixtureDbAvailable()) {
+    console.warn("⚠ gen-contract: no fixture DB (Docker/POSTGRESDK_DOCS_PG_URL) — skipping.");
     return;
   }
 
-  await ensurePostgres();
-  await loadSchema();
-
+  await ensureFixtureDb();
   const work = mkdtempSync(join(tmpdir(), "postgresdk-docs-"));
-  const outDir = join(work, "api");
-  const cfgPath = join(work, "postgresdk.config.ts");
-  writeFileSync(
-    cfgPath,
-    `export default {\n` +
-      `  connectionString: ${JSON.stringify(PG_URL)},\n` +
-      `  outDir: { client: ${JSON.stringify(join(outDir, "client"))}, server: ${JSON.stringify(join(outDir, "server"))} },\n` +
-      `};\n`,
-    "utf-8",
-  );
-
-  execFileSync("bun", [resolve(SRC, "cli.ts"), "gen", "-c", cfgPath, "--force"], {
-    stdio: ["ignore", "ignore", "inherit"],
-    cwd: ROOT,
-  });
-
-  const contract = readFileSync(join(outDir, "server", "CONTRACT.md"), "utf-8").trim();
+  const { server } = generateFixtureSdk(join(work, "api"));
+  const contract = readFileSync(join(server, "CONTRACT.md"), "utf-8").trim();
 
   const body = `
 This page is a **real, unedited \`CONTRACT.md\`** produced by running postgresdk against the
@@ -124,6 +51,14 @@ project's fixture schema ([\`test/schema.sql\`](https://github.com/adpharm/postg
 — a small library domain (\`authors\` → \`books\`, \`books\` ↔ \`tags\`, plus \`users\`/\`products\` with
 \`pgvector\` and \`pg_trgm\`). Use it to see exactly what tables, types, methods, and endpoints
 postgresdk emits for your own schema.
+
+:::note[Reading the examples below]
+- **Import paths are relative to the generated *client* directory** (e.g. \`./client\`). In the guides
+  we use the default \`outDir\` of \`{ client: "./api/client", server: "./api/server" }\`, so your
+  imports there would start \`./api/client\`. Adjust to wherever your \`outDir\` points.
+- Some feature snippets (e.g. vector search) use **placeholder table names** to illustrate the
+  shape of a call — match them to the real tables in *your* schema.
+:::
 
 ---
 

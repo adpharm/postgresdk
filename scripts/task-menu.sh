@@ -13,6 +13,7 @@ MENU=(
   docs:dev      # work on the docs site (auto-regenerates reference pages)
   docs:gen      # regenerate reference pages after editing src/
   docs:build    # build the static site + llms.txt
+  docs:check    # typecheck documented SDK usage (catch doc drift)
   build         # build the postgresdk lib + CLI
   test          # run the test suite
   typecheck     # typecheck the lib
