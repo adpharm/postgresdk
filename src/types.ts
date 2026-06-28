@@ -1,14 +1,23 @@
 export interface AuthConfig {
+  /** Header to read the API key from. @default "x-api-key" */
   apiKeyHeader?: string;
-  apiKeys?: string[]; // can include "env:MY_KEY_LIST"
+  /** Accepted API keys. A value may use the `"env:MY_KEY_LIST"` form to read a comma-separated list from the environment. */
+  apiKeys?: string[];
+  /** JWT (HS256) verification config. Its presence selects the JWT auth strategy. */
   jwt?: {
     services: Array<{
-      issuer: string;    // Required - identifies the service (must match JWT 'iss' claim)
-      secret: string;    // Required - MUST use "env:VAR_NAME" format (e.g., "env:JWT_SECRET")
-                         // ⚠️ SECURITY: Never use process.env.X or hardcoded strings in config!
-                         // Generator converts "env:JWT_SECRET" → process.env.JWT_SECRET in generated code
+      /** Identifies the calling service. Must match the JWT `iss` claim. */
+      issuer: string;
+      /**
+       * Signing secret. MUST use the `"env:VAR_NAME"` form (e.g. `"env:JWT_SECRET"`).
+       *
+       * SECURITY: never inline `process.env.X` or a literal secret here. The generator
+       * rewrites `"env:JWT_SECRET"` to `process.env.JWT_SECRET` in the generated code.
+       */
+      secret: string;
     }>;
-    audience?: string;    // Optional - validates 'aud' claim
+    /** When set, validates the JWT `aud` claim. */
+    audience?: string;
   };
 }
 
@@ -20,82 +29,111 @@ export function getAuthStrategy(auth: AuthConfig | undefined): "none" | "api-key
   return "none";
 }
 
-// Simplified auth syntax support
+/**
+ * Simplified auth syntax. Either a full {@link AuthConfig}, or an API-key shorthand
+ * (`{ apiKey: "..." }`) that is normalized to a full config by {@link normalizeAuthConfig}.
+ */
 export type AuthConfigInput = AuthConfig | {
-  // Shorthand for API key auth
+  /** Shorthand for a single API key. Merged into `apiKeys`. */
   apiKey?: string;
+  /** Additional accepted API keys. */
   apiKeys?: string[];
+  /** Header to read the API key from. @default "x-api-key" */
   apiKeyHeader?: string;
 }
 
 export interface DeleteConfig {
-  /** Column name for soft deletes (e.g. "deleted_at"). Absence = hard deletes only. */
+  /** Column name for soft deletes (e.g. `"deleted_at"`). Absence means hard deletes only. */
   softDeleteColumn?: string;
-  /** Whether to also expose hardDelete when soft delete is configured. @default true */
+  /** Whether to also expose `hardDelete` when soft delete is configured. @default true */
   exposeHardDelete?: boolean;
-  /** Per-table overrides. Use null to disable soft delete for a specific table. */
+  /** Per-table overrides. Use `null` to disable soft delete for a specific table. */
   softDeleteColumnOverrides?: Record<string, string | null>;
 }
 
 export interface Config {
-  // Required
+  /**
+   * Postgres connection string used to introspect the schema
+   * (e.g. `"postgres://user:pass@host:5432/db"`). Read it from an env var in real configs.
+   */
   connectionString: string;
 
-  // Optional
+  /** Postgres schema to introspect. @default "public" */
   schema?: string;
+
+  /**
+   * Where generated code is written. A single string is used for both server and client
+   * (the client SDK lands in an `sdk/` subdirectory); an object sets each separately.
+   * @default { client: "./api/client", server: "./api/server" }
+   */
   outDir?: string | { client: string; server: string };
-  /** Delete configuration (soft/hard delete behavior). */
+
+  /** Soft/hard delete behavior. */
   delete?: DeleteConfig;
-  dateType?: "date" | "string";
-  numericMode?: "string" | "number" | "auto";  // How to type numeric columns (default: "auto" - int2/int4→number, int8/numeric→string)
-  
-  // Include methods generation
-  includeMethodsDepth?: number;  // How deep to generate include methods (default: 2)
-  skipJunctionTables?: boolean;  // Skip junction tables in include methods (default: true)
-  
-  // Server framework for generated routes
+
+  /**
+   * How numeric columns are typed. `"auto"` maps `int2`/`int4` → `number`
+   * and `int8`/`numeric` → `string` (to avoid precision loss). @default "auto"
+   */
+  numericMode?: "string" | "number" | "auto";
+
+  /** How deep to generate eager-loading `include` helper methods. @default 2 */
+  includeMethodsDepth?: number;
+
+  /** Skip junction (M:N) tables when generating include methods. @default true */
+  skipJunctionTables?: boolean;
+
+  /**
+   * Server framework for the generated routes. Only `"hono"` is implemented today;
+   * `"express"`/`"fastify"` are reserved. @default "hono"
+   */
   serverFramework?: "hono" | "express" | "fastify";
 
-  // API path prefix for table routes (default: "/v1")
+  /** Path prefix for the generated table routes. @default "/v1" */
   apiPathPrefix?: string;
 
-  /** Maximum allowed value for the `limit` parameter in list operations (default: 1000). Set to 0 to disable. */
+  /** Maximum allowed value for the `limit` parameter in list operations. Set to `0` to disable the cap. @default 1000 */
   maxLimit?: number;
 
-  // Auth
+  /** API authentication. Omit for no auth. Accepts the API-key shorthand or a full {@link AuthConfig}. */
   auth?: AuthConfigInput;
 
-  // Pull token for protecting /_psdk/* endpoints (optional - if not set, endpoints are public)
-  // Use "env:VAR_NAME" syntax to read from environment variables
+  /**
+   * Token protecting the `/_psdk/*` SDK-distribution endpoints. Use the `"env:VAR_NAME"` form.
+   * If unset, those endpoints are public.
+   */
   pullToken?: string;
 
-  // Pull configuration (for client repos)
+  /** Pull configuration for client repos that consume a generated SDK over HTTP. */
   pull?: PullConfig;
-  
-  // Use .js extensions in server imports (for Vercel Edge compatibility)
+
+  /** Emit `.js` import extensions in generated server code (needed for Vercel Edge). @default false */
   useJsExtensions?: boolean;
-  
-  // Use .js extensions in client SDK imports (for specific bundlers/environments)
+
+  /** Emit `.js` import extensions in generated client SDK code (for certain bundlers/runtimes). @default false */
   useJsExtensionsClient?: boolean;
-  
-  // Delete generated files for tables/items no longer in the schema (default: true)
+
+  /** Delete generated files for tables/items no longer present in the schema. @default true */
   clean?: boolean;
 
-  // Test generation configuration
+  /** Generated test-suite configuration. */
   tests?: {
-    // Generate test files
+    /** Generate test files. @default false */
     generate?: boolean;
-    // Output directory for tests (default: "./api/tests")
+    /** Output directory for generated tests. @default "./api/tests" */
     output?: string;
-    // Test framework to use
+    /** Test framework for the generated tests. @default "vitest" */
     framework?: "vitest" | "jest" | "bun";
   };
 }
 
 export interface PullConfig {
-  from: string;           // API URL to pull from
-  output?: string;        // Output directory (default: ./src/sdk)
-  pullToken?: string;     // Auth token for /_psdk/* endpoints (use "env:VAR_NAME" syntax)
+  /** API URL to pull the SDK from. */
+  from: string;
+  /** Output directory for the pulled SDK. @default "./src/sdk" */
+  output?: string;
+  /** Auth token for the `/_psdk/*` endpoints. Use the `"env:VAR_NAME"` form. */
+  pullToken?: string;
 }
 
 // Normalize simplified auth syntax to full AuthConfig

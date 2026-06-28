@@ -93,16 +93,6 @@ export default {
   skipJunctionTables: true,
 
   /**
-   * How to handle date/timestamp columns in TypeScript
-   * - "date": Use JavaScript Date objects (better for manipulation)
-   * - "string": Use ISO 8601 strings (better for JSON serialization)
-   *
-   * This affects both server and client TypeScript types.
-   * @default "date"
-   */
-  dateType: "date",
-
-  /**
    * Server framework for generated API routes
    *
    * Currently supported:
@@ -359,7 +349,6 @@ export default {
  *   outDir: { client: "./src/generated/client", server: "./src/generated/server" },
  *   softDeleteColumn: "deleted_at",
  *   includeMethodsDepth: 2,
- *   dateType: "string",
  *   auth: {
  *     jwt: {
  *       services: [
@@ -377,7 +366,6 @@ export default {
  *   connectionString: process.env.DATABASE_URL,
  *   serverFramework: "hono",  // Hono works great on edge
  *   useJsExtensions: true,    // Required for Vercel Edge
- *   dateType: "string",       // Better for JSON serialization
  *   auth: { apiKey: process.env.API_KEY }
  * };
  *
