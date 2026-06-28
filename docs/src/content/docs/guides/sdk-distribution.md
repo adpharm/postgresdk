@@ -15,6 +15,11 @@ The generator embeds the SDK as `sdk-bundle.ts` and exposes:
 - `GET /_psdk/sdk/manifest` — lists files and metadata
 - `GET /_psdk/sdk/download` — the complete bundle
 - `GET /_psdk/sdk/files/:path` — individual files
+- `GET /_psdk/contract.md` — the API contract as Markdown
+- `GET /_psdk/contract.json` — the API contract as JSON
+
+The `contract.md` / `contract.json` endpoints are handy for agents that want the live schema
+contract straight from a running API.
 
 Protect these endpoints by setting [`pullToken`](/reference/configuration/#config) (use the
 `env:` form). If unset, they're public.
