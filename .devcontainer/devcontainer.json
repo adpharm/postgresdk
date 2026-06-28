@@ -14,10 +14,10 @@
       "version": "lts",
       "nvmVersion": "latest"
     },
-    // "ghcr.io/devcontainers/features/python:1": {
-    //   "installTools": true,
-    //   "version": "3.12"
-    // },
+    "ghcr.io/devcontainers/features/python:1": {
+      "installTools": true,
+      "version": "latest"
+    },
     // "ghcr.io/swift-server-community/swift-devcontainer-features/sqlite:1": {},
     "ghcr.io/devcontainers/features/docker-in-docker:2": {
       "moby": true,
@@ -65,12 +65,14 @@
   },
   // "remoteUser": "node",
   "mounts": [
-    "source=claude-code-bashhistory-${devcontainerId},target=/commandhistory,type=volume",
-    "source=claude-code-config-${devcontainerId},target=/home/vscode/.claude,type=volume",
+    "source=claude-code-bashhistory-postgresdk,target=/commandhistory,type=volume",
+    "source=claude-code-config-postgresdk,target=/home/vscode/.claude,type=volume",
     // Mount the host's .aws directory into the container for AWS CLI access
     "source=${localEnv:HOME}/.aws,target=/home/vscode/.aws,type=bind,consistency=cached",
     // Mount the host's ssh directory into the container for SSH access
-    "source=${localEnv:HOME}/.ssh,target=/home/vscode/.ssh,type=bind,consistency=cached"
+    "source=${localEnv:HOME}/.ssh,target=/home/vscode/.ssh,type=bind,consistency=cached",
+    // Mount the host's git identity so commit author info persists across container rebuilds
+    "source=${localEnv:HOME}/.gitconfig,target=/home/vscode/.gitconfig,type=bind,consistency=cached"
   ],
   "remoteEnv": {
     "NODE_OPTIONS": "--max-old-space-size=4096",
