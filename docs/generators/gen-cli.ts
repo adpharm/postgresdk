@@ -19,7 +19,9 @@ function parseCommands(text: string): Array<[string, string]> {
   for (let i = start + 1; i < lines.length; i++) {
     const line = lines[i]!;
     if (!line.trim()) break; // blank line ends the section
-    const m = line.match(/^\s+(\S+)\s{2,}(.+?)\s*$/);
+    // Name is everything up to the 2-space gap (so multi-word names like
+    // "generate, gen" are captured, not truncated at the first space).
+    const m = line.match(/^\s+(.+?)\s{2,}(.+?)\s*$/);
     if (m) rows.push([m[1]!, m[2]!]);
   }
   return rows;

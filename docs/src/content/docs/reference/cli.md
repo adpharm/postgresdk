@@ -18,6 +18,7 @@ typed Hono API server and TypeScript client SDK. Run it with `bunx postgresdk@la
 | Command | Description |
 | --- | --- |
 | `init` | Create a postgresdk.config.ts file |
+| `generate, gen` | Generate SDK from database |
 | `pull` | Pull SDK from API endpoint |
 | `version` | Show version |
 | `help` | Show help |
