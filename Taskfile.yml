@@ -1,0 +1,86 @@
+version: "3"
+
+# Root Taskfile. Per our conventions, run everything through `task` so env vars,
+# auth, and working directories are handled consistently.
+#
+# Docs live in ./docs (Astro Starlight). Reference pages are generated from
+# postgresdk's own source (see docs/generators) so the docs can't drift.
+
+vars:
+  DOCS_DIR: docs
+
+tasks:
+  default:
+    desc: List available tasks
+    cmds:
+      - task --list
+    silent: true
+
+  start:
+    desc: Interactive menu — pick a task to run (no need to memorize them)
+    interactive: true
+    silent: true
+    cmds:
+      - bash scripts/task-menu.sh
+
+  # ---- postgresdk library ----
+  build:
+    desc: Build the postgresdk library + CLI to dist/
+    cmds:
+      - bun run build
+
+  test:
+    desc: Run the postgresdk test suite
+    cmds:
+      - bun test
+
+  typecheck:
+    desc: Typecheck the postgresdk library
+    cmds:
+      - bun run typecheck
+
+  # ---- docs: generators (code is the source of truth) ----
+  docs:gen:
+    desc: Regenerate the fast reference pages (CLI, config, operators) — no Docker needed
+    cmds:
+      - bun {{.DOCS_DIR}}/generators/gen-cli.ts
+      - bun {{.DOCS_DIR}}/generators/gen-config.ts
+      - bun {{.DOCS_DIR}}/generators/gen-operators.ts
+
+  docs:gen:contract:
+    desc: Regenerate the "generated API example" page (runs postgresdk against test/schema.sql; needs Docker)
+    cmds:
+      - bun {{.DOCS_DIR}}/generators/gen-contract.ts
+
+  docs:gen:all:
+    desc: Regenerate every reference page (fast pages + contract example)
+    cmds:
+      - task: docs:gen
+      - task: docs:gen:contract
+
+  # ---- docs: dev / build ----
+  docs:install:
+    desc: Install the docs site dependencies
+    dir: "{{.DOCS_DIR}}"
+    cmds:
+      - bun install
+
+  docs:dev:
+    desc: Run the docs dev server (regenerates fast pages first)
+    deps: [docs:gen]
+    dir: "{{.DOCS_DIR}}"
+    cmds:
+      - bun run dev
+
+  docs:build:
+    desc: Regenerate fast pages then build the static docs site (emits llms.txt)
+    deps: [docs:gen]
+    dir: "{{.DOCS_DIR}}"
+    cmds:
+      - bun run build
+
+  docs:preview:
+    desc: Preview the built docs site locally
+    dir: "{{.DOCS_DIR}}"
+    cmds:
+      - bun run preview

@@ -29,6 +29,7 @@
   },
   "exclude": [
     "node_modules",
+    "docs",
     "test/.jsonb-types-test",
     "test/.jsonb-sdk-test",
     "test/.jsonb-arrays-test",

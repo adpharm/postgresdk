@@ -1,0 +1,51 @@
+---
+title: postgresdk
+description: Generate a typed Hono API server and TypeScript client SDK from a Postgres schema.
+template: splash
+hero:
+  tagline: Point it at a Postgres schema. Get a fully typed Hono API server and TypeScript client SDK — includes, Zod, transactions, vector & trigram search, soft-delete, and auth.
+  actions:
+    - text: Get started
+      link: /getting-started/quick-start/
+      icon: right-arrow
+      variant: primary
+    - text: View on GitHub
+      link: https://github.com/adpharm/postgresdk
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid } from "@astrojs/starlight/components";
+
+## What it is
+
+`postgresdk` is a CLI + library that **introspects your PostgreSQL schema** and generates two things:
+
+- A **Hono API server** — typed routes, Zod validation, auth middleware, soft/hard delete, vector & trigram search.
+- A **TypeScript client SDK** — typed CRUD, eager-loading `include`s, atomic transactions, type-safe `where` filtering, and pagination.
+
+Regenerate any time your schema changes. No hand-written glue, no drift.
+
+<CardGrid stagger>
+  <Card title="Code is the source of truth" icon="setting">
+    The reference docs are **generated from postgresdk's own source** — the CLI, the `Config` type, and the WHERE operators — so they can't go stale.
+  </Card>
+  <Card title="Built for agents" icon="open-book">
+    Every page is available as plain Markdown, plus [`/llms.txt`](/llms.txt), [`/llms-full.txt`](/llms-full.txt), and [`/llms-small.txt`](/llms-small.txt) for downstream agents to read verbatim.
+  </Card>
+  <Card title="See real output" icon="document">
+    The [Generated API example](/reference/generated-api-example/) is a real `CONTRACT.md` produced by running postgresdk against a fixture schema.
+  </Card>
+  <Card title="Typed end to end" icon="approve-check">
+    Nested includes infer their own return types. `where` operators reject the wrong column types at compile time.
+  </Card>
+</CardGrid>
+
+## For LLMs & agent skills
+
+This site is designed to be consumed by agents that build skills on top of postgresdk. The
+[llms.txt](https://llmstxt.org/) files are generated at build time:
+
+- [`/llms.txt`](/llms.txt) — index + project summary
+- [`/llms-full.txt`](/llms-full.txt) — the entire docs as one file
+- [`/llms-small.txt`](/llms-small.txt) — a trimmed bundle for smaller context windows

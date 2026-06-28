@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- docs: Add an Astro Starlight docs site under `docs/` whose CLI/config/operator/contract reference pages are generated from source; trim README to point at <https://docs.postgresdk.com>
+- chore: Add a root `Taskfile.yml` (build/test/typecheck/docs tasks) with an interactive `task start` menu
 - refactor: Remove the `install-skill` CLI command and the bundled PostgreSDK skill (`skills/postgresdk/SKILL.md`); drop `skills` from the published package `files`
 - refactor: Remove the `dateType` config option (date/timestamp columns no longer toggle between `Date` and `string`)
 - refactor: JSDoc every `Config`/`AuthConfig` option so the generated configuration reference reads from source
