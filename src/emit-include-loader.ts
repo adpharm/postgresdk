@@ -28,6 +28,13 @@ export function emitIncludeLoader(model: Model, maxDepth: number, opts: EmitIncl
     fkIndex[t.name] = t.fks.map((f) => ({ from: f.from, toTable: f.toTable, to: f.to }));
   }
 
+  // table -> list of valid column names, baked in at code-gen time. Used as a
+  // SQL-injection allowlist for `orderBy` (identifiers can't be parameterized).
+  const columnsByTable: Record<string, string[]> = {};
+  for (const t of Object.values(model.tables)) {
+    columnsByTable[t.name] = t.columns.map((c) => c.name);
+  }
+
   const ext = useJsExtensions ? ".js" : "";
 
   return `/**
@@ -69,6 +76,39 @@ const PKS: Record<string, string[]> = ${JSON.stringify(
     null,
     2
   )};
+/**
+ * Valid column names per table, baked in at generation time. Used as a strict
+ * allowlist so a caller-supplied \`orderBy\` can never be interpolated into SQL
+ * unless it is a real column of the target table. SQL identifiers cannot be
+ * bound as parameters, so allowlisting is the correct defense here.
+ */
+const COLUMNS: Record<string, string[]> = ${JSON.stringify(columnsByTable, null, 2)};
+
+/**
+ * Validate a caller-supplied \`orderBy\` against the target table's real columns
+ * and return a safely-quoted SQL identifier (optionally aliased). Throws on any
+ * unknown column, closing the include-spec SQL-injection vector.
+ */
+function safeOrderByIdent(table: string, orderBy: string, alias?: string): string {
+  const cols = COLUMNS[table];
+  if (!cols || !cols.includes(orderBy)) {
+    throw new Error(\`Invalid orderBy column "\${orderBy}" for table "\${table}"\`);
+  }
+  return alias ? \`\${alias}."\${orderBy}"\` : \`"\${orderBy}"\`;
+}
+
+/**
+ * Coerce a caller-supplied limit/offset to a safe non-negative integer before it
+ * is interpolated into SQL. Rejects non-integers and negatives so nothing but a
+ * plain number can ever reach the query text.
+ */
+function safeInt(value: unknown, label: string): number {
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isInteger(n) || n < 0) {
+    throw new Error(\`Invalid \${label} "\${String(value)}": expected a non-negative integer\`);
+  }
+  return n;
+}
 /** Soft-delete column per table, null if not applicable. Baked in at generation time. */
 const SOFT_DELETE_COLS: Record<string, string | null> = ${JSON.stringify(softDeleteCols, null, 2)};
 
@@ -397,12 +437,12 @@ export async function loadIncludes(
     // If limit/offset are needed, use window functions to limit per parent
     if (options.limit !== undefined || options.offset !== undefined) {
       const orderByClause = options.orderBy
-        ? \`ORDER BY "\${options.orderBy}" \${options.order === 'desc' ? 'DESC' : 'ASC'}\`
+        ? \`ORDER BY \${safeOrderByIdent(target, options.orderBy)} \${options.order === 'desc' ? 'DESC' : 'ASC'}\`
         : 'ORDER BY (SELECT NULL)';
 
       const partitionCols = fk.from.map((c: string) => \`"\${c}"\`).join(', ');
-      const offset = options.offset ?? 0;
-      const limit = options.limit ?? NO_LIMIT;
+      const offset = options.offset !== undefined ? safeInt(options.offset, "offset") : 0;
+      const limit = options.limit !== undefined ? safeInt(options.limit, "limit") : NO_LIMIT;
 
       sql = \`
         SELECT * FROM (
@@ -414,7 +454,7 @@ export async function loadIncludes(
       \`;
     } else if (options.orderBy) {
       // Just ORDER BY without limit/offset
-      sql += \` ORDER BY "\${options.orderBy}" \${options.order === 'desc' ? 'DESC' : 'ASC'}\`;
+      sql += \` ORDER BY \${safeOrderByIdent(target, options.orderBy)} \${options.order === 'desc' ? 'DESC' : 'ASC'}\`;
     }
 
     log.debug("oneToMany SQL", { curr, target, key, sql, paramsCount: params.length, options });
@@ -452,12 +492,12 @@ export async function loadIncludes(
     // If we have limit/offset/orderBy, use a JOIN with window functions
     if (options.limit !== undefined || options.offset !== undefined || options.orderBy) {
       const orderByClause = options.orderBy
-        ? \`ORDER BY t."\${options.orderBy}" \${options.order === 'desc' ? 'DESC' : 'ASC'}\`
+        ? \`ORDER BY \${safeOrderByIdent(target, options.orderBy, "t")} \${options.order === 'desc' ? 'DESC' : 'ASC'}\`
         : 'ORDER BY (SELECT NULL)';
 
       const partitionCols = toCurr.from.map((c: string) => \`j."\${c}"\`).join(', ');
-      const offset = options.offset ?? 0;
-      const limit = options.limit ?? NO_LIMIT;
+      const offset = options.offset !== undefined ? safeInt(options.offset, "offset") : 0;
+      const limit = options.limit !== undefined ? safeInt(options.limit, "limit") : NO_LIMIT;
 
       const targetPkCols = pkOf(target);
       const joinConditions = toTarget.from.map((jCol: string, i: number) => {

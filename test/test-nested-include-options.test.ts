@@ -452,3 +452,106 @@ test("multi-level nesting with options (authors → books → tags)", async () =
     await pg.end();
   }
 });
+
+// --- Security: the nested include `orderBy`/`limit`/`offset` are caller-supplied
+// (the route validates the include spec as z.any()) and are interpolated into raw
+// SQL by the include loader. These assert the generated allowlist/coercion rejects
+// injection payloads BEFORE they reach the database, on both the 1:N and M:N sinks.
+test("nested orderBy injection is rejected on 1:N relation (authors → books)", async () => {
+  const pg = new Client({ connectionString: "postgres://user:pass@localhost:5432/testdb" });
+  await pg.connect();
+
+  try {
+    await pg.query("DELETE FROM book_tags");
+    await pg.query("DELETE FROM books");
+    await pg.query("DELETE FROM authors");
+
+    const author = await pg.query("INSERT INTO authors (name) VALUES ('Victim') RETURNING *");
+    await pg.query("INSERT INTO books (title, author_id) VALUES ('Book 1', $1)", [author.rows[0].id]);
+
+    const { registerAuthorsRoutes } = await import("./.results/server/routes/authors");
+    const { registerBooksRoutes } = await import("./.results/server/routes/books");
+    const app = new Hono();
+    registerAuthorsRoutes(app, { pg });
+    registerBooksRoutes(app, { pg });
+    const server = serve({ fetch: app.fetch, port: 3470 });
+
+    const sdk = new SDK({ baseUrl: "http://localhost:3470" });
+
+    // Break out of the quoted identifier and drop the table. Unguarded, node-postgres'
+    // simple protocol would run the trailing `DROP TABLE` as a second statement. The
+    // allowlist throws inside the loader; the loader's per-relation catch then omits
+    // the relation, so the request resolves but the injected SQL never executes.
+    const payload = 'title" DESC; DROP TABLE books; --';
+    const injected = await sdk.authors.list({ include: { books: { orderBy: payload } } });
+    expect((injected.data[0] as AuthorWithBooks).books ?? []).toHaveLength(0);
+
+    // Same for a plausible-but-unknown column (no quote-breakout needed).
+    const badCol = await sdk.authors.list({ include: { books: { orderBy: "not_a_real_column" } } });
+    expect((badCol.data[0] as AuthorWithBooks).books ?? []).toHaveLength(0);
+
+    // The load-bearing assertion: nothing executed — the table is still intact. If the
+    // payload had run, this SELECT would error (table dropped) and fail the test.
+    const stillThere = await pg.query("SELECT COUNT(*)::int AS n FROM books");
+    expect(stillThere.rows[0].n).toBe(1);
+
+    // A legit column must still work through the same path.
+    const ok = await sdk.authors.list({ include: { books: { orderBy: "title" } } });
+    expect((ok.data[0] as AuthorWithBooks).books).toHaveLength(1);
+
+    server.close();
+  } finally {
+    await pg.end();
+  }
+});
+
+test("nested orderBy injection is rejected on M:N relation (books → tags)", async () => {
+  const pg = new Client({ connectionString: "postgres://user:pass@localhost:5432/testdb" });
+  await pg.connect();
+
+  try {
+    await pg.query("DELETE FROM book_tags");
+    await pg.query("DELETE FROM books");
+    await pg.query("DELETE FROM tags");
+    await pg.query("DELETE FROM authors");
+
+    const author = await pg.query("INSERT INTO authors (name) VALUES ('Author') RETURNING *");
+    const book = await pg.query("INSERT INTO books (title, author_id) VALUES ('Book', $1) RETURNING *", [author.rows[0].id]);
+    const tag = await pg.query("INSERT INTO tags (name) VALUES ('Tag') RETURNING *");
+    await pg.query("INSERT INTO book_tags (book_id, tag_id) VALUES ($1, $2)", [book.rows[0].id, tag.rows[0].id]);
+
+    const { registerBooksRoutes } = await import("./.results/server/routes/books");
+    const { registerTagsRoutes } = await import("./.results/server/routes/tags");
+    const { registerBookTagsRoutes } = await import("./.results/server/routes/book_tags");
+    const app = new Hono();
+    registerBooksRoutes(app, { pg });
+    registerTagsRoutes(app, { pg });
+    registerBookTagsRoutes(app, { pg });
+    const server = serve({ fetch: app.fetch, port: 3471 });
+
+    const sdk = new SDK({ baseUrl: "http://localhost:3471" });
+
+    // The M:N sink aliases the identifier as t."...", so the payload targets that form.
+    const payload = 'name" DESC; DROP TABLE tags; --';
+    const injected = await sdk.books.list({ include: { tags: { orderBy: payload } } });
+    expect((injected.data[0] as BookWithTags).tags ?? []).toHaveLength(0);
+
+    // A non-integer limit is rejected by safeInt rather than interpolated raw.
+    const badLimit = await sdk.books.list({
+      include: { tags: { limit: "1); DROP TABLE tags; --" as unknown as number } },
+    });
+    expect((badLimit.data[0] as BookWithTags).tags ?? []).toHaveLength(0);
+
+    // Nothing executed — the tags table is intact.
+    const stillThere = await pg.query("SELECT COUNT(*)::int AS n FROM tags");
+    expect(stillThere.rows[0].n).toBe(1);
+
+    // Legit orderBy + limit still work through the same path.
+    const ok = await sdk.books.list({ include: { tags: { orderBy: "name", limit: 5 } } });
+    expect((ok.data[0] as BookWithTags).tags).toHaveLength(1);
+
+    server.close();
+  } finally {
+    await pg.end();
+  }
+});
