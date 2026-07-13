@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [v0.19.7] - 2026-07-13
 
 - fix: Generated include loader allowlists nested `orderBy` columns and coerces `limit`/`offset` to non-negative integers, closing a SQL-injection vector in the include spec
 - docs: Add an Astro Starlight docs site under `docs/` whose CLI/config/operator/contract reference pages are generated from source; trim README to point at <https://docs.postgresdk.com>
