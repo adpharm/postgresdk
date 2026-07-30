@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - fix: `emitSdkContract` documents list as `POST /<prefix>/<table>/list` and honours `apiPathPrefix` instead of hardcoding `GET /v1/<table>`
 - test: Add `test:contract-routes` — diffs `CONTRACT.md` endpoints against the routes `emitHonoRoutes` actually registers
+- chore(docs): Docs generators build their SDK from a dedicated `postgresdk_docs_fixture` database, recreated per run, so scratch tables left by `bun test` can't leak into the generated API example page
 
 ## [v0.19.8] - 2026-07-30
 

@@ -8,6 +8,12 @@
  *   and Docker is never touched.
  * - Otherwise a local Docker container (pgvector/pgvector:pg17) is started, matching
  *   the test harness.
+ *
+ * Isolation: that server is shared with `bun test`, whose suites create their own
+ * scratch tables (sd_post, enum fixtures, …) and leave them behind. Introspecting it
+ * directly would leak those into the generated docs — output that differs per machine
+ * and fails CI's no-diff gate. So we always (re)create a dedicated database containing
+ * exactly test/schema.sql, and generate from that.
  */
 import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
@@ -18,12 +24,24 @@ import { ROOT, SRC } from "./_shared";
 const CONTAINER = "postgresdk-test-db";
 const IMAGE = "pgvector/pgvector:pg17";
 const DEFAULT_URL = "postgres://user:pass@localhost:5432/testdb";
+/** Database the docs fixture owns outright — dropped and recreated on every run. */
+const FIXTURE_DB = "postgresdk_docs_fixture";
 
-/** Connection string for the fixture DB (env override wins). */
-export const PG_URL = process.env.POSTGRESDK_DOCS_PG_URL ?? DEFAULT_URL;
+/** Connection string for the Postgres *server* (env override wins). Used for admin work. */
+const ADMIN_URL = process.env.POSTGRESDK_DOCS_PG_URL ?? DEFAULT_URL;
+
+/** Connection string for the docs fixture database itself — what the SDK is generated from. */
+export const PG_URL = withDatabase(ADMIN_URL, FIXTURE_DB);
 
 /** True when an external DB is provided and we should not manage Docker. */
 const externalDb = Boolean(process.env.POSTGRESDK_DOCS_PG_URL);
+
+/** Swap the database name on a Postgres connection string, preserving credentials/host/params. */
+function withDatabase(url: string, database: string): string {
+  const u = new URL(url);
+  u.pathname = `/${database}`;
+  return u.toString();
+}
 
 function sh(cmd: string, args: string[]): string {
   return execFileSync(cmd, args, { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] });
@@ -45,7 +63,7 @@ export function fixtureDbAvailable(): boolean {
 async function waitForPg(): Promise<void> {
   for (let i = 0; i < 30; i++) {
     try {
-      const pg = new Client({ connectionString: PG_URL });
+      const pg = new Client({ connectionString: ADMIN_URL });
       await pg.connect();
       await pg.query("SELECT 1");
       await pg.end();
@@ -75,15 +93,27 @@ async function ensureDockerPostgres(): Promise<void> {
   await waitForPg();
 }
 
-/** Ensure the fixture DB is up and loaded with test/schema.sql. */
+/**
+ * Ensure the fixture DB exists and contains exactly test/schema.sql.
+ *
+ * The database is dropped and recreated every run, so generated docs depend only on
+ * test/schema.sql — never on whatever the test suite last left in the shared server.
+ */
 export async function ensureFixtureDb(): Promise<void> {
   if (!externalDb) await ensureDockerPostgres();
   else await waitForPg();
 
+  const admin = new Client({ connectionString: ADMIN_URL });
+  await admin.connect();
+  // FORCE terminates any lingering sessions (e.g. an interrupted earlier run).
+  await admin.query(`DROP DATABASE IF EXISTS ${FIXTURE_DB} WITH (FORCE)`);
+  await admin.query(`CREATE DATABASE ${FIXTURE_DB}`);
+  await admin.end();
+
   const sql = readFileSync(resolve(ROOT, "test/schema.sql"), "utf-8");
   const pg = new Client({ connectionString: PG_URL });
   await pg.connect();
-  await pg.query(sql); // simple-protocol multi-statement; schema.sql is re-runnable
+  await pg.query(sql); // simple-protocol multi-statement
   await pg.end();
 }
 
