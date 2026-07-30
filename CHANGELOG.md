@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [v0.19.8] - 2026-07-30
 
 - fix: Re-export `Config`, `AuthConfig`, `AuthConfigInput`, `DeleteConfig`, `PullConfig` from the package entry point so `satisfies Config` works in consumer configs
 - test: Add `test:public-types` — builds the `.d.ts` files, links the package into a throwaway consumer, and typechecks the docs-prescribed config against the `exports` map
