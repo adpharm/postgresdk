@@ -35,6 +35,14 @@ import { confirmAndDeleteStaleFiles } from "./cli-utils";
 import type { Config } from "./types";
 import { normalizeAuthConfig, getAuthStrategy } from "./types";
 
+/**
+ * Public config surface. Consumers annotate `postgresdk.config.ts` with
+ * `satisfies Config`, so these must be reachable from the package entry point —
+ * the `exports` map only exposes ".", so deep imports into `dist/` are blocked.
+ * Covered by `test/test-public-types.ts`.
+ */
+export type { Config, AuthConfig, AuthConfigInput, DeleteConfig, PullConfig } from "./types";
+
 /** Resolves the effective soft delete column for a given table, respecting per-table overrides. */
 export function resolveSoftDeleteColumn(cfg: Pick<Config, "delete">, tableName: string): string | null {
   const del = cfg.delete;
