@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 2026-07-30
+
+- fix: `emitSdkContract` documents list as `POST /<prefix>/<table>/list` and honours `apiPathPrefix` instead of hardcoding `GET /v1/<table>`
+- test: Add `test:contract-routes` — diffs `CONTRACT.md` endpoints against the routes `emitHonoRoutes` actually registers
+
 ## [v0.19.8] - 2026-07-30
 
 - fix: Re-export `Config`, `AuthConfig`, `AuthConfigInput`, `DeleteConfig`, `PullConfig` from the package entry point so `satisfies Config` works in consumer configs

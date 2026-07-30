@@ -159,7 +159,7 @@ Access via: `sdk.authors`
 **list**
 - Signature: `list(params?: ListParams): Promise<PaginatedResponse<Authors>>`
 - List authors with filtering, sorting, and pagination. Returns paginated results with metadata.
-- API: `GET /v1/authors`
+- API: `POST /v1/authors/list`
 
 ```typescript
 const result = await sdk.authors.list({
@@ -246,8 +246,9 @@ const deleted = await sdk.authors.hardDelete('id');
 
 ##### API Endpoints
 
-- `GET /v1/authors`
-  - List all authors records with pagination metadata
+- `POST /v1/authors/list`
+  - List authors records with filtering, sorting, and pagination metadata
+  - Request: `ListParams`
   - Response: `PaginatedResponse<Authors>`
 - `GET /v1/authors/:id`
   - Get authors by ID
@@ -286,7 +287,7 @@ Access via: `sdk.book_tags`
 **list**
 - Signature: `list(params?: ListParams): Promise<PaginatedResponse<BookTags>>`
 - List book_tags with filtering, sorting, and pagination. Returns paginated results with metadata.
-- API: `GET /v1/book_tags`
+- API: `POST /v1/book_tags/list`
 
 ```typescript
 const result = await sdk.book_tags.list({
@@ -312,8 +313,9 @@ const created = await sdk.book_tags.create({
 
 ##### API Endpoints
 
-- `GET /v1/book_tags`
-  - List all book_tags records with pagination metadata
+- `POST /v1/book_tags/list`
+  - List book_tags records with filtering, sorting, and pagination metadata
+  - Request: `ListParams`
   - Response: `PaginatedResponse<BookTags>`
 - `POST /v1/book_tags`
   - Create new book_tags
@@ -338,7 +340,7 @@ Access via: `sdk.books`
 **list**
 - Signature: `list(params?: ListParams): Promise<PaginatedResponse<Books>>`
 - List books with filtering, sorting, and pagination. Returns paginated results with metadata.
-- API: `GET /v1/books`
+- API: `POST /v1/books/list`
 
 ```typescript
 const result = await sdk.books.list({
@@ -439,8 +441,9 @@ const deleted = await sdk.books.hardDelete('id');
 
 ##### API Endpoints
 
-- `GET /v1/books`
-  - List all books records with pagination metadata
+- `POST /v1/books/list`
+  - List books records with filtering, sorting, and pagination metadata
+  - Request: `ListParams`
   - Response: `PaginatedResponse<Books>`
 - `GET /v1/books/:id`
   - Get books by ID
@@ -480,7 +483,7 @@ Access via: `sdk.products`
 **list**
 - Signature: `list(params?: ListParams): Promise<PaginatedResponse<Products>>`
 - List products with filtering, sorting, and pagination. Returns paginated results with metadata.
-- API: `GET /v1/products`
+- API: `POST /v1/products/list`
 
 ```typescript
 const result = await sdk.products.list({
@@ -553,8 +556,9 @@ const deleted = await sdk.products.hardDelete('id');
 
 ##### API Endpoints
 
-- `GET /v1/products`
-  - List all products records with pagination metadata
+- `POST /v1/products/list`
+  - List products records with filtering, sorting, and pagination metadata
+  - Request: `ListParams`
   - Response: `PaginatedResponse<Products>`
 - `GET /v1/products/:id`
   - Get products by ID
@@ -585,6 +589,250 @@ const deleted = await sdk.products.hardDelete('id');
 | tags | object | `JsonValue | null` |  | tags |
 | settings | object | `JsonValue | null` |  | settings |
 
+#### SdComment
+
+Resource for sd_comment operations
+
+##### SDK Methods
+
+Access via: `sdk.sd_comment`
+
+**list**
+- Signature: `list(params?: ListParams): Promise<PaginatedResponse<SdComment>>`
+- List sd_comment with filtering, sorting, and pagination. Returns paginated results with metadata.
+- API: `POST /v1/sd_comment/list`
+
+```typescript
+const result = await sdk.sd_comment.list({
+  where: { id: { $ilike: '%value%' } },
+  orderBy: 'id',
+  order: 'desc',
+  limit: 20,
+  offset: 0
+}); // result.data, result.total, result.hasMore
+```
+
+**getByPk**
+- Signature: `getByPk(id: string): Promise<SdComment | null>`
+- Get a single sd_comment by primary key
+- API: `GET /v1/sd_comment/:id`
+
+```typescript
+const item = await sdk.sd_comment.getByPk('id'); // null if not found
+```
+
+**create**
+- Signature: `create(data: InsertSdComment): Promise<SdComment>`
+- Create a new sd_comment
+- API: `POST /v1/sd_comment`
+
+```typescript
+const created = await sdk.sd_comment.create({
+    body: 'example value',
+  post_id: 'related-id-123',
+  deleted_at: '2024-01-01T00:00:00Z'
+});
+```
+
+**update**
+- Signature: `update(id: string, data: UpdateSdComment): Promise<SdComment>`
+- Update an existing sd_comment
+- API: `PATCH /v1/sd_comment/:id`
+
+```typescript
+const updated = await sdk.sd_comment.update('id', {
+    body: 'example value',
+  post_id: 'related-id-123'
+});
+```
+
+**upsert**
+- Signature: `upsert(args: { where: UpdateSdComment; create: InsertSdComment; update: UpdateSdComment }): Promise<SdComment>`
+- Insert or update a sd_comment based on a conflict target. The 'where' keys define the unique conflict columns (must be a unique constraint). 'create' is used if no conflict; 'update' is applied if a conflict occurs.
+- API: `POST /v1/sd_comment/upsert`
+
+```typescript
+const result = await sdk.sd_comment.upsert({
+  where: { id: 'some-id' },
+  create: {   body: 'example value',
+  post_id: 'related-id-123',
+  deleted_at: '2024-01-01T00:00:00Z' },
+  update: {   body: 'example value',
+  post_id: 'related-id-123' },
+});
+```
+
+**hardDelete**
+- Signature: `hardDelete(id: string): Promise<SdComment>`
+- Permanently delete a sd_comment
+- API: `DELETE /v1/sd_comment/:id`
+
+```typescript
+const deleted = await sdk.sd_comment.hardDelete('id');
+```
+
+**listWithSdPost**
+- Signature: `listWithSdPost(params?: ListParams): PaginatedResponse<SelectSdComment & { sd_post: SelectSdPost | null }>`
+- Get sd_comment with included sd_post data
+- API: `POST /v1/sd_comment/list`
+
+**getByPkWithSdPost**
+- Signature: `getByPkWithSdPost(id: string): SelectSdComment & { sd_post: SelectSdPost | null } | null`
+- Get sd_comment with included sd_post data
+- API: `POST /v1/sd_comment/list`
+
+##### API Endpoints
+
+- `POST /v1/sd_comment/list`
+  - List sd_comment records with filtering, sorting, and pagination metadata
+  - Request: `ListParams`
+  - Response: `PaginatedResponse<SdComment>`
+- `GET /v1/sd_comment/:id`
+  - Get sd_comment by ID
+  - Response: `SdComment`
+- `POST /v1/sd_comment`
+  - Create new sd_comment
+  - Request: `InsertSdComment`
+  - Response: `SdComment`
+- `PATCH /v1/sd_comment/:id`
+  - Update sd_comment
+  - Request: `UpdateSdComment`
+  - Response: `SdComment`
+- `POST /v1/sd_comment/upsert`
+  - Upsert sd_comment — insert if no conflict on 'where' columns, update otherwise
+  - Request: `{ where: UpdateSdComment; create: InsertSdComment; update: UpdateSdComment }`
+  - Response: `SdComment`
+- `DELETE /v1/sd_comment/:id`
+  - Delete sd_comment
+  - Response: `SdComment`
+
+##### Fields
+
+| Field | Type | TypeScript | Required | Description |
+|-------|------|------------|----------|-------------|
+| id | number | `number` |  | Primary key |
+| body | string | `string | null` |  | body |
+| post_id | number | `number | null` |  | Foreign key to post → sd_post |
+| deleted_at | date/datetime | `string | null` |  | Soft delete timestamp |
+
+#### SdPost
+
+Resource for sd_post operations
+
+##### SDK Methods
+
+Access via: `sdk.sd_post`
+
+**list**
+- Signature: `list(params?: ListParams): Promise<PaginatedResponse<SdPost>>`
+- List sd_post with filtering, sorting, and pagination. Returns paginated results with metadata.
+- API: `POST /v1/sd_post/list`
+
+```typescript
+const result = await sdk.sd_post.list({
+  where: { id: { $ilike: '%value%' } },
+  orderBy: 'id',
+  order: 'desc',
+  limit: 20,
+  offset: 0
+}); // result.data, result.total, result.hasMore
+```
+
+**getByPk**
+- Signature: `getByPk(id: string): Promise<SdPost | null>`
+- Get a single sd_post by primary key
+- API: `GET /v1/sd_post/:id`
+
+```typescript
+const item = await sdk.sd_post.getByPk('id'); // null if not found
+```
+
+**create**
+- Signature: `create(data: InsertSdPost): Promise<SdPost>`
+- Create a new sd_post
+- API: `POST /v1/sd_post`
+
+```typescript
+const created = await sdk.sd_post.create({
+    title: 'Example Title'
+});
+```
+
+**update**
+- Signature: `update(id: string, data: UpdateSdPost): Promise<SdPost>`
+- Update an existing sd_post
+- API: `PATCH /v1/sd_post/:id`
+
+```typescript
+const updated = await sdk.sd_post.update('id', {
+    title: 'Example Title'
+});
+```
+
+**upsert**
+- Signature: `upsert(args: { where: UpdateSdPost; create: InsertSdPost; update: UpdateSdPost }): Promise<SdPost>`
+- Insert or update a sd_post based on a conflict target. The 'where' keys define the unique conflict columns (must be a unique constraint). 'create' is used if no conflict; 'update' is applied if a conflict occurs.
+- API: `POST /v1/sd_post/upsert`
+
+```typescript
+const result = await sdk.sd_post.upsert({
+  where: { id: 'some-id' },
+  create: {   title: 'Example Title' },
+  update: {   title: 'Example Title' },
+});
+```
+
+**hardDelete**
+- Signature: `hardDelete(id: string): Promise<SdPost>`
+- Permanently delete a sd_post
+- API: `DELETE /v1/sd_post/:id`
+
+```typescript
+const deleted = await sdk.sd_post.hardDelete('id');
+```
+
+**listWithSdComments**
+- Signature: `listWithSdComments(params?: ListParams): PaginatedResponse<SelectSdPost & { sd_comments: SelectSdComment[] }>`
+- Get sd_post with included sd_comments data
+- API: `POST /v1/sd_post/list`
+
+**getByPkWithSdComments**
+- Signature: `getByPkWithSdComments(id: string): SelectSdPost & { sd_comments: SelectSdComment[] } | null`
+- Get sd_post with included sd_comments data
+- API: `POST /v1/sd_post/list`
+
+##### API Endpoints
+
+- `POST /v1/sd_post/list`
+  - List sd_post records with filtering, sorting, and pagination metadata
+  - Request: `ListParams`
+  - Response: `PaginatedResponse<SdPost>`
+- `GET /v1/sd_post/:id`
+  - Get sd_post by ID
+  - Response: `SdPost`
+- `POST /v1/sd_post`
+  - Create new sd_post
+  - Request: `InsertSdPost`
+  - Response: `SdPost`
+- `PATCH /v1/sd_post/:id`
+  - Update sd_post
+  - Request: `UpdateSdPost`
+  - Response: `SdPost`
+- `POST /v1/sd_post/upsert`
+  - Upsert sd_post — insert if no conflict on 'where' columns, update otherwise
+  - Request: `{ where: UpdateSdPost; create: InsertSdPost; update: UpdateSdPost }`
+  - Response: `SdPost`
+- `DELETE /v1/sd_post/:id`
+  - Delete sd_post
+  - Response: `SdPost`
+
+##### Fields
+
+| Field | Type | TypeScript | Required | Description |
+|-------|------|------------|----------|-------------|
+| id | number | `number` |  | Primary key |
+| title | string | `string | null` |  | title |
+
 #### Tags
 
 Resource for tags operations
@@ -596,7 +844,7 @@ Access via: `sdk.tags`
 **list**
 - Signature: `list(params?: ListParams): Promise<PaginatedResponse<Tags>>`
 - List tags with filtering, sorting, and pagination. Returns paginated results with metadata.
-- API: `GET /v1/tags`
+- API: `POST /v1/tags/list`
 
 ```typescript
 const result = await sdk.tags.list({
@@ -683,8 +931,9 @@ const deleted = await sdk.tags.hardDelete('id');
 
 ##### API Endpoints
 
-- `GET /v1/tags`
-  - List all tags records with pagination metadata
+- `POST /v1/tags/list`
+  - List tags records with filtering, sorting, and pagination metadata
+  - Request: `ListParams`
   - Response: `PaginatedResponse<Tags>`
 - `GET /v1/tags/:id`
   - Get tags by ID
@@ -723,7 +972,7 @@ Access via: `sdk.users`
 **list**
 - Signature: `list(params?: ListParams): Promise<PaginatedResponse<Users>>`
 - List users with filtering, sorting, and pagination. Returns paginated results with metadata.
-- API: `GET /v1/users`
+- API: `POST /v1/users/list`
 
 ```typescript
 const result = await sdk.users.list({
@@ -796,8 +1045,9 @@ const deleted = await sdk.users.hardDelete('id');
 
 ##### API Endpoints
 
-- `GET /v1/users`
-  - List all users records with pagination metadata
+- `POST /v1/users/list`
+  - List users records with filtering, sorting, and pagination metadata
+  - Request: `ListParams`
   - Response: `PaginatedResponse<Users>`
 - `GET /v1/users/:id`
   - Get users by ID
@@ -838,7 +1088,7 @@ Access via: `sdk.video_sections`
 **list**
 - Signature: `list(params?: ListParams): Promise<PaginatedResponse<VideoSections>>`
 - List video_sections with filtering, sorting, and pagination. Returns paginated results with metadata.
-- API: `GET /v1/video_sections`
+- API: `POST /v1/video_sections/list`
 
 ```typescript
 const result = await sdk.video_sections.list({
@@ -911,8 +1161,9 @@ const deleted = await sdk.video_sections.hardDelete('id');
 
 ##### API Endpoints
 
-- `GET /v1/video_sections`
-  - List all video_sections records with pagination metadata
+- `POST /v1/video_sections/list`
+  - List video_sections records with filtering, sorting, and pagination metadata
+  - Request: `ListParams`
   - Response: `PaginatedResponse<VideoSections>`
 - `GET /v1/video_sections/:id`
   - Get video_sections by ID
@@ -955,7 +1206,7 @@ Access via: `sdk.websites`
 **list**
 - Signature: `list(params?: ListParams): Promise<PaginatedResponse<Websites>>`
 - List websites with filtering, sorting, and pagination. Returns paginated results with metadata.
-- API: `GET /v1/websites`
+- API: `POST /v1/websites/list`
 
 ```typescript
 const result = await sdk.websites.list({
@@ -1026,8 +1277,9 @@ const deleted = await sdk.websites.hardDelete('id');
 
 ##### API Endpoints
 
-- `GET /v1/websites`
-  - List all websites records with pagination metadata
+- `POST /v1/websites/list`
+  - List websites records with filtering, sorting, and pagination metadata
+  - Request: `ListParams`
   - Response: `PaginatedResponse<Websites>`
 - `GET /v1/websites/:id`
   - Get websites by ID
@@ -1061,6 +1313,7 @@ const deleted = await sdk.websites.hardDelete('id');
 - **book_tags** → **books** (many-to-one): Each book_tags belongs to one books
 - **book_tags** → **tags** (many-to-one): Each book_tags belongs to one tags
 - **books** → **authors** (many-to-one): Each books belongs to one authors
+- **sd_comment** → **sd_post** (many-to-one): Each sd_comment belongs to one sd_post
 
 ### Type Imports
 

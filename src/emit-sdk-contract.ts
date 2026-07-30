@@ -225,7 +225,8 @@ function generateSDKAuthExamples(auth?: AuthConfig): SDKAuthExample[] {
 function generateResourceWithSDK(table: Table, model: Model, graph?: Graph, config?: Config & { auth?: AuthConfig }): ResourceWithSDK {
   const Type = pascal(table.name);
   const tableName = table.name;
-  const basePath = `/v1/${tableName}`;
+  // Must track the route emitter's prefix, not a hardcoded "/v1" — see index.ts.
+  const basePath = `${config?.apiPathPrefix || "/v1"}/${tableName}`;
   const hasSinglePK = table.pk.length === 1;
   const pkField = hasSinglePK ? table.pk[0] : 'id';
   const enums = model.enums || {};
@@ -256,14 +257,16 @@ function generateResourceWithSDK(table: Table, model: Model, graph?: Graph, conf
   limit: 20,
   offset: 0${softDeleteCol ? `,\n  includeSoftDeleted: false` : ""}
 }); // result.data, result.total, result.hasMore`,
-    correspondsTo: `GET ${basePath}`
+    correspondsTo: `POST ${basePath}/list`
   });
 
+  // list is POST-with-body, not GET-with-query-params: filters like `where` are
+  // objects that don't survive a query string. See emitHonoRoutes' `listSchema`.
   endpoints.push({
-    method: "GET",
-    path: basePath,
-    description: `List all ${tableName} records with pagination metadata`,
-    queryParameters: generateQueryParams(table, enums),
+    method: "POST",
+    path: `${basePath}/list`,
+    description: `List ${tableName} records with filtering, sorting, and pagination metadata`,
+    requestBody: `ListParams`,
     responseBody: `PaginatedResponse<${Type}>`
   });
   
@@ -561,37 +564,6 @@ function generateExampleValue(column: Column): string {
     default:
       return `'example value'`;
   }
-}
-
-function generateQueryParams(table: Table, enums: Record<string, string[]>): Record<string, string> {
-  const params: Record<string, string> = {
-    limit: "number - Max records to return (omit for all)",
-    offset: "number - Records to skip",
-    orderBy: "string | string[] - Field(s) to sort by",
-    order: "'asc' | 'desc' | ('asc' | 'desc')[] - Sort direction(s)"
-  };
-
-  // Add a few example filters
-  let filterCount = 0;
-  for (const col of table.columns) {
-    if (filterCount >= 3) break; // Limit examples for readability
-
-    const type = postgresTypeToJsonType(col.pgType, enums);
-    params[col.name] = `${type} - Filter by ${col.name}`;
-
-    if (type === 'string') {
-      params[`${col.name}_like`] = `string - Search in ${col.name}`;
-    } else if (type === 'number' || type === 'date/datetime') {
-      params[`${col.name}_gt`] = `${type} - Greater than`;
-      params[`${col.name}_lt`] = `${type} - Less than`;
-    }
-
-    filterCount++;
-  }
-
-  params['...'] = "Additional filters for all fields";
-
-  return params;
 }
 
 function postgresTypeToJsonType(pgType: string, enums: Record<string, string[]>): string {
